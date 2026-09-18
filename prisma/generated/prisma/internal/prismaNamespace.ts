@@ -622,7 +622,7 @@ export const ContactsScalarFieldEnum = {
   created_at: 'created_at',
   phone: 'phone',
   email: 'email',
-  user: 'user'
+  user_id: 'user_id'
 } as const
 
 export type ContactsScalarFieldEnum = (typeof ContactsScalarFieldEnum)[keyof typeof ContactsScalarFieldEnum]

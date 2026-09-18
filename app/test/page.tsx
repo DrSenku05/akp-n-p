@@ -15,13 +15,13 @@ type UserContact = {
   middlename: null
   lastname: string
   birthdate: string
-  contacts_contacts_userTouser: [
+  contacts: [
     {
       id: number
       created_at: string
       phone: string | null
       email: string | null
-      user: number
+      user_id: number
     }
   ]
 }
@@ -91,14 +91,14 @@ function Page() {
                 <Separator className="my-3" />
 
                 <div className="flex flex-wrap gap-2">
-                  {user.contacts_contacts_userTouser[0]?.phone && (
+                  {user.contacts[0]?.phone && (
                     <Chip variant='primary' size="sm">
-                      📞 {user.contacts_contacts_userTouser[0].phone}
+                      📞 {user.contacts[0].phone}
                     </Chip>
                   )}
-                  {user.contacts_contacts_userTouser[0]?.email && (
+                  {user.contacts[0]?.email && (
                     <Chip variant='primary' size="sm">
-                      ✉️ {user.contacts_contacts_userTouser[0].email}
+                      ✉️ {user.contacts[0].email}
                     </Chip>
                   )}
                 </div>

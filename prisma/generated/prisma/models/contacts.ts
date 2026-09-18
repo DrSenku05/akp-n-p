@@ -28,12 +28,12 @@ export type AggregateContacts = {
 
 export type ContactsAvgAggregateOutputType = {
   id: number | null
-  user: number | null
+  user_id: number | null
 }
 
 export type ContactsSumAggregateOutputType = {
   id: number | null
-  user: number | null
+  user_id: number | null
 }
 
 export type ContactsMinAggregateOutputType = {
@@ -41,7 +41,7 @@ export type ContactsMinAggregateOutputType = {
   created_at: Date | null
   phone: string | null
   email: string | null
-  user: number | null
+  user_id: number | null
 }
 
 export type ContactsMaxAggregateOutputType = {
@@ -49,7 +49,7 @@ export type ContactsMaxAggregateOutputType = {
   created_at: Date | null
   phone: string | null
   email: string | null
-  user: number | null
+  user_id: number | null
 }
 
 export type ContactsCountAggregateOutputType = {
@@ -57,19 +57,19 @@ export type ContactsCountAggregateOutputType = {
   created_at: number
   phone: number
   email: number
-  user: number
+  user_id: number
   _all: number
 }
 
 
 export type ContactsAvgAggregateInputType = {
   id?: true
-  user?: true
+  user_id?: true
 }
 
 export type ContactsSumAggregateInputType = {
   id?: true
-  user?: true
+  user_id?: true
 }
 
 export type ContactsMinAggregateInputType = {
@@ -77,7 +77,7 @@ export type ContactsMinAggregateInputType = {
   created_at?: true
   phone?: true
   email?: true
-  user?: true
+  user_id?: true
 }
 
 export type ContactsMaxAggregateInputType = {
@@ -85,7 +85,7 @@ export type ContactsMaxAggregateInputType = {
   created_at?: true
   phone?: true
   email?: true
-  user?: true
+  user_id?: true
 }
 
 export type ContactsCountAggregateInputType = {
@@ -93,7 +93,7 @@ export type ContactsCountAggregateInputType = {
   created_at?: true
   phone?: true
   email?: true
-  user?: true
+  user_id?: true
   _all?: true
 }
 
@@ -188,7 +188,7 @@ export type ContactsGroupByOutputType = {
   created_at: Date
   phone: string | null
   email: string | null
-  user: number | null
+  user_id: number | null
   _count: ContactsCountAggregateOutputType | null
   _avg: ContactsAvgAggregateOutputType | null
   _sum: ContactsSumAggregateOutputType | null
@@ -219,8 +219,8 @@ export type contactsWhereInput = {
   created_at?: Prisma.DateTimeFilter<"contacts"> | Date | string
   phone?: Prisma.StringNullableFilter<"contacts"> | string | null
   email?: Prisma.StringNullableFilter<"contacts"> | string | null
-  user?: Prisma.IntNullableFilter<"contacts"> | number | null
-  user_contacts_userTouser?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.userWhereInput> | null
+  user_id?: Prisma.IntNullableFilter<"contacts"> | number | null
+  user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.userWhereInput> | null
 }
 
 export type contactsOrderByWithRelationInput = {
@@ -228,8 +228,8 @@ export type contactsOrderByWithRelationInput = {
   created_at?: Prisma.SortOrder
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   email?: Prisma.SortOrderInput | Prisma.SortOrder
-  user?: Prisma.SortOrderInput | Prisma.SortOrder
-  user_contacts_userTouser?: Prisma.userOrderByWithRelationInput
+  user_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  user?: Prisma.userOrderByWithRelationInput
 }
 
 export type contactsWhereUniqueInput = Prisma.AtLeast<{
@@ -240,8 +240,8 @@ export type contactsWhereUniqueInput = Prisma.AtLeast<{
   created_at?: Prisma.DateTimeFilter<"contacts"> | Date | string
   phone?: Prisma.StringNullableFilter<"contacts"> | string | null
   email?: Prisma.StringNullableFilter<"contacts"> | string | null
-  user?: Prisma.IntNullableFilter<"contacts"> | number | null
-  user_contacts_userTouser?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.userWhereInput> | null
+  user_id?: Prisma.IntNullableFilter<"contacts"> | number | null
+  user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.userWhereInput> | null
 }, "id">
 
 export type contactsOrderByWithAggregationInput = {
@@ -249,7 +249,7 @@ export type contactsOrderByWithAggregationInput = {
   created_at?: Prisma.SortOrder
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   email?: Prisma.SortOrderInput | Prisma.SortOrder
-  user?: Prisma.SortOrderInput | Prisma.SortOrder
+  user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.contactsCountOrderByAggregateInput
   _avg?: Prisma.contactsAvgOrderByAggregateInput
   _max?: Prisma.contactsMaxOrderByAggregateInput
@@ -265,14 +265,14 @@ export type contactsScalarWhereWithAggregatesInput = {
   created_at?: Prisma.DateTimeWithAggregatesFilter<"contacts"> | Date | string
   phone?: Prisma.StringNullableWithAggregatesFilter<"contacts"> | string | null
   email?: Prisma.StringNullableWithAggregatesFilter<"contacts"> | string | null
-  user?: Prisma.IntNullableWithAggregatesFilter<"contacts"> | number | null
+  user_id?: Prisma.IntNullableWithAggregatesFilter<"contacts"> | number | null
 }
 
 export type contactsCreateInput = {
   created_at?: Date | string
   phone?: string | null
   email?: string | null
-  user_contacts_userTouser?: Prisma.userCreateNestedOneWithoutContacts_contacts_userTouserInput
+  user?: Prisma.userCreateNestedOneWithoutContactsInput
 }
 
 export type contactsUncheckedCreateInput = {
@@ -280,14 +280,14 @@ export type contactsUncheckedCreateInput = {
   created_at?: Date | string
   phone?: string | null
   email?: string | null
-  user?: number | null
+  user_id?: number | null
 }
 
 export type contactsUpdateInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  user_contacts_userTouser?: Prisma.userUpdateOneWithoutContacts_contacts_userTouserNestedInput
+  user?: Prisma.userUpdateOneWithoutContactsNestedInput
 }
 
 export type contactsUncheckedUpdateInput = {
@@ -295,7 +295,7 @@ export type contactsUncheckedUpdateInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  user?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  user_id?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type contactsCreateManyInput = {
@@ -303,7 +303,7 @@ export type contactsCreateManyInput = {
   created_at?: Date | string
   phone?: string | null
   email?: string | null
-  user?: number | null
+  user_id?: number | null
 }
 
 export type contactsUpdateManyMutationInput = {
@@ -317,7 +317,7 @@ export type contactsUncheckedUpdateManyInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  user?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  user_id?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
 }
 
 export type ContactsListRelationFilter = {
@@ -335,12 +335,12 @@ export type contactsCountOrderByAggregateInput = {
   created_at?: Prisma.SortOrder
   phone?: Prisma.SortOrder
   email?: Prisma.SortOrder
-  user?: Prisma.SortOrder
+  user_id?: Prisma.SortOrder
 }
 
 export type contactsAvgOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  user?: Prisma.SortOrder
+  user_id?: Prisma.SortOrder
 }
 
 export type contactsMaxOrderByAggregateInput = {
@@ -348,7 +348,7 @@ export type contactsMaxOrderByAggregateInput = {
   created_at?: Prisma.SortOrder
   phone?: Prisma.SortOrder
   email?: Prisma.SortOrder
-  user?: Prisma.SortOrder
+  user_id?: Prisma.SortOrder
 }
 
 export type contactsMinOrderByAggregateInput = {
@@ -356,53 +356,53 @@ export type contactsMinOrderByAggregateInput = {
   created_at?: Prisma.SortOrder
   phone?: Prisma.SortOrder
   email?: Prisma.SortOrder
-  user?: Prisma.SortOrder
+  user_id?: Prisma.SortOrder
 }
 
 export type contactsSumOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  user?: Prisma.SortOrder
+  user_id?: Prisma.SortOrder
 }
 
-export type contactsCreateNestedManyWithoutUser_contacts_userTouserInput = {
-  create?: Prisma.XOR<Prisma.contactsCreateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput> | Prisma.contactsCreateWithoutUser_contacts_userTouserInput[] | Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput[]
-  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput | Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput[]
-  createMany?: Prisma.contactsCreateManyUser_contacts_userTouserInputEnvelope
+export type contactsCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.contactsCreateWithoutUserInput, Prisma.contactsUncheckedCreateWithoutUserInput> | Prisma.contactsCreateWithoutUserInput[] | Prisma.contactsUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUserInput | Prisma.contactsCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.contactsCreateManyUserInputEnvelope
   connect?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
 }
 
-export type contactsUncheckedCreateNestedManyWithoutUser_contacts_userTouserInput = {
-  create?: Prisma.XOR<Prisma.contactsCreateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput> | Prisma.contactsCreateWithoutUser_contacts_userTouserInput[] | Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput[]
-  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput | Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput[]
-  createMany?: Prisma.contactsCreateManyUser_contacts_userTouserInputEnvelope
+export type contactsUncheckedCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.contactsCreateWithoutUserInput, Prisma.contactsUncheckedCreateWithoutUserInput> | Prisma.contactsCreateWithoutUserInput[] | Prisma.contactsUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUserInput | Prisma.contactsCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.contactsCreateManyUserInputEnvelope
   connect?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
 }
 
-export type contactsUpdateManyWithoutUser_contacts_userTouserNestedInput = {
-  create?: Prisma.XOR<Prisma.contactsCreateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput> | Prisma.contactsCreateWithoutUser_contacts_userTouserInput[] | Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput[]
-  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput | Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput[]
-  upsert?: Prisma.contactsUpsertWithWhereUniqueWithoutUser_contacts_userTouserInput | Prisma.contactsUpsertWithWhereUniqueWithoutUser_contacts_userTouserInput[]
-  createMany?: Prisma.contactsCreateManyUser_contacts_userTouserInputEnvelope
+export type contactsUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.contactsCreateWithoutUserInput, Prisma.contactsUncheckedCreateWithoutUserInput> | Prisma.contactsCreateWithoutUserInput[] | Prisma.contactsUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUserInput | Prisma.contactsCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.contactsUpsertWithWhereUniqueWithoutUserInput | Prisma.contactsUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.contactsCreateManyUserInputEnvelope
   set?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
   disconnect?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
   delete?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
   connect?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
-  update?: Prisma.contactsUpdateWithWhereUniqueWithoutUser_contacts_userTouserInput | Prisma.contactsUpdateWithWhereUniqueWithoutUser_contacts_userTouserInput[]
-  updateMany?: Prisma.contactsUpdateManyWithWhereWithoutUser_contacts_userTouserInput | Prisma.contactsUpdateManyWithWhereWithoutUser_contacts_userTouserInput[]
+  update?: Prisma.contactsUpdateWithWhereUniqueWithoutUserInput | Prisma.contactsUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.contactsUpdateManyWithWhereWithoutUserInput | Prisma.contactsUpdateManyWithWhereWithoutUserInput[]
   deleteMany?: Prisma.contactsScalarWhereInput | Prisma.contactsScalarWhereInput[]
 }
 
-export type contactsUncheckedUpdateManyWithoutUser_contacts_userTouserNestedInput = {
-  create?: Prisma.XOR<Prisma.contactsCreateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput> | Prisma.contactsCreateWithoutUser_contacts_userTouserInput[] | Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput[]
-  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput | Prisma.contactsCreateOrConnectWithoutUser_contacts_userTouserInput[]
-  upsert?: Prisma.contactsUpsertWithWhereUniqueWithoutUser_contacts_userTouserInput | Prisma.contactsUpsertWithWhereUniqueWithoutUser_contacts_userTouserInput[]
-  createMany?: Prisma.contactsCreateManyUser_contacts_userTouserInputEnvelope
+export type contactsUncheckedUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.contactsCreateWithoutUserInput, Prisma.contactsUncheckedCreateWithoutUserInput> | Prisma.contactsCreateWithoutUserInput[] | Prisma.contactsUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.contactsCreateOrConnectWithoutUserInput | Prisma.contactsCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.contactsUpsertWithWhereUniqueWithoutUserInput | Prisma.contactsUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.contactsCreateManyUserInputEnvelope
   set?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
   disconnect?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
   delete?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
   connect?: Prisma.contactsWhereUniqueInput | Prisma.contactsWhereUniqueInput[]
-  update?: Prisma.contactsUpdateWithWhereUniqueWithoutUser_contacts_userTouserInput | Prisma.contactsUpdateWithWhereUniqueWithoutUser_contacts_userTouserInput[]
-  updateMany?: Prisma.contactsUpdateManyWithWhereWithoutUser_contacts_userTouserInput | Prisma.contactsUpdateManyWithWhereWithoutUser_contacts_userTouserInput[]
+  update?: Prisma.contactsUpdateWithWhereUniqueWithoutUserInput | Prisma.contactsUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.contactsUpdateManyWithWhereWithoutUserInput | Prisma.contactsUpdateManyWithWhereWithoutUserInput[]
   deleteMany?: Prisma.contactsScalarWhereInput | Prisma.contactsScalarWhereInput[]
 }
 
@@ -414,43 +414,43 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
-export type contactsCreateWithoutUser_contacts_userTouserInput = {
+export type contactsCreateWithoutUserInput = {
   created_at?: Date | string
   phone?: string | null
   email?: string | null
 }
 
-export type contactsUncheckedCreateWithoutUser_contacts_userTouserInput = {
+export type contactsUncheckedCreateWithoutUserInput = {
   id?: number
   created_at?: Date | string
   phone?: string | null
   email?: string | null
 }
 
-export type contactsCreateOrConnectWithoutUser_contacts_userTouserInput = {
+export type contactsCreateOrConnectWithoutUserInput = {
   where: Prisma.contactsWhereUniqueInput
-  create: Prisma.XOR<Prisma.contactsCreateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput>
+  create: Prisma.XOR<Prisma.contactsCreateWithoutUserInput, Prisma.contactsUncheckedCreateWithoutUserInput>
 }
 
-export type contactsCreateManyUser_contacts_userTouserInputEnvelope = {
-  data: Prisma.contactsCreateManyUser_contacts_userTouserInput | Prisma.contactsCreateManyUser_contacts_userTouserInput[]
+export type contactsCreateManyUserInputEnvelope = {
+  data: Prisma.contactsCreateManyUserInput | Prisma.contactsCreateManyUserInput[]
   skipDuplicates?: boolean
 }
 
-export type contactsUpsertWithWhereUniqueWithoutUser_contacts_userTouserInput = {
+export type contactsUpsertWithWhereUniqueWithoutUserInput = {
   where: Prisma.contactsWhereUniqueInput
-  update: Prisma.XOR<Prisma.contactsUpdateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedUpdateWithoutUser_contacts_userTouserInput>
-  create: Prisma.XOR<Prisma.contactsCreateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedCreateWithoutUser_contacts_userTouserInput>
+  update: Prisma.XOR<Prisma.contactsUpdateWithoutUserInput, Prisma.contactsUncheckedUpdateWithoutUserInput>
+  create: Prisma.XOR<Prisma.contactsCreateWithoutUserInput, Prisma.contactsUncheckedCreateWithoutUserInput>
 }
 
-export type contactsUpdateWithWhereUniqueWithoutUser_contacts_userTouserInput = {
+export type contactsUpdateWithWhereUniqueWithoutUserInput = {
   where: Prisma.contactsWhereUniqueInput
-  data: Prisma.XOR<Prisma.contactsUpdateWithoutUser_contacts_userTouserInput, Prisma.contactsUncheckedUpdateWithoutUser_contacts_userTouserInput>
+  data: Prisma.XOR<Prisma.contactsUpdateWithoutUserInput, Prisma.contactsUncheckedUpdateWithoutUserInput>
 }
 
-export type contactsUpdateManyWithWhereWithoutUser_contacts_userTouserInput = {
+export type contactsUpdateManyWithWhereWithoutUserInput = {
   where: Prisma.contactsScalarWhereInput
-  data: Prisma.XOR<Prisma.contactsUpdateManyMutationInput, Prisma.contactsUncheckedUpdateManyWithoutUser_contacts_userTouserInput>
+  data: Prisma.XOR<Prisma.contactsUpdateManyMutationInput, Prisma.contactsUncheckedUpdateManyWithoutUserInput>
 }
 
 export type contactsScalarWhereInput = {
@@ -461,30 +461,30 @@ export type contactsScalarWhereInput = {
   created_at?: Prisma.DateTimeFilter<"contacts"> | Date | string
   phone?: Prisma.StringNullableFilter<"contacts"> | string | null
   email?: Prisma.StringNullableFilter<"contacts"> | string | null
-  user?: Prisma.IntNullableFilter<"contacts"> | number | null
+  user_id?: Prisma.IntNullableFilter<"contacts"> | number | null
 }
 
-export type contactsCreateManyUser_contacts_userTouserInput = {
+export type contactsCreateManyUserInput = {
   id?: number
   created_at?: Date | string
   phone?: string | null
   email?: string | null
 }
 
-export type contactsUpdateWithoutUser_contacts_userTouserInput = {
+export type contactsUpdateWithoutUserInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
-export type contactsUncheckedUpdateWithoutUser_contacts_userTouserInput = {
+export type contactsUncheckedUpdateWithoutUserInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
-export type contactsUncheckedUpdateManyWithoutUser_contacts_userTouserInput = {
+export type contactsUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -498,8 +498,8 @@ export type contactsSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   created_at?: boolean
   phone?: boolean
   email?: boolean
-  user?: boolean
-  user_contacts_userTouser?: boolean | Prisma.contacts$user_contacts_userTouserArgs<ExtArgs>
+  user_id?: boolean
+  user?: boolean | Prisma.contacts$userArgs<ExtArgs>
 }, ExtArgs["result"]["contacts"]>
 
 export type contactsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -507,8 +507,8 @@ export type contactsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   created_at?: boolean
   phone?: boolean
   email?: boolean
-  user?: boolean
-  user_contacts_userTouser?: boolean | Prisma.contacts$user_contacts_userTouserArgs<ExtArgs>
+  user_id?: boolean
+  user?: boolean | Prisma.contacts$userArgs<ExtArgs>
 }, ExtArgs["result"]["contacts"]>
 
 export type contactsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -516,8 +516,8 @@ export type contactsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   created_at?: boolean
   phone?: boolean
   email?: boolean
-  user?: boolean
-  user_contacts_userTouser?: boolean | Prisma.contacts$user_contacts_userTouserArgs<ExtArgs>
+  user_id?: boolean
+  user?: boolean | Prisma.contacts$userArgs<ExtArgs>
 }, ExtArgs["result"]["contacts"]>
 
 export type contactsSelectScalar = {
@@ -525,31 +525,31 @@ export type contactsSelectScalar = {
   created_at?: boolean
   phone?: boolean
   email?: boolean
-  user?: boolean
+  user_id?: boolean
 }
 
-export type contactsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "created_at" | "phone" | "email" | "user", ExtArgs["result"]["contacts"]>
+export type contactsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "created_at" | "phone" | "email" | "user_id", ExtArgs["result"]["contacts"]>
 export type contactsInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user_contacts_userTouser?: boolean | Prisma.contacts$user_contacts_userTouserArgs<ExtArgs>
+  user?: boolean | Prisma.contacts$userArgs<ExtArgs>
 }
 export type contactsIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user_contacts_userTouser?: boolean | Prisma.contacts$user_contacts_userTouserArgs<ExtArgs>
+  user?: boolean | Prisma.contacts$userArgs<ExtArgs>
 }
 export type contactsIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user_contacts_userTouser?: boolean | Prisma.contacts$user_contacts_userTouserArgs<ExtArgs>
+  user?: boolean | Prisma.contacts$userArgs<ExtArgs>
 }
 
 export type $contactsPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "contacts"
   objects: {
-    user_contacts_userTouser: Prisma.$userPayload<ExtArgs> | null
+    user: Prisma.$userPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
     created_at: Date
     phone: string | null
     email: string | null
-    user: number | null
+    user_id: number | null
   }, ExtArgs["result"]["contacts"]>
   composites: {}
 }
@@ -944,7 +944,7 @@ readonly fields: contactsFieldRefs;
  */
 export interface Prisma__contactsClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  user_contacts_userTouser<T extends Prisma.contacts$user_contacts_userTouserArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.contacts$user_contacts_userTouserArgs<ExtArgs>>): Prisma.Prisma__userClient<runtime.Types.Result.GetResult<Prisma.$userPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  user<T extends Prisma.contacts$userArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.contacts$userArgs<ExtArgs>>): Prisma.Prisma__userClient<runtime.Types.Result.GetResult<Prisma.$userPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -978,7 +978,7 @@ export interface contactsFieldRefs {
   readonly created_at: Prisma.FieldRef<"contacts", 'DateTime'>
   readonly phone: Prisma.FieldRef<"contacts", 'String'>
   readonly email: Prisma.FieldRef<"contacts", 'String'>
-  readonly user: Prisma.FieldRef<"contacts", 'Int'>
+  readonly user_id: Prisma.FieldRef<"contacts", 'Int'>
 }
     
 
@@ -1380,9 +1380,9 @@ export type contactsDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
 }
 
 /**
- * contacts.user_contacts_userTouser
+ * contacts.user
  */
-export type contacts$user_contacts_userTouserArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type contacts$userArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the user
    */

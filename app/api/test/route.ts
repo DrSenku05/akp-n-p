@@ -7,13 +7,13 @@ export async function GET(request: NextRequest) {
 
   const products = await prisma.user.findMany({
     include: {
-      contacts_contacts_userTouser: true,
+      contacts: true,
     }
   });
 
   return NextResponse.json(products);
 }
-
+``
 // POST /api/products
 // export async function POST(request: NextRequest) {
 //   const body = await request.json();
