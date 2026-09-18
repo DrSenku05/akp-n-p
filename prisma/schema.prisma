@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../prisma/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user {
+  id                           Int        @id @default(autoincrement())
+  created_at                   DateTime   @default(now()) @db.Timestamptz(6)
+  firstname                    String
+  middlename                   String?
+  lastname                     String
+  birthdate                    DateTime   @db.Date
+  contacts_contacts_userTouser contacts[] @relation("contacts_userTouser")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model contacts {
+  id                       Int      @id @default(autoincrement())
+  created_at               DateTime @default(now()) @db.Timestamptz(6)
+  phone                    String?
+  email                    String?
+  user                     Int?
+  user_contacts_userTouser user?    @relation("contacts_userTouser", fields: [user], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
