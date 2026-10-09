@@ -1,8 +1,8 @@
 export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: "Next.js + HeroUI",
-  description: "Make beautiful websites regardless of your design experience.",
+  name: "AKP Native Products Admin",
+  description: "Administration system for AKP Native Products Trading.",
   navItems: [
     {
       label: "Home",

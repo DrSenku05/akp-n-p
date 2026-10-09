@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // GET /api/products
 export async function GET(request: NextRequest) {
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   const products = await prisma.user.findMany({
     include: {
