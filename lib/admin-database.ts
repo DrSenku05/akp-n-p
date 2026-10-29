@@ -13,6 +13,8 @@ type ProductRecord = {
   visibility: string
   featured: boolean
   craft_origin: string | null
+  description: string | null
+  image_url: string | null
 }
 
 const money = (amount: string | number) => `₱${Number(amount).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`
@@ -24,7 +26,7 @@ async function getDemoProducts() {
   return prisma.$queryRaw<ProductRecord[]>`
     select p.sku, p.name, c.name as category, p.price::text as price,
       p.stock_quantity as stock, p.reorder_level as reorder, p.visibility,
-      p.is_featured as featured, p.craft_origin
+      p.is_featured as featured, p.craft_origin, p.description, p.image_url
     from public.products p
     left join public.product_categories c on c.id = p.category_id
     where p.sku like 'AKP-ACT-%'
@@ -38,14 +40,14 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
   try {
     if (slug === "products") {
       const products = await getDemoProducts()
-      return { error: false, rows: products.map((p) => [p.sku, "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= p.reorder ? "Low Stock" : "Active", "View · Edit · Archive"]) }
+      return { error: false, rows: products.map((p) => [p.sku, p.image_url ?? "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= p.reorder ? "Low Stock" : "Active", "View · Edit · Archive", p.description ?? "", String(p.reorder), p.visibility, p.featured ? "Yes" : "No", p.craft_origin ?? "", p.image_url ?? ""]) }
     }
 
     if (slug === "inventory") {
       const products = await prisma.$queryRaw<(ProductRecord & { last_delta: number | null; last_reason: string | null; last_date: Date | null })[]>`
         select p.sku, p.name, c.name as category, p.price::text as price,
           p.stock_quantity as stock, p.reorder_level as reorder, p.visibility,
-          p.is_featured as featured, p.craft_origin,
+          p.is_featured as featured, p.craft_origin, p.description, p.image_url,
           movement.quantity_delta as last_delta, movement.reason as last_reason,
           movement.created_at as last_date
         from public.products p

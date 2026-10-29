@@ -112,7 +112,12 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const filteredRows = useMemo(() => rows.filter((row) => row.join(" ").toLowerCase().includes(query.toLowerCase()) && (filter === "All" || row.some((cell) => cell.toLowerCase().includes(filter.toLowerCase())))), [rows, filter, query])
   const openForm = (title: string, row?: string[], rowIndex?: number, action?: string, customFields?: string[]) => {
     const fields = customFields ?? config.columns.filter((column) => column !== "Actions" && column !== "Status")
-    const values = Object.fromEntries(fields.map((field) => [field, row?.[config.columns.indexOf(field)] ?? ""]))
+    const productValues: Record<string, string> = {
+      "Product Name": row?.[2] ?? "", "Image URL": row?.[13] ?? row?.[1] ?? "", Description: row?.[8] ?? "",
+      Category: row?.[3] ?? "", Price: (row?.[4] ?? "").replace(/^₱/, ""), "Reorder Level": row?.[9] ?? "",
+      "Craft / Origin": row?.[12] ?? "", Visibility: row?.[10] ?? "", Featured: row?.[11] ?? "No",
+    }
+    const values = Object.fromEntries(fields.map((field) => [field, slug === "products" ? (productValues[field] ?? "") : row?.[config.columns.indexOf(field)] ?? ""]))
     setDialog({ title, kind: "form", row, rowIndex, action, values })
   }
   const exportRows = (format: "csv" | "pdf" = "csv") => {
@@ -136,6 +141,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       if (slug === "customers") extraFields.push(["Address book", "Address details are not included in the reference sample."], ["Order history", "See linked transactions in Order Management."], ["Feedback", "See verified reviews in Customer Feedback."])
       if (slug === "returns-refunds" && decisionNotes[row[0]]) extraFields.push(["Decision notes", decisionNotes[row[0]]])
       if (slug === "payments" && lower === "view receipt") extraFields.push(["Receipt proof", "No receipt attachment is included in the sample data."])
+      if (slug === "products") extraFields.push(["Description", row[8] || "No description provided"], ["Reorder level", row[9] || "0"], ["Visibility", row[10] || "—"], ["Featured", row[11] || "No"], ["Craft / Origin", row[12] || "Not provided"], ["Image URL", row[13] || "No image uploaded"])
       setDialog({ title: `${action}: ${row[0]}`, kind: "view", row, fields: table === "announcements" ? ["Title", "Target", "Sent"] : config.columns.filter((column) => column !== "Actions"), extraFields })
       return
     }
@@ -145,7 +151,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       return
     }
     if (lower.includes("edit") || lower === "adjust") {
-      const fields = lower === "adjust" ? ["Current Stock", "Reason"] : slug === "products" ? ["Product Name", "Category", "Price"] : undefined
+      const fields = lower === "adjust" ? ["Current Stock", "Reason"] : slug === "products" ? ["Product Name", "Image URL", "Description", "Category", "Price", "Reorder Level", "Craft / Origin", "Visibility", "Featured"] : undefined
       openForm(`${action}: ${row[0]}`, row, index, action, fields)
       return
     }
@@ -358,7 +364,18 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           <Modal.Header><Modal.Heading>{dialog?.title}</Modal.Heading></Modal.Header>
           <Modal.Body>
             {dialog?.kind === "view" && dialog.row && <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).map((column, index) => <div key={column} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div>)}{dialog.extraFields?.map(([label, value]) => <div key={label} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl>}
-            {dialog?.kind === "form" && <div className="space-y-3">{dialog.message && <p className="text-sm text-default-600">{dialog.message}</p>}{Object.entries(dialog.values ?? {}).map(([field, value]) => <DialogField key={field} field={field} value={value} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...current.values, [field]: next } } : current)} />)}</div>}
+            {dialog?.kind === "form" && (
+              <div className="space-y-3">
+                {dialog.message && <p className="text-sm text-default-600">{dialog.message}</p>}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {Object.entries(dialog.values ?? {}).map(([field, value]) => (
+                    <div key={field} className={["Description", "Image URL", "Craft / Origin", "Reason"].includes(field) ? "sm:col-span-2" : ""}>
+                      <DialogField field={field} value={value} choicesOverride={field === "Product" ? rows.map((item) => slug === "inventory" ? item[1] : item[0]).filter(Boolean) : undefined} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), [field]: next } } : current)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {dialog?.kind === "confirm" && <div className="space-y-3"><p className="text-sm leading-6 text-default-600">{dialog.message ?? `Continue with ${dialog.action?.toLowerCase()} for ${dialog.row?.[0]}?`}</p><p className="rounded-md bg-warning/10 p-3 text-xs leading-5 text-warning">This demo stores changes only in this browser. No customer, payment, or production database will be changed.</p></div>}
           </Modal.Body>
           {dialog?.kind !== "view" && <Modal.Footer><Button variant="outline" slot="close">Cancel</Button><Button variant={dialog?.kind === "confirm" && isDestructive(dialog.action) ? "danger" : "primary"} onPress={commitDialog}>{dialog?.kind === "confirm" ? "Confirm" : "Save changes"}</Button></Modal.Footer>}
@@ -374,9 +391,8 @@ function DataTable({ config, rows, compact = false, onAction }: { config: Module
   return <div className="overflow-x-auto"><table className={`w-full ${compact ? "min-w-[540px]" : "min-w-[760px]"} text-left text-xs`}><thead className="bg-default-50 text-default-500"><tr>{config.columns.map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t border-default-100 transition-colors hover:bg-default-50/70">{config.columns.map((heading, cellIndex) => { const cell = row[cellIndex] ?? ""; if (heading === "Actions") { const actions = cell.split(" · ").map((item) => item.trim()).filter(Boolean); return <td key={heading} className="px-3 py-2 align-middle"><div className="flex flex-wrap gap-x-1 gap-y-1">{actions.map((action) => { const lower = action.toLowerCase(); const Icon = lower.includes("delete") || lower.includes("remove") ? Trash2 : lower.includes("edit") || lower.includes("adjust") ? Pencil : lower.includes("view") || lower.includes("review") || lower.includes("detail") || lower.includes("receipt") || lower.includes("track") ? Eye : lower.includes("download") ? Download : lower.includes("record") ? PackagePlus : undefined; const destructive = ["delete", "remove", "reject", "suspend", "archive", "end"].some((word) => lower.includes(word)); return <Button key={action} size="sm" variant="ghost" className={`h-7 min-w-0 px-1.5 text-[11px] ${destructive ? "text-danger" : "text-[#315f43]"}`} onPress={() => onAction?.(action, row, index)}>{Icon && <Icon size={12} />}{action}</Button> })}</div></td> } return <td key={`${cellIndex}-${cell}`} className="max-w-64 px-3 py-3 align-middle text-default-700">{statusValues.includes(cell) ? <Chip size="sm" variant="soft" color={statusColor(cell)}>{cell}</Chip> : <span className={cellIndex === 0 ? "font-semibold" : ""}>{cell}</span>}</td> })}</tr>)}</tbody></table>{rows.length === 0 && <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No records found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>}<div className="flex items-center justify-between border-t border-default-100 pt-3 text-[11px] text-default-500"><span>Showing {rows.length} records</span><div className="flex gap-2"><Button size="sm" variant="outline" isDisabled>Previous</Button><Button size="sm" variant="outline" isDisabled>Next</Button></div></div></div>
 }
 
-function DialogField({ field, value, onChange }: { field: string; value: string; onChange: (value: string) => void }) {
+function DialogField({ field, value, onChange, choicesOverride }: { field: string; value: string; onChange: (value: string) => void; choicesOverride?: string[] }) {
   const options: Record<string, string[]> = {
-    Product: ["Woven Abaca Bag", "Native Rattan Basket", "Handwoven Table Runner", "Bamboo Jewelry Set", "Native Buri Hat"],
     "Movement Type": ["Stock in (restock)", "Stock out (sale)", "Damage"],
     Category: ["Native Materials", "Bags", "Baskets", "Home Decor", "Accessories", "Headwear"],
     Target: ["All Customers", "All Users"],
@@ -386,7 +402,7 @@ function DialogField({ field, value, onChange }: { field: string; value: string;
     Availability: ["Available", "On Delivery", "Off Duty"],
     "Assigned Orders": ["#ORD-0041"],
   }
-  const choices = options[field]
+  const choices = choicesOverride ?? options[field]
   const multiline = ["message", "reason", "address", "description", "comment", "note"].some((term) => field.toLowerCase().includes(term))
   const numeric = ["quantity", "stock", "reorder"].some((term) => field.toLowerCase().includes(term))
   return <label className="block space-y-1 text-xs font-medium">{field}{choices ? <select aria-label={field} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose {field.toLowerCase()}</option>{choices.map((choice) => <option key={choice}>{choice}</option>)}</select> : multiline ? <textarea aria-label={field} className="min-h-20 w-full rounded-md border border-default-200 bg-background p-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)} /> : <input aria-label={field} type={numeric ? "number" : "text"} min={numeric ? "0" : undefined} step={numeric ? "any" : undefined} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)} />}</label>

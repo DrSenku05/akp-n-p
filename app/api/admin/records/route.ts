@@ -32,13 +32,14 @@ export async function POST(request: NextRequest) {
     const visibilityInput = value("Visibility", "Status").toLowerCase()
     const fields = {
       name: value("Product Name", "Product") || (module === "heritage-showcase" ? row[0] : ""),
-      description: value("Description", "Craft / Origin") || null,
+      description: value("Description") || null,
       category_id: category?.id ?? null,
       price: money(value("Price")),
       reorder_level: Number(value("Reorder Level") || 0),
       craft_origin: value("Craft / Origin") || null,
       is_featured: ["yes", "true"].includes(value("Featured").toLowerCase()),
       visibility: visibilityInput ? visibilityInput === "active" ? "published" : visibilityInput : undefined,
+      image_url: value("Image URL") || null,
     }
     if (module === "heritage-showcase") {
       result = await supabase.from("products").update({
@@ -47,6 +48,8 @@ export async function POST(request: NextRequest) {
         is_featured: ["yes", "true"].includes(value("Featured").toLowerCase()),
         visibility: value("Visibility").toLowerCase(),
       }).eq("name", row[0]).select("id")
+    } else if (module === "products" && action.includes("archive")) {
+      result = await supabase.from("products").update({ visibility: "archived" }).eq("sku", sku).select("id")
     } else if (!fields.name || !Number.isFinite(fields.price) || fields.price < 0) return fail("Product name and a valid non-negative price are required.")
     else if (action === "create") {
       const skuInput = value("SKU", "Product ID")
@@ -55,10 +58,12 @@ export async function POST(request: NextRequest) {
       if (!Number.isInteger(stock) || stock < 0) return fail("Stock must be a whole number zero or greater.")
       result = await supabase.from("products").insert({ sku: skuInput, ...fields, stock_quantity: stock, visibility: fields.visibility || "draft" })
     } else {
-      const productPatch: Record<string, string | number | null> = { name: fields.name, price: fields.price }
+      const productPatch: Record<string, string | number | boolean | null> = { name: fields.name, price: fields.price }
       if (categoryName) productPatch.category_id = category?.id ?? null
       if (values.Description !== undefined) productPatch.description = value("Description") || null
       if (values["Craft / Origin"] !== undefined) productPatch.craft_origin = value("Craft / Origin") || null
+      if (values["Image URL"] !== undefined) productPatch.image_url = value("Image URL") || null
+      if (values.Featured !== undefined) productPatch.is_featured = ["yes", "true"].includes(value("Featured").toLowerCase())
       if (values["Reorder Level"] !== undefined) productPatch.reorder_level = Number(value("Reorder Level") || 0)
       if (visibilityInput) productPatch.visibility = visibilityInput === "active" ? "published" : visibilityInput
       let query = supabase.from("products").update(productPatch)
