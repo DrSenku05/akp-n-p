@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     const productId = module === "heritage-showcase" ? value("Product ID") : ""
     const categoryName = value("Category")
     const { data: category } = categoryName ? await supabase.from("product_categories").select("id").eq("name", categoryName).maybeSingle() : { data: null }
+    const visibilityInput = value("Visibility", "Status").toLowerCase()
     const fields = {
       name: value("Product Name", "Product") || (module === "heritage-showcase" ? row[0] : ""),
       description: value("Description", "Craft / Origin") || null,
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
       reorder_level: Number(value("Reorder Level") || 0),
       craft_origin: value("Craft / Origin") || null,
       is_featured: ["yes", "true"].includes(value("Featured").toLowerCase()),
-      visibility: value("Visibility", "Status").toLowerCase() === "active" ? "published" : value("Visibility", "Status").toLowerCase(),
+      visibility: visibilityInput ? visibilityInput === "active" ? "published" : visibilityInput : undefined,
     }
     if (module === "heritage-showcase") {
       result = await supabase.from("products").update({
@@ -54,7 +55,13 @@ export async function POST(request: NextRequest) {
       if (!Number.isInteger(stock) || stock < 0) return fail("Stock must be a whole number zero or greater.")
       result = await supabase.from("products").insert({ sku: skuInput, ...fields, stock_quantity: stock, visibility: fields.visibility || "draft" })
     } else {
-      let query = supabase.from("products").update(fields)
+      const productPatch: Record<string, string | number | null> = { name: fields.name, price: fields.price }
+      if (categoryName) productPatch.category_id = category?.id ?? null
+      if (values.Description !== undefined) productPatch.description = value("Description") || null
+      if (values["Craft / Origin"] !== undefined) productPatch.craft_origin = value("Craft / Origin") || null
+      if (values["Reorder Level"] !== undefined) productPatch.reorder_level = Number(value("Reorder Level") || 0)
+      if (visibilityInput) productPatch.visibility = visibilityInput === "active" ? "published" : visibilityInput
+      let query = supabase.from("products").update(productPatch)
       query = module === "products" ? query.eq("sku", sku) : query.eq("name", row[0])
       result = await query.select("id")
     }

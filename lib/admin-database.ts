@@ -27,7 +27,7 @@ async function getDemoProducts() {
       p.is_featured as featured, p.craft_origin
     from public.products p
     left join public.product_categories c on c.id = p.category_id
-    where p.sku like 'DEMO-SKU-%'
+    where p.sku like 'AKP-ACT-%'
     order by p.sku
   `
 }
@@ -38,7 +38,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
   try {
     if (slug === "products") {
       const products = await getDemoProducts()
-      return { error: false, rows: products.map((p) => [p.sku, "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= p.reorder ? "Low Stock" : "Active", "Edit · Archive"]) }
+      return { error: false, rows: products.map((p) => [p.sku, "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= p.reorder ? "Low Stock" : "Active", "View · Edit · Archive"]) }
     }
 
     if (slug === "inventory") {
@@ -56,7 +56,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           where im.product_id = p.id
           order by im.created_at desc limit 1
         ) movement on true
-        where p.sku like 'DEMO-SKU-%'
+        where p.sku like 'AKP-ACT-%'
         order by p.sku
       `
       return { error: false, rows: products.map((p) => [p.sku, p.name, String(p.stock), String(p.reorder), p.last_delta === null ? "No movements" : `${dateLabel(p.last_date)} · ${p.last_delta > 0 ? "+" : ""}${p.last_delta} ${p.last_reason ?? "movement"}`, p.stock === 0 ? "Out of Stock" : p.stock <= p.reorder ? "Low Stock" : "Normal", "View · Adjust"]) }
@@ -177,7 +177,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       const logs = await prisma.$queryRaw<{ id: bigint; actor_role: string | null; module: string; action: string; created_at: Date; metadata: { row?: Record<string, unknown> } }[]>`
         select id, actor_role, module, action, created_at, metadata
         from public.audit_logs
-        where metadata->'row'->>'sku' like 'DEMO-SKU-%'
+        where metadata->'row'->>'sku' like 'AKP-ACT-%'
           or metadata->'row'->>'order_number' like 'DEMO-ORD-%'
           or metadata->'row'->>'request_number' like 'DEMO-RET-%'
           or metadata->'row'->>'reference' like 'DEMO-PAY-%'
@@ -203,7 +203,7 @@ export async function getAdminDashboardPreview() {
         (select count(*)::int from public.orders where order_number like 'DEMO-ORD-%' and created_at >= date_trunc('day', now())) as orders_today,
         (select count(*)::int from public.orders where order_number like 'DEMO-ORD-%' and status = 'pending') as pending_orders,
         (select coalesce(sum(amount), 0)::text from public.payments where reference like 'DEMO-PAY-%' and status = 'verified' and created_at >= date_trunc('month', now())) as revenue_month,
-        (select count(*)::int from public.products where sku like 'DEMO-SKU-%' and visibility <> 'archived' and stock_quantity <= reorder_level) as low_stock
+        (select count(*)::int from public.products where sku like 'AKP-ACT-%' and visibility <> 'archived' and stock_quantity <= reorder_level) as low_stock
     `
     const recentOrders = await prisma.$queryRaw<{ order_number: string; customer: string | null; amount: string; status: string; created_at: Date }[]>`
       select o.order_number, c.name as customer, o.total_amount::text as amount, o.status, o.created_at
