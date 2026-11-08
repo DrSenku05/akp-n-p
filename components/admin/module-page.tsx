@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Archive, Bell, CircleAlert, Download, Filter, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Archive, Bell, CircleAlert, Download, Filter, ImagePlus, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus } from "lucide-react"
 import { Button, Card, Chip, Input, Modal } from "@heroui/react"
+import { createClient } from "@/lib/supabase/client"
+import Image from "next/image"
 
 type ModuleConfig = { title: string; subtitle: string; action?: string; stats?: [string, string, string?][]; columns: string[]; rows: string[][]; search: string; filter?: string; filterOptions?: string[]; note?: string }
 
@@ -80,6 +82,10 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const [rows, setRows] = useState<string[][]>(databaseRows ?? config.rows)
   const [loaded, setLoaded] = useState(false)
   const [dialog, setDialog] = useState<DialogState | null>(null)
+  const [productImage, setProductImage] = useState<File | null>(null)
+  const [productImagePreview, setProductImagePreview] = useState("")
+  const previewObjectUrl = useRef("")
+  const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState("")
   const [dateRange, setDateRange] = useState("This month")
   const [customStart, setCustomStart] = useState("")
@@ -88,6 +94,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
   const [restoreId, setRestoreId] = useState("")
   const isDatabasePreview = databaseRows !== undefined
+  useEffect(() => () => { if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current) }, [])
   useEffect(() => {
     setLoaded(false)
     if (databaseRows !== undefined) {
@@ -111,9 +118,13 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   useEffect(() => { if (loaded) localStorage.setItem(`akp-admin:notes:${slug}`, JSON.stringify(decisionNotes)) }, [loaded, decisionNotes, slug])
   const filteredRows = useMemo(() => rows.filter((row) => row.join(" ").toLowerCase().includes(query.toLowerCase()) && (filter === "All" || row.some((cell) => cell.toLowerCase().includes(filter.toLowerCase())))), [rows, filter, query])
   const openForm = (title: string, row?: string[], rowIndex?: number, action?: string, customFields?: string[]) => {
-    const fields = customFields ?? config.columns.filter((column) => column !== "Actions" && column !== "Status")
+    if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current)
+    previewObjectUrl.current = ""
+    setProductImage(null)
+    setProductImagePreview(slug === "products" ? row?.[13] || "" : "")
+    const fields = customFields ?? config.columns.filter((column) => column !== "Actions" && column !== "Status" && !(slug === "products" && column === "Image"))
     const productValues: Record<string, string> = {
-      "Product Name": row?.[2] ?? "", "Image URL": row?.[13] ?? row?.[1] ?? "", Description: row?.[8] ?? "",
+      "Product Name": row?.[2] ?? "", Description: row?.[8] ?? "",
       Category: row?.[3] ?? "", Price: (row?.[4] ?? "").replace(/^₱/, ""), "Reorder Level": row?.[9] ?? "",
       "Craft / Origin": row?.[12] ?? "", Visibility: row?.[10] ?? "", Featured: row?.[11] ?? "No",
     }
@@ -167,6 +178,8 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   }
   const commitDialog = async () => {
     if (!dialog) return
+    let uploadedImageUrl = ""
+    let uploadedImagePath = ""
     if (isDatabasePreview) {
       const writable = ["products", "inventory", "orders", "customers", "delivery-personnel", "returns-refunds", "payments", "feedback", "promotions", "notifications", "heritage-showcase"]
       if (!writable.includes(slug)) {
@@ -178,21 +191,37 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         ? dialog.action === "Record Movement" ? "record-movement" : slug === "returns-refunds" ? dialog.action ?? "edit" : dialog.row ? "edit" : "create"
         : dialog.action ?? ""
       try {
+        setSaving(true)
+        let values = dialog.values ?? {}
+        if (slug === "products" && productImage) {
+          const supabase = createClient()
+          const safeName = productImage.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-|-$/g, "") || "product-image"
+          uploadedImagePath = `products/${crypto.randomUUID()}-${safeName}`
+          const { error: uploadError } = await supabase.storage.from("product-images").upload(uploadedImagePath, productImage, { contentType: productImage.type, upsert: false })
+          if (uploadError) throw uploadError
+          uploadedImageUrl = supabase.storage.from("product-images").getPublicUrl(uploadedImagePath).data.publicUrl
+          values = { ...values, "Image URL": uploadedImageUrl }
+        }
         const response = await fetch("/api/admin/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ module: slug, action, row: dialog.row, values: dialog.values }),
+          body: JSON.stringify({ module: slug, action, row: dialog.row, values }),
         })
         const result = await response.json() as { error?: string }
-        if (!response.ok) throw new Error(result.error || "Database save failed.")
+        if (!response.ok) {
+          if (uploadedImagePath) await createClient().storage.from("product-images").remove([uploadedImagePath])
+          throw new Error(result.error || "Database save failed.")
+        }
       } catch (cause) {
         setNotice(cause instanceof Error ? cause.message : "Database save failed. No local changes were applied.")
         setDialog(null)
         return
+      } finally {
+        setSaving(false)
       }
     }
     if (dialog.kind === "form") {
-      const fields = Object.keys(dialog.values ?? {})
+      const fields = [...Object.keys(dialog.values ?? {}), ...(uploadedImageUrl ? ["Image URL"] : [])]
       if (["Announcement", "New Announcement", "Send Notification"].includes(dialog.action ?? "")) {
         const values = dialog.values ?? {}
         if (!values.Title?.trim() || !values.Message?.trim()) { setNotice("Add a title and message before saving the announcement."); return }
@@ -244,6 +273,10 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       fields.forEach((field, index) => {
         const columnIndex = config.columns.indexOf(field)
         if (columnIndex >= 0) current[columnIndex] = dialog.values?.[field] ?? ""
+        else if (field === "Image URL" && uploadedImageUrl) {
+          current[config.columns.indexOf("Image")] = uploadedImageUrl
+          current[13] = uploadedImageUrl
+        }
         else if (field === "Assigned Orders") {
           const assignedIndex = config.columns.indexOf("Assigned Orders")
           if (assignedIndex >= 0) current[assignedIndex] = dialog.values?.[field] ?? ""
@@ -363,10 +396,15 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           <Modal.CloseTrigger />
           <Modal.Header><Modal.Heading>{dialog?.title}</Modal.Heading></Modal.Header>
           <Modal.Body>
-            {dialog?.kind === "view" && dialog.row && <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).map((column, index) => <div key={column} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div>)}{dialog.extraFields?.map(([label, value]) => <div key={label} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl>}
+            {dialog?.kind === "view" && dialog.row && <div className="space-y-4">{slug === "products" && dialog.row[13] && <Image src={dialog.row[13]} alt={`${dialog.row[2]} product`} width={960} height={480} unoptimized className="max-h-64 w-full rounded-xl border border-default-200 object-cover" />}<dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).map((column, index) => <div key={column} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 text-sm font-medium">{column === "Image" ? dialog.row?.[index] ? "Image preview above" : "No image uploaded" : dialog.row?.[index] || "—"}</dd></div>)}{dialog.extraFields?.map(([label, value]) => <div key={label} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl></div>}
             {dialog?.kind === "form" && (
               <div className="space-y-3">
                 {dialog.message && <p className="text-sm text-default-600">{dialog.message}</p>}
+                {slug === "products" && <section className="space-y-3 rounded-xl border border-default-200 bg-default-50/60 p-4" aria-label="Product image upload">
+                  <div className="flex items-start gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success"><ImagePlus size={18} /></span><div><h3 className="text-sm font-semibold">Product photo</h3><p className="mt-1 text-xs leading-5 text-default-500">Choose an image from your device. JPG, PNG, WEBP, GIF, or AVIF · up to 10 MB.</p></div></div>
+                  {productImagePreview ? <Image src={productImagePreview} alt="Selected product image preview" width={960} height={480} unoptimized className="max-h-52 w-full rounded-lg border border-default-200 object-cover" /> : <div className="flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-default-300 bg-background text-center"><ImagePlus size={24} className="text-default-400" /><p className="text-xs text-default-500">Image preview appears here</p></div>}
+                  {isDatabasePreview ? <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-default-200 bg-background px-3 text-xs font-medium hover:bg-default-100"><ImagePlus size={14} />{productImagePreview ? "Choose a different image" : "Choose image"}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]; if (!allowed.includes(file.type)) { setNotice("Choose a JPG, PNG, WEBP, GIF, or AVIF image."); return } if (file.size > 10 * 1024 * 1024) { setNotice("Product images must be 10 MB or smaller."); return } if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current); previewObjectUrl.current = URL.createObjectURL(file); setProductImage(file); setProductImagePreview(previewObjectUrl.current); setNotice("") }} /></label> : <p className="text-xs text-warning">Connect the admin page to Supabase to upload and save product images.</p>}
+                </section>}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {Object.entries(dialog.values ?? {}).map(([field, value]) => (
                     <div key={field} className={["Description", "Image URL", "Craft / Origin", "Reason"].includes(field) ? "sm:col-span-2" : ""}>
@@ -378,7 +416,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
             )}
             {dialog?.kind === "confirm" && <div className="space-y-3"><p className="text-sm leading-6 text-default-600">{dialog.message ?? `Continue with ${dialog.action?.toLowerCase()} for ${dialog.row?.[0]}?`}</p><p className="rounded-md bg-warning/10 p-3 text-xs leading-5 text-warning">This demo stores changes only in this browser. No customer, payment, or production database will be changed.</p></div>}
           </Modal.Body>
-          {dialog?.kind !== "view" && <Modal.Footer><Button variant="outline" slot="close">Cancel</Button><Button variant={dialog?.kind === "confirm" && isDestructive(dialog.action) ? "danger" : "primary"} onPress={commitDialog}>{dialog?.kind === "confirm" ? "Confirm" : "Save changes"}</Button></Modal.Footer>}
+          {dialog?.kind !== "view" && <Modal.Footer><Button variant="outline" slot="close" isDisabled={saving}>Cancel</Button><Button variant={dialog?.kind === "confirm" && isDestructive(dialog.action) ? "danger" : "primary"} isDisabled={saving} onPress={commitDialog}>{saving ? "Saving…" : dialog?.kind === "confirm" ? "Confirm" : "Save changes"}</Button></Modal.Footer>}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>
@@ -388,7 +426,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
 
 function DataTable({ config, rows, compact = false, onAction }: { config: ModuleConfig; rows: string[][]; compact?: boolean; onAction?: (action: string, row: string[], index: number) => void }) {
   const statusValues = ["Active", "Suspended", "Pending", "Processing", "Shipped", "Delivered", "Cancelled", "Normal", "Low Stock", "Out of Stock", "Verified", "Refunded", "Failed", "Open", "Approved", "Rejected", "Successful", "Inactive", "Archived", "Available", "On Delivery", "Off Duty", "Under Review", "Published", "Draft", "Flagged", "Unflagged"]
-  return <div className="overflow-x-auto"><table className={`w-full ${compact ? "min-w-[540px]" : "min-w-[760px]"} text-left text-xs`}><thead className="bg-default-50 text-default-500"><tr>{config.columns.map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t border-default-100 transition-colors hover:bg-default-50/70">{config.columns.map((heading, cellIndex) => { const cell = row[cellIndex] ?? ""; if (heading === "Actions") { const actions = cell.split(" · ").map((item) => item.trim()).filter(Boolean); return <td key={heading} className="px-3 py-2 align-middle"><div className="flex flex-wrap gap-x-1 gap-y-1">{actions.map((action) => { const lower = action.toLowerCase(); const Icon = lower.includes("delete") || lower.includes("remove") ? Trash2 : lower.includes("edit") || lower.includes("adjust") ? Pencil : lower.includes("view") || lower.includes("review") || lower.includes("detail") || lower.includes("receipt") || lower.includes("track") ? Eye : lower.includes("download") ? Download : lower.includes("record") ? PackagePlus : undefined; const destructive = ["delete", "remove", "reject", "suspend", "archive", "end"].some((word) => lower.includes(word)); return <Button key={action} size="sm" variant="ghost" className={`h-7 min-w-0 px-1.5 text-[11px] ${destructive ? "text-danger" : "text-[#315f43]"}`} onPress={() => onAction?.(action, row, index)}>{Icon && <Icon size={12} />}{action}</Button> })}</div></td> } return <td key={`${cellIndex}-${cell}`} className="max-w-64 px-3 py-3 align-middle text-default-700">{statusValues.includes(cell) ? <Chip size="sm" variant="soft" color={statusColor(cell)}>{cell}</Chip> : <span className={cellIndex === 0 ? "font-semibold" : ""}>{cell}</span>}</td> })}</tr>)}</tbody></table>{rows.length === 0 && <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No records found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>}<div className="flex items-center justify-between border-t border-default-100 pt-3 text-[11px] text-default-500"><span>Showing {rows.length} records</span><div className="flex gap-2"><Button size="sm" variant="outline" isDisabled>Previous</Button><Button size="sm" variant="outline" isDisabled>Next</Button></div></div></div>
+  return <div className="overflow-x-auto"><table className={`w-full ${compact ? "min-w-[540px]" : "min-w-[760px]"} text-left text-xs`}><thead className="bg-default-50 text-default-500"><tr>{config.columns.map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t border-default-100 transition-colors hover:bg-default-50/70">{config.columns.map((heading, cellIndex) => { const cell = row[cellIndex] ?? ""; if (heading === "Actions") { const actions = cell.split(" · ").map((item) => item.trim()).filter(Boolean); return <td key={heading} className="px-3 py-2 align-middle"><div className="flex flex-wrap gap-x-1 gap-y-1">{actions.map((action) => { const lower = action.toLowerCase(); const Icon = lower.includes("delete") || lower.includes("remove") ? Trash2 : lower.includes("edit") || lower.includes("adjust") ? Pencil : lower.includes("view") || lower.includes("review") || lower.includes("detail") || lower.includes("receipt") || lower.includes("track") ? Eye : lower.includes("download") ? Download : lower.includes("record") ? PackagePlus : undefined; const destructive = ["delete", "remove", "reject", "suspend", "archive", "end"].some((word) => lower.includes(word)); return <Button key={action} size="sm" variant="ghost" className={`h-7 min-w-0 px-1.5 text-[11px] ${destructive ? "text-danger" : "text-[#315f43]"}`} onPress={() => onAction?.(action, row, index)}>{Icon && <Icon size={12} />}{action}</Button> })}</div></td> } if (heading === "Image") return <td key={heading} className="px-3 py-2 align-middle">{cell && cell !== "—" ? <Image src={cell} alt={`${row[config.columns.indexOf("Product Name")] || "Product"} image`} width={52} height={52} unoptimized className="size-12 rounded-lg border border-default-200 object-cover" /> : <span className="text-default-400">No image</span>}</td>; return <td key={`${cellIndex}-${cell}`} className="max-w-64 px-3 py-3 align-middle text-default-700">{statusValues.includes(cell) ? <Chip size="sm" variant="soft" color={statusColor(cell)}>{cell}</Chip> : <span className={cellIndex === 0 ? "font-semibold" : ""}>{cell}</span>}</td> })}</tr>)}</tbody></table>{rows.length === 0 && <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No records found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>}<div className="flex items-center justify-between border-t border-default-100 pt-3 text-[11px] text-default-500"><span>Showing {rows.length} records</span><div className="flex gap-2"><Button size="sm" variant="outline" isDisabled>Previous</Button><Button size="sm" variant="outline" isDisabled>Next</Button></div></div></div>
 }
 
 function DialogField({ field, value, onChange, choicesOverride }: { field: string; value: string; onChange: (value: string) => void; choicesOverride?: string[] }) {
