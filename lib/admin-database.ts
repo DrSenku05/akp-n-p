@@ -36,9 +36,10 @@ const orderActions = (status: string, fulfillment: string) => {
   return "View"
 }
 const paymentMethodLabel = (method: string) => {
-  const normalized = method.toLowerCase()
-  if (normalized.includes("cod") || normalized.includes("cash")) return "COD"
-  if (normalized.includes("gcash") || normalized.includes("wallet")) return "GCash"
+  const normalized = method.trim().toLowerCase()
+  // GCash contains the substring "cash", so identify it before COD.
+  if (normalized.includes("gcash") || normalized.includes("wallet")) return "Online payment (GCash)"
+  if (normalized === "cod" || normalized.includes("cash on delivery") || normalized.includes("cash")) return "COD"
   return title(method)
 }
 const paymentStatusLabel = (status: string) => ["verified", "paid"].includes(status.toLowerCase()) ? "Paid" : title(status)
@@ -142,7 +143,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         const fulfillment = o.fulfillment?.toLowerCase() ?? "delivery"
         const method = o.method ? paymentMethodLabel(o.method) : "—"
         const pin = o.latitude !== null && o.longitude !== null ? `${o.latitude},${o.longitude}` : ""
-        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "GCash" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin]
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin]
       }) }
     }
 
@@ -204,7 +205,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       return { error: false, rows: payments.map((p) => {
         const method = paymentMethodLabel(p.method)
         const status = paymentStatusLabel(p.status)
-        const actions = `${status !== "Pending" ? "View Details" : method === "COD" ? "Mark Cash Collected" : method === "GCash" ? "Confirm Payment · Reject Payment" : "View Details"}${p.receipt_url ? " · View Receipt" : ""}`
+        const actions = `${status !== "Pending" ? "View Details" : method === "COD" ? "Mark Cash Collected" : method === "Online payment (GCash)" ? "Confirm Payment · Reject Payment" : "View Details"}${p.receipt_url ? " · View Receipt" : ""}`
         return [`PAY-${p.id.slice(0, 8).toUpperCase()}`, p.order_number, p.customer ?? "Unknown", money(p.amount), method, p.reference ?? "—", status, dateLabel(p.created_at), actions, p.id, p.receipt_url ?? ""]
       }) }
     }
