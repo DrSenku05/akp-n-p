@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Bell, CircleAlert, Download, Filter, ImagePlus, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus } from "lucide-react"
+import { Archive, Bell, CircleAlert, Download, Filter, ImagePlus, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus, Smartphone, Upload } from "lucide-react"
 import { Button, Card, Chip, Input, Modal } from "@heroui/react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -92,8 +92,24 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const [announcementRows, setAnnouncementRows] = useState<string[][]>(databaseAnnouncements ?? [["New product arrivals!", "All Customers", "Aug 14", "View · Delete"], ["Holiday hours notice", "All Customers", "Aug 10", "View · Delete"], ["App maintenance", "All Users", "Aug 5", "View · Delete"]])
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
   const [restoreId, setRestoreId] = useState("")
+  const [gcash, setGcash] = useState({ accountName: "", accountNumber: "", qrUrl: "", qrPath: "", enabled: false, canEdit: false })
+  const [gcashFile, setGcashFile] = useState<File | null>(null)
+  const [gcashPreview, setGcashPreview] = useState("")
+  const [gcashDialogOpen, setGcashDialogOpen] = useState(false)
+  const [gcashBusy, setGcashBusy] = useState(false)
+  const [gcashMessage, setGcashMessage] = useState("")
+  const gcashObjectUrl = useRef("")
   const isDatabasePreview = databaseRows !== undefined
-  useEffect(() => () => { if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current) }, [])
+  useEffect(() => () => { if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current); if (gcashObjectUrl.current) URL.revokeObjectURL(gcashObjectUrl.current) }, [])
+  useEffect(() => {
+    if (slug !== "settings") return
+    fetch("/api/admin/payment-settings", { cache: "no-store" }).then(async (response) => {
+      const result = await response.json() as { settings?: { accountName?: string; accountNumber?: string; qrUrl?: string; qrPath?: string; enabled?: boolean }; canEdit?: boolean; error?: string }
+      if (!response.ok) throw new Error(result.error || "Could not load GCash settings.")
+      setGcash({ accountName: result.settings?.accountName ?? "", accountNumber: result.settings?.accountNumber ?? "", qrUrl: result.settings?.qrUrl ?? "", qrPath: result.settings?.qrPath ?? "", enabled: result.settings?.enabled ?? false, canEdit: result.canEdit ?? false })
+      setGcashPreview(result.settings?.qrUrl ?? "")
+    }).catch((error: unknown) => setGcashMessage(error instanceof Error ? error.message : "Could not load GCash settings."))
+  }, [slug])
   useEffect(() => {
     setLoaded(false)
     if (databaseRows !== undefined) {
@@ -377,6 +393,40 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     if (action === "Record Movement") { openForm(action, undefined, undefined, action, ["Product", "Movement Type", "Quantity", "Reason"]); return }
     openForm(action, undefined, undefined, action)
   }
+  const saveGcashSettings = async () => {
+    if (!gcash.accountName.trim() || !gcash.accountNumber.trim()) { setGcashMessage("Enter the GCash account name and number."); return }
+    if (gcash.enabled && !(gcashFile || gcash.qrUrl)) { setGcashMessage("Upload a QR image before enabling GCash payments."); return }
+    setGcashBusy(true)
+    setGcashMessage("")
+    let qrUrl = gcash.qrUrl
+    let qrPath = gcash.qrPath
+    let uploadedPath = ""
+    try {
+      if (gcashFile) {
+        const safeName = gcashFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-") || "gcash-qr"
+        qrPath = `payment/gcash-${crypto.randomUUID()}-${safeName}`
+        uploadedPath = qrPath
+        const storage = createClient().storage.from("gcash-payment")
+        const { error } = await storage.upload(qrPath, gcashFile, { contentType: gcashFile.type, upsert: false })
+        if (error) throw error
+        qrUrl = storage.getPublicUrl(qrPath).data.publicUrl
+      }
+      const response = await fetch("/api/admin/payment-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountName: gcash.accountName.trim(), accountNumber: gcash.accountNumber.trim(), qrUrl, qrPath, enabled: gcash.enabled }) })
+      const result = await response.json() as { error?: string }
+      if (!response.ok) throw new Error(result.error || "Could not save GCash settings.")
+      setGcash((current) => ({ ...current, qrUrl, qrPath }))
+      setGcashPreview(qrUrl)
+      setGcashFile(null)
+      if (gcashObjectUrl.current) URL.revokeObjectURL(gcashObjectUrl.current)
+      gcashObjectUrl.current = ""
+      setGcashDialogOpen(false)
+      setGcashMessage("GCash payment instructions saved for the customer app.")
+    } catch (error) {
+      if (uploadedPath) await createClient().storage.from("gcash-payment").remove([uploadedPath])
+      setGcashMessage(error instanceof Error ? error.message : "Could not save GCash settings.")
+    }
+    finally { setGcashBusy(false) }
+  }
   const secondary = slug === "promotions" || slug === "notifications" ? "Catalog & Marketing" : ["customers", "feedback", "payments"].includes(slug) ? "Customers" : ["reports", "audit-logs", "backup-restore", "users", "settings"].includes(slug) ? "System" : "Operations"
   const displayStats = getDisplayStats(slug, config.stats, rows, isDatabasePreview)
   return <div className="mx-auto max-w-[1540px] space-y-5">
@@ -385,6 +435,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">AKP Native Products · {secondary}</p><h1 className="text-2xl font-bold tracking-tight">{config.title}</h1><p className="mt-1 text-sm text-default-500">{config.subtitle}</p></div><div className="flex flex-wrap gap-2">{slug === "products" && <Button size="sm" variant="outline" onPress={() => location.assign("/heritage-showcase")}>Heritage Showcase</Button>}{slug === "inventory" && <Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export</Button>}{slug === "reports" && <><Button size="sm" variant="outline" onPress={() => exportRows("pdf")}><Download size={15}/>Export PDF</Button><Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export CSV</Button></>}{slug === "promotions" && <><Button size="sm" variant="outline" onPress={() => triggerTopAction("Announcement")}><Plus size={15}/>Announcement</Button><Button size="sm" variant="primary" onPress={() => triggerTopAction("New Promotion")}><Plus size={15}/>New Promotion</Button></>}{config.action && !["reports", "promotions"].includes(slug) && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}>{config.action.toLowerCase().includes("export") ? <Download size={15} /> : <Plus size={15} />}{config.action}</Button>}</div></div>
     {notice && <div role="status" className="flex items-center justify-between rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{notice}<Button size="sm" variant="ghost" onPress={() => setNotice("")}>Dismiss</Button></div>}
     {slug === "payments" && <Card className="rounded-md border border-warning/30 bg-warning/5 shadow-none"><Card.Content className="grid gap-4 p-4 md:grid-cols-2"><div><p className="text-xs font-semibold text-foreground">GCash · verify outside the website</p><p className="mt-1 text-xs leading-5 text-default-600">Open the platform’s official GCash account separately. Match the actual incoming transfer, exact amount, and customer reference before confirming. A screenshot or reference alone is not proof.</p></div><div><p className="text-xs font-semibold text-foreground">Cash on Delivery · collect first</p><p className="mt-1 text-xs leading-5 text-default-600">Keep COD pending until the full cash amount is physically received. Record collection with “Mark Cash Collected.”</p></div></Card.Content></Card>}
+    {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success"><Smartphone size={19}/></span><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold">GCash online payments</h2><Chip size="sm" variant="soft" color={gcash.enabled ? "success" : "default"}>{gcash.enabled ? "Enabled" : "Not enabled"}</Chip></div><p className="mt-1 max-w-2xl text-xs leading-5 text-default-500">Set the account details and QR image customers should see after choosing GCash in the app. This displays payment instructions only; transfers still require manual verification.</p><p className="mt-2 text-xs text-default-600">{gcash.accountName || "Account name not set"}{gcash.accountNumber ? ` · ${gcash.accountNumber}` : ""}</p>{gcashMessage && <p role="status" className="mt-2 text-xs text-success">{gcashMessage}</p>}</div></div><div className="flex items-center gap-3">{gcashPreview ? <img src={gcashPreview} alt="Configured GCash QR code" className="size-16 rounded-lg border border-default-200 bg-white object-contain p-1"/> : <div className="flex size-16 items-center justify-center rounded-lg border border-dashed border-default-300 text-default-400"><ImagePlus size={20}/></div>}<Button size="sm" variant="outline" isDisabled={!gcash.canEdit} onPress={() => { setGcashMessage(""); setGcashDialogOpen(true) }}>{gcash.qrUrl ? "Manage GCash" : "Set up GCash"}</Button></div></Card.Content></Card>}
     {displayStats && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{displayStats.map(([label, value, note]) => <Card key={label} className="rounded-md border border-default-200 shadow-none"><Card.Content className="p-4"><p className="text-xs text-default-500">{label}</p><p className="mt-2 text-xl font-bold">{value}</p>{note && <p className="mt-1 text-[11px] text-default-400">{note}</p>}</Card.Content></Card>)}</div>}
     {slug === "backup-restore" && <Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="grid gap-5 p-4 md:grid-cols-[1.1fr_0.9fr]"><div><div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Archive size={16} /> Backup history</div><p className="text-xs text-default-500">Select a backup to restore. Restoring overwrites current data and must be confirmed.</p></div><div className="flex flex-wrap items-center gap-2"><select aria-label="Select backup to restore" value={restoreId} onChange={(event) => setRestoreId(event.target.value)} className="h-9 min-w-48 rounded-md border border-default-200 bg-background px-3 text-xs"><option value="">Select backup to restore</option>{rows.map((r) => <option key={r[0]} value={r[0]}>{r[0]} · {r[3]}</option>)}</select><Button size="sm" variant="danger" isDisabled={!restoreId} onPress={() => setDialog({ title: "Restore backup", kind: "confirm", row: [restoreId], action: "Restore", message: "This irreversible operation normally replaces live business data. Here it only simulates restore because this prototype has no database." })}><RotateCcw size={14} />Restore selected</Button></div></Card.Content></Card>}
     {slug === "reports" && <><div className="flex flex-wrap items-end justify-between gap-3"><label className="space-y-1 text-xs text-default-500">Date range<select aria-label="Date range" value={dateRange} onChange={(event) => setDateRange(event.target.value)} className="block h-9 min-w-48 rounded-md border border-default-200 bg-background px-3 text-xs"><option>Last 7 days</option><option>This month</option><option>Custom range</option></select></label>{dateRange === "Custom range" && <div className="flex flex-wrap gap-2"><label className="space-y-1 text-xs text-default-500">From<input aria-label="Custom start date" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} className="block h-9 rounded-md border border-default-200 bg-background px-2 text-xs" /></label><label className="space-y-1 text-xs text-default-500">To<input aria-label="Custom end date" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} className="block h-9 rounded-md border border-default-200 bg-background px-2 text-xs" /></label></div>}<p className="text-[11px] text-default-400">Choose a report to preview</p></div><div className="grid gap-3 md:grid-cols-2">{config.rows.map((row) => <Card key={row[0]} className="rounded-md border border-default-200 shadow-none"><Card.Content className="flex items-center justify-between gap-4 p-4"><div><p className="text-sm font-semibold">{row[0]}</p><p className="mt-1 text-xs text-default-500">{row[1]}</p></div><Button size="sm" variant="outline" onPress={() => setGeneratedReport(row[0])}>Generate</Button></Card.Content></Card>)}</div><Card className="min-h-48 rounded-md border border-default-200 shadow-none"><Card.Content className="flex min-h-48 flex-col items-center justify-center p-6 text-center"><p className="text-sm font-semibold">{generatedReport ?? "Report Preview Area"}</p><p className="mt-2 max-w-lg text-xs leading-5 text-default-500">{generatedReport ? `${generatedReport} for ${dateRange === "Custom range" ? `${customStart || "start date"} to ${customEnd || "end date"}` : dateRange} · Preview is ready for export.` : "Generated report chart or table will appear here after you choose Generate."}</p>{generatedReport && <div className="mt-5 flex h-16 items-end gap-2">{[35, 58, 46, 78, 62, 92, 70, 100].map((height, index) => <span key={index} className="w-5 rounded-t-sm bg-[#8dab92]" style={{ height: `${height}%` }} />)}</div>}</Card.Content></Card></>}
@@ -420,6 +471,9 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           {dialog?.kind !== "view" && <Modal.Footer><Button variant="outline" slot="close" isDisabled={saving}>Cancel</Button><Button variant={dialog?.kind === "confirm" && isDestructive(dialog.action) ? "danger" : "primary"} isDisabled={saving} onPress={commitDialog}>{saving ? "Saving…" : dialog?.kind === "confirm" ? "Confirm" : "Save changes"}</Button></Modal.Footer>}
         </Modal.Dialog>
       </Modal.Container>
+    </Modal.Backdrop>
+    <Modal.Backdrop isOpen={gcashDialogOpen} onOpenChange={(open) => { if (!open && !gcashBusy) setGcashDialogOpen(false) }}>
+      <Modal.Container><Modal.Dialog className="max-h-[90dvh] overflow-y-auto sm:max-w-xl"><Modal.CloseTrigger/><Modal.Header><Modal.Heading>GCash payment details</Modal.Heading></Modal.Header><Modal.Body><div className="space-y-4"><p className="text-sm leading-6 text-default-500">Customers see these details after choosing GCash. Use the registered account name and number. Do not upload payment receipts here.</p><label className="block space-y-1 text-xs font-medium">GCash account name<input aria-label="GCash account name" autoComplete="name" className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm font-normal" value={gcash.accountName} onChange={(event) => setGcash((current) => ({ ...current, accountName: event.target.value }))}/></label><label className="block space-y-1 text-xs font-medium">GCash mobile/account number<input aria-label="GCash mobile or account number" inputMode="tel" autoComplete="tel" className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm font-normal" value={gcash.accountNumber} onChange={(event) => setGcash((current) => ({ ...current, accountNumber: event.target.value }))}/></label><div className="space-y-2"><p className="text-xs font-medium">GCash QR image <span className="font-normal text-default-500">PNG, JPG, or WEBP · up to 5 MB</span></p>{gcashPreview ? <img src={gcashPreview} alt="GCash QR code preview" className="mx-auto max-h-64 w-full rounded-lg border border-default-200 bg-white object-contain p-2"/> : <div className="flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-default-300 text-default-500"><ImagePlus size={22}/><span className="text-xs">Choose an image to preview the QR code</span></div>}<label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-default-200 px-3 text-xs font-medium hover:bg-default-50"><Upload size={14}/>{gcashFile ? "Choose another image" : "Upload QR from this device"}<input type="file" className="sr-only" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { setGcashMessage("Choose a PNG, JPG, or WEBP image."); return } if (file.size > 5 * 1024 * 1024) { setGcashMessage("The GCash QR image must be 5 MB or smaller."); return } if (gcashObjectUrl.current) URL.revokeObjectURL(gcashObjectUrl.current); gcashObjectUrl.current = URL.createObjectURL(file); setGcashFile(file); setGcashPreview(gcashObjectUrl.current); setGcashMessage("") }}/></label></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={gcash.enabled} onChange={(event) => setGcash((current) => ({ ...current, enabled: event.target.checked }))}/><span>Show GCash as an online payment option</span></label><p className="rounded-lg bg-warning/10 p-3 text-xs leading-5 text-warning">The QR is for customers to pay. Independently verify each transfer in GCash before marking an order paid.</p></div></Modal.Body><Modal.Footer><Button variant="outline" isDisabled={gcashBusy} onPress={() => setGcashDialogOpen(false)}>Cancel</Button><Button variant="primary" isDisabled={gcashBusy} onPress={saveGcashSettings}>{gcashBusy ? "Saving…" : "Save GCash settings"}</Button></Modal.Footer></Modal.Dialog></Modal.Container>
     </Modal.Backdrop>
     <p className="text-[10px] text-default-400">{isDatabasePreview ? "Record values are loaded from Supabase. Demo seed entries are clearly marked in the database." : "Screen content follows the supplied admin references. Sample records are illustrative and stored in this browser until a database connection is configured."}</p>
   </div>
