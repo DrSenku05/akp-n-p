@@ -20,7 +20,26 @@ type ProductRecord = {
 const money = (amount: string | number) => `₱${Number(amount).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`
 const dateLabel = (value: Date | string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
-const orderActions = (status: string) => status === "pending" ? "View · Process" : status === "processing" ? "View · Ship" : status === "shipped" ? "View · Track" : "View"
+const orderStatusLabel = (status: string, fulfillment: string) => {
+  if (status === "pending") return "Pending"
+  if (["processing", "preparing", "confirmed"].includes(status)) return "Preparing"
+  if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) return ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Ready for Pickup" : "Out for Delivery"
+  if (["delivered", "completed"].includes(status)) return "Completed"
+  return title(status)
+}
+const orderActions = (status: string, fulfillment: string) => {
+  if (status === "pending") return "View · Start Preparing · Cancel"
+  if (["processing", "preparing", "confirmed"].includes(status)) return `View · ${["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Ready for Pickup" : "Out for Delivery"} · Cancel`
+  if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) return "View · Complete Order"
+  return "View"
+}
+const paymentMethodLabel = (method: string) => {
+  const normalized = method.toLowerCase()
+  if (normalized.includes("cod") || normalized.includes("cash")) return "COD"
+  if (normalized.includes("gcash") || normalized.includes("wallet")) return "GCash"
+  return title(method)
+}
+const paymentStatusLabel = (status: string) => ["verified", "paid"].includes(status.toLowerCase()) ? "Paid" : title(status)
 
 async function getDemoProducts() {
   return prisma.$queryRaw<ProductRecord[]>`
@@ -78,18 +97,32 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "orders") {
-      const orders = await prisma.$queryRaw<{ order_number: string; customer: string | null; item_count: number; total: string; payment: string | null; status: string; created_at: Date }[]>`
-        select o.order_number, c.name as customer, count(distinct oi.id)::int as item_count,
-          o.total_amount::text as total, max(p.status) as payment, o.status, o.created_at
+      const orders = await prisma.$queryRaw<{ order_number: string; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; created_at: Date }[]>`
+        select o.order_number, c.name as customer, coalesce(items.item_count, 0)::int as item_count,
+          items.summary as items, o.total_amount::text as total, p.method, p.status as payment,
+          p.reference, o.fulfillment_method as fulfillment, o.status,
+          nullif(concat_ws(', ', nullif(trim(concat_ws(' ', a.address_line, a.barangay)), ''), a.city, a.province, a.postal_code), '') as address,
+          o.created_at
         from public.orders o
         left join public.customers c on c.id = o.customer_id
-        left join public.order_items oi on oi.order_id = o.id
-        left join public.payments p on p.order_id = o.id
-        where o.order_number like 'DEMO-ORD-%'
-        group by o.id, c.name
+        left join public.customer_addresses a on a.id = o.delivery_address_id
+        left join lateral (
+          select count(*)::int as item_count,
+            string_agg(concat(oi.product_name, ' × ', oi.quantity), ', ' order by oi.created_at) as summary
+          from public.order_items oi where oi.order_id = o.id
+        ) items on true
+        left join lateral (
+          select pay.method, pay.status, pay.reference
+          from public.payments pay where pay.order_id = o.id
+          order by pay.created_at desc limit 1
+        ) p on true
         order by o.created_at desc, o.order_number
       `
-      return { error: false, rows: orders.map((o) => [o.order_number, o.customer ?? "Unknown", String(o.item_count), money(o.total), title(o.payment ?? "unpaid"), title(o.status), dateLabel(o.created_at), orderActions(o.status)]) }
+      return { error: false, rows: orders.map((o) => {
+        const fulfillment = o.fulfillment?.toLowerCase() ?? "delivery"
+        const method = o.method ? paymentMethodLabel(o.method) : "—"
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "GCash" ? o.reference ?? "Not provided" : "—", o.fulfillment]
+      }) }
     }
 
     if (slug === "delivery-personnel") {
@@ -134,16 +167,20 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "payments") {
-      const payments = await prisma.$queryRaw<{ id: string; order_number: string; customer: string | null; amount: string; method: string; status: string; created_at: Date }[]>`
+      const payments = await prisma.$queryRaw<{ id: string; order_number: string; customer: string | null; amount: string; method: string; reference: string | null; status: string; created_at: Date }[]>`
         select p.id::text as id, o.order_number, c.name as customer,
-          p.amount::text as amount, p.method, p.status, p.created_at
+          p.amount::text as amount, p.method, p.reference, p.status, p.created_at
         from public.payments p
         join public.orders o on o.id = p.order_id
         left join public.customers c on c.id = o.customer_id
-        where p.reference like 'DEMO-PAY-%'
         order by p.created_at desc
       `
-      return { error: false, rows: payments.map((p, index) => [`TXN-DEMO-${String(index + 1).padStart(3, "0")}`, p.order_number, p.customer ?? "Unknown", money(p.amount), p.method, title(p.status), dateLabel(p.created_at), p.status === "pending" ? "Verify · Reject" : "View Receipt"]) }
+      return { error: false, rows: payments.map((p) => {
+        const method = paymentMethodLabel(p.method)
+        const status = paymentStatusLabel(p.status)
+        const actions = status !== "Pending" ? "View Details" : method === "COD" ? "Mark Cash Collected" : method === "GCash" ? "Confirm Payment · Reject Payment" : "View Details"
+        return [`PAY-${p.id.slice(0, 8).toUpperCase()}`, p.order_number, p.customer ?? "Unknown", money(p.amount), method, p.reference ?? "—", status, dateLabel(p.created_at), actions, p.id]
+      }) }
     }
 
     if (slug === "heritage-showcase") {

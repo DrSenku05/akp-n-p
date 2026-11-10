@@ -87,9 +87,34 @@ export async function POST(request: NextRequest) {
     const actualType = action === "record-movement" ? movementType : "adjustment"
     result = await supabase.from("inventory_movements").insert({ product_id: product.id, movement_type: actualType, quantity_delta: delta, reason: value("Reason") || "Admin inventory update", created_by: claims.sub })
   } else if (module === "orders") {
-    const status = action.includes("process") ? "processing" : action.includes("ship") ? "shipped" : action.includes("deliver") ? "delivered" : action.includes("cancel") ? "cancelled" : ""
-    if (!status) return fail("Unsupported order action.")
-    result = await supabase.from("orders").update({ status }).eq("order_number", row[0].replace(/^#/, "")).select("id")
+    const orderNumber = row[0]?.replace(/^#/, "")
+    if (!orderNumber) return fail("Order number is required.")
+    const { data: order, error: lookupError } = await supabase.from("orders").select("id,status,fulfillment_method").eq("order_number", orderNumber).maybeSingle()
+    if (lookupError) return fail(lookupError.message)
+    if (!order) return fail("Order was not found.", 404)
+    const current = order.status.toLowerCase()
+    const fulfillment = order.fulfillment_method.toLowerCase()
+    const isWalkIn = ["pickup", "walk_in", "walk-in"].includes(fulfillment)
+    let status = ""
+    if (action.includes("start preparing")) {
+      if (current !== "pending") return fail("Only pending orders can start preparation.", 409)
+      status = "processing"
+    } else if (action.includes("ready for pickup")) {
+      if (!isWalkIn) return fail("Only walk-in orders can be marked ready for pickup.")
+      if (current !== "processing") return fail("The order must be preparing before it can be ready for pickup.", 409)
+      status = "shipped"
+    } else if (action.includes("out for delivery")) {
+      if (isWalkIn) return fail("Walk-in orders do not go out for delivery.")
+      if (current !== "processing") return fail("The order must be preparing before it can go out for delivery.", 409)
+      status = "shipped"
+    } else if (action.includes("complete")) {
+      if (current !== "shipped") return fail("The order must be ready for pickup or out for delivery before completion.", 409)
+      status = "delivered"
+    } else if (action.includes("cancel")) {
+      if (!["pending", "processing"].includes(current)) return fail("Only pending or preparing orders can be cancelled.", 409)
+      status = "cancelled"
+    } else return fail("Unsupported order action.")
+    result = await supabase.from("orders").update({ status }).eq("id", order.id).select("id")
   } else if (module === "customers") {
     const email = row[2]
     if (!email || email === "—") return fail("This customer row has no email identifier, so it cannot be safely updated.")
@@ -104,10 +129,27 @@ export async function POST(request: NextRequest) {
     if (!status) return fail("Unsupported return request action.")
     result = await supabase.from("return_requests").update({ status, decision_note: value("Decision Notes") || null, decided_by: claims.sub, decided_at: new Date().toISOString() }).eq("request_number", row[0]).select("id")
   } else if (module === "payments") {
-    if (!action.includes("verify") && !action.includes("reject")) return fail("Unsupported payment action.")
-    const { data: order } = await supabase.from("orders").select("id").eq("order_number", row[1].replace(/^#/, "")).maybeSingle()
-    if (!order) return fail("The linked order was not found.", 404)
-    result = await supabase.from("payments").update({ status: action.includes("verify") ? "verified" : "rejected", verified_by: claims.sub, verified_at: new Date().toISOString() }).eq("order_id", order.id).select("id")
+    const paymentId = row[9]
+    if (!paymentId) return fail("Payment identifier is missing. Refresh the payment list and try again.")
+    const { data: payment, error: lookupError } = await supabase.from("payments").select("id,method,status").eq("id", paymentId).maybeSingle()
+    if (lookupError) return fail(lookupError.message)
+    if (!payment) return fail("Payment record was not found.", 404)
+    if (payment.status.toLowerCase() !== "pending") return fail("Only pending payments can be changed.", 409)
+    const method = payment.method.toLowerCase()
+    const isCod = method.includes("cod") || method.includes("cash")
+    const isGcash = method.includes("gcash") || method.includes("wallet")
+    let status = ""
+    if (action.includes("reject payment")) {
+      if (!isGcash) return fail("Only GCash payments can be rejected here.")
+      status = "rejected"
+    } else if (action.includes("confirm payment")) {
+      if (!isGcash) return fail("This action is only for GCash payments.")
+      status = "verified"
+    } else if (action.includes("cash collected")) {
+      if (!isCod) return fail("Cash collection can only be recorded for COD payments.")
+      status = "verified"
+    } else return fail("Unsupported payment action.")
+    result = await supabase.from("payments").update({ status, verified_by: claims.sub, verified_at: new Date().toISOString() }).eq("id", payment.id).eq("status", "pending").select("id")
   } else if (module === "feedback") {
     const status = action.includes("remove") ? "removed" : action.includes("flag") && !action.includes("unflag") ? "flagged" : "visible"
     result = await supabase.from("feedback").update({ moderation_status: status }).eq("comment", row[4].replace(/^\[flagged content\]$/, "DEMO: sample feedback; replace with a verified customer review.")).select("id")
