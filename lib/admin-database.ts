@@ -112,7 +112,9 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     if (slug === "orders") {
       const orders = await prisma.$queryRaw<{ order_number: string; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; latitude: number | null; longitude: number | null; created_at: Date }[]>`
         select o.order_number, c.name as customer, coalesce(items.item_count, 0)::int as item_count,
-          items.summary as items, o.total_amount::text as total, p.method, p.status as payment,
+          items.summary as items, o.total_amount::text as total,
+          coalesce(nullif(o.payment_method, ''), p.method) as method,
+          coalesce(p.status, o.payment_status) as payment,
           p.reference, o.fulfillment_method as fulfillment, o.status,
           nullif(concat_ws(', ', nullif(trim(concat_ws(' ', a.address_line, a.barangay)), ''),
             case when nullif(trim(coalesce(a.landmark, o.delivery_address->>'landmark')), '') is not null
