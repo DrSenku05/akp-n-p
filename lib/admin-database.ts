@@ -30,7 +30,7 @@ const orderStatusLabel = (status: string, fulfillment: string) => {
   return title(status)
 }
 const orderActions = (status: string, fulfillment: string) => {
-  if (status === "pending") return "View · Start Preparing · Cancel"
+  if (status === "pending") return "View · Accept Order · Cancel"
   if (["processing", "preparing", "confirmed"].includes(status)) return `View · ${["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Ready for Pickup" : "Out for Delivery"} · Cancel`
   if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) return "View · Complete Order"
   return "View"
@@ -87,25 +87,38 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "customers") {
-      const customers = await prisma.$queryRaw<{ id: string; name: string; email: string | null; phone: string | null; orders: number; spent: string; status: string }[]>`
+      const customers = await prisma.$queryRaw<{ id: string; name: string; email: string | null; phone: string | null; orders: number; spent: string; status: string; addresses: string | null; address_pin: string | null }[]>`
         select c.id::text as id, c.name, c.email, c.phone, c.status,
+          address_book.addresses, address_book.address_pin,
           count(o.id)::int as orders, coalesce(sum(o.total_amount), 0)::text as spent
         from public.customers c
         left join public.orders o on o.customer_id = c.id and o.order_number not like 'DEMO-ORD-%'
+        left join lateral (
+          select string_agg(nullif(concat_ws(', ', nullif(trim(a.address_line), ''), nullif(trim(a.barangay), ''), a.city, a.province, a.postal_code, a.country,
+            case when nullif(trim(a.landmark), '') is not null then 'Landmark: ' || trim(a.landmark) end), ''), ' · ' order by a.is_default desc, a.created_at) as addresses,
+            (select pin.latitude::text || ',' || pin.longitude::text from public.customer_addresses pin
+             where pin.customer_id = c.id and pin.latitude is not null and pin.longitude is not null
+             order by pin.is_default desc, pin.created_at limit 1) as address_pin
+          from public.customer_addresses a where a.customer_id = c.id
+        ) address_book on true
         where coalesce(c.email, '') not like '%.demo@example.com'
           and c.name not like 'Demo Customer - %'
-        group by c.id, c.name, c.email, c.phone, c.status
+        group by c.id, c.name, c.email, c.phone, c.status, address_book.addresses, address_book.address_pin
         order by c.name
       `
-      return { error: false, rows: customers.map((c) => [`CUS-${c.id.slice(0, 8).toUpperCase()}`, c.name, c.email ?? "—", c.phone ?? "—", String(c.orders), money(c.spent), title(c.status), `View · Edit · ${c.status === "active" ? "Suspend" : "Reactivate"}`, c.id]) }
+      return { error: false, rows: customers.map((c) => [`CUS-${c.id.slice(0, 8).toUpperCase()}`, c.name, c.email ?? "—", c.phone ?? "—", String(c.orders), money(c.spent), title(c.status), `View · Edit · ${c.status === "active" ? "Suspend" : "Reactivate"}`, c.id, c.addresses ?? "No saved addresses", c.address_pin ?? ""]) }
     }
 
     if (slug === "orders") {
-      const orders = await prisma.$queryRaw<{ order_number: string; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; created_at: Date }[]>`
+      const orders = await prisma.$queryRaw<{ order_number: string; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; latitude: number | null; longitude: number | null; created_at: Date }[]>`
         select o.order_number, c.name as customer, coalesce(items.item_count, 0)::int as item_count,
           items.summary as items, o.total_amount::text as total, p.method, p.status as payment,
           p.reference, o.fulfillment_method as fulfillment, o.status,
-          nullif(concat_ws(', ', nullif(trim(concat_ws(' ', a.address_line, a.barangay)), ''), a.city, a.province, a.postal_code), '') as address,
+          nullif(concat_ws(', ', nullif(trim(concat_ws(' ', a.address_line, a.barangay)), ''),
+            case when nullif(trim(coalesce(a.landmark, o.delivery_address->>'landmark')), '') is not null
+              then 'Landmark: ' || trim(coalesce(a.landmark, o.delivery_address->>'landmark')) end,
+            a.city, a.province, a.postal_code), '') as address,
+          a.latitude, a.longitude,
           o.created_at
         from public.orders o
         left join public.customers c on c.id = o.customer_id
@@ -126,7 +139,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       return { error: false, rows: orders.map((o) => {
         const fulfillment = o.fulfillment?.toLowerCase() ?? "delivery"
         const method = o.method ? paymentMethodLabel(o.method) : "—"
-        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "GCash" ? o.reference ?? "Not provided" : "—", o.fulfillment]
+        const pin = o.latitude !== null && o.longitude !== null ? `${o.latitude},${o.longitude}` : ""
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "GCash" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin]
       }) }
     }
 
@@ -175,9 +189,9 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "payments") {
-      const payments = await prisma.$queryRaw<{ id: string; order_number: string; customer: string | null; amount: string; method: string; reference: string | null; status: string; created_at: Date }[]>`
+      const payments = await prisma.$queryRaw<{ id: string; order_number: string; customer: string | null; amount: string; method: string; reference: string | null; receipt_url: string | null; status: string; created_at: Date }[]>`
         select p.id::text as id, o.order_number, c.name as customer,
-          p.amount::text as amount, p.method, p.reference, p.status, p.created_at
+          p.amount::text as amount, p.method, p.reference, p.receipt_url, p.status, p.created_at
         from public.payments p
         join public.orders o on o.id = p.order_id
         left join public.customers c on c.id = o.customer_id
@@ -188,8 +202,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       return { error: false, rows: payments.map((p) => {
         const method = paymentMethodLabel(p.method)
         const status = paymentStatusLabel(p.status)
-        const actions = status !== "Pending" ? "View Details" : method === "COD" ? "Mark Cash Collected" : method === "GCash" ? "Confirm Payment · Reject Payment" : "View Details"
-        return [`PAY-${p.id.slice(0, 8).toUpperCase()}`, p.order_number, p.customer ?? "Unknown", money(p.amount), method, p.reference ?? "—", status, dateLabel(p.created_at), actions, p.id]
+        const actions = `${status !== "Pending" ? "View Details" : method === "COD" ? "Mark Cash Collected" : method === "GCash" ? "Confirm Payment · Reject Payment" : "View Details"}${p.receipt_url ? " · View Receipt" : ""}`
+        return [`PAY-${p.id.slice(0, 8).toUpperCase()}`, p.order_number, p.customer ?? "Unknown", money(p.amount), method, p.reference ?? "—", status, dateLabel(p.created_at), actions, p.id, p.receipt_url ?? ""]
       }) }
     }
 

@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     const fulfillment = order.fulfillment_method.toLowerCase()
     const isWalkIn = ["pickup", "walk_in", "walk-in"].includes(fulfillment)
     let status = ""
-    if (action.includes("start preparing")) {
+    if (action.includes("accept") || action.includes("start preparing")) {
       if (current !== "pending") return fail("Only pending orders can start preparation.", 409)
       status = "processing"
     } else if (action.includes("ready for pickup")) {
