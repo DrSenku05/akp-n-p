@@ -28,7 +28,7 @@ const extras: Record<string, ModuleConfig> = {
   notifications: { title: "Marketing and Notifications", subtitle: "Send announcements and customer notifications", action: "New Announcement", search: "Search sent notifications...", columns: ["Title", "Target", "Type", "Sent", "Status", "Actions"], rows: [["New product arrivals!", "All Customers", "Announcement", "Aug 14", "Sent", "View"], ["Holiday hours notice", "All Customers", "Announcement", "Aug 10", "Sent", "View"], ["App maintenance", "All Users", "System", "Aug 5", "Sent", "View"]], note: "Compose a message, select a target audience and notification type, then send." },
   "heritage-showcase": { title: "Native Heritage Showcase", subtitle: "Curate local products and the stories behind their craft", action: "Add to Showcase", search: "Search showcased products...", columns: ["Product", "Craft / Origin", "Category", "Visibility", "Featured", "Actions"], rows: [["Woven Abaca Bag", "Handwoven abaca · South Cotabato", "Bags", "Published", "Yes", "Edit · Remove"], ["Native Rattan Basket", "Traditional rattan weaving", "Baskets", "Published", "Yes", "Edit · Remove"], ["Bamboo Jewelry Set", "Locally crafted bamboo", "Accessories", "Draft", "No", "Edit · Publish"]], note: "Showcase entries connect to catalog products and explain local materials, makers, and craft traditions." },
   "returns-and-refunds": { title: "Return and Refund Management", subtitle: "Handle eligible return and refund requests from customers", action: "Export", stats: [["Open Requests", "4"], ["Under Review", "2"], ["Approved", "1"], ["Rejected", "1"]], search: "Search requests...", columns: ["Request ID", "Order ID", "Customer", "Reason", "Type", "Amount", "Status", "Actions"], rows: [["RET-007", "#ORD-0033", "Rosa Tan", "Defective item", "Refund", "₱780", "Open", "Review · Approve · Reject"]] },
-  users: { title: "User Management", subtitle: "Manage Owner and Staff access to the administration system", action: "Add User", search: "Search by name or email...", filter: "All Roles", columns: ["Name", "Email", "Role", "Status", "Last Login", "Actions"], rows: [["AKP Owner", "admin@akp.com", "Owner", "Active", "Aug 14, 08:00 AM", "Edit"], ["Staff Account 01", "staff01@akp.com", "Staff", "Active", "Aug 14, 10:38 AM", "Edit · Suspend"], ["Staff Account 02", "staff02@akp.com", "Staff", "Active", "Aug 14, 09:20 AM", "Edit · Suspend"]], note: "Owner manages users and roles. Staff access follows the module permission policy." },
+  users: { title: "User Management", subtitle: "Review real owner, staff, delivery driver, and customer accounts", stats: [["Owner/Admin", "0"], ["Staff", "0"], ["Delivery Drivers", "0"], ["Customers", "0"]], search: "Search by name or email...", filter: "Account type", filterOptions: ["Owner/Admin", "Staff", "Delivery Driver", "Customer"], columns: ["Account ID", "Name", "Email", "Account Type", "Status", "Last Sign In", "Actions"], rows: [], note: "Accounts are ranked by type. Suspending a driver with active deliveries is blocked; owner accounts cannot be suspended from this screen. Customer and driver status changes update their records and depend on the customer app enforcing those statuses." },
   settings: { title: "Settings", subtitle: "Configure store, operational, and account preferences", columns: ["Setting", "Current value", "Description", "Actions"], search: "", rows: [["Store name", "AKP Native Products Trading", "Displayed in admin and customer surfaces", "Edit"], ["Currency", "PHP (₱)", "Local transaction currency", "Edit"], ["Low stock threshold", "Per product", "Reorder level is set for each SKU", "Manage"], ["Return window", "7 days", "Eligible return period", "Edit"], ["Automatic backups", "Daily at 2:00 AM", "Backup schedule", "Configure"]] },
 }
 
@@ -44,6 +44,7 @@ function getDisplayStats(slug: string, stats: ModuleConfig["stats"], rows: strin
   if (slug === "orders") return [["Awaiting Action", String(countStatus(7, "pending"))], ["Preparing", String(countStatus(7, "preparing"))], ["In Fulfillment", String(rows.filter((row) => ["ready for pickup", "out for delivery"].includes(row[7]?.toLowerCase())).length)], ["Completed", String(countStatus(7, "completed"))]] as [string, string, string?][]
   if (slug === "inventory") return [["Total SKUs", String(rows.length)], ["Low Stock Items", String(rows.filter((row) => ["low stock", "out of stock"].includes(row[5]?.toLowerCase())).length), "At or below reorder threshold"], ["Out of Stock", String(countStatus(5, "out of stock"))], ["Last Updated", today, "Philippine time"]] as [string, string, string?][]
   if (slug === "delivery-personnel") return [["Total Personnel", String(rows.length)], ["Available", String(countStatus(4, "available"))], ["On Delivery", String(countStatus(4, "on delivery"))], ["Assigned Orders", String(rows.filter((row) => row[3] && row[3] !== "—").length)]] as [string, string, string?][]
+  if (slug === "users") return [["Owner/Admin", String(rows.filter((row) => row[3] === "Owner/Admin").length)], ["Staff", String(rows.filter((row) => row[3] === "Staff").length)], ["Delivery Drivers", String(rows.filter((row) => row[3] === "Delivery Driver").length)], ["Customers", String(rows.filter((row) => row[3] === "Customer").length)]] as [string, string, string?][]
   if (slug === "returns-refunds") return [["Open Requests", String(countStatus(6, "pending"))], ["Under Review", String(countStatus(6, "under review"))], ["Approved", String(countStatus(6, "approved"))], ["Rejected", String(countStatus(6, "rejected"))]] as [string, string, string?][]
   if (slug === "feedback") {
     const ratings = rows.map((row) => (row[3]?.match(/★/g) ?? []).length).filter((rating) => rating > 0)
@@ -89,7 +90,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const [dateRange, setDateRange] = useState("This month")
   const [customStart, setCustomStart] = useState("")
   const [customEnd, setCustomEnd] = useState("")
-  const [announcementRows, setAnnouncementRows] = useState<string[][]>(databaseAnnouncements ?? [["New product arrivals!", "All Customers", "Aug 14", "View · Delete"], ["Holiday hours notice", "All Customers", "Aug 10", "View · Delete"], ["App maintenance", "All Users", "Aug 5", "View · Delete"]])
+  const [announcementRows, setAnnouncementRows] = useState<string[][]>(databaseError ? [] : databaseAnnouncements ?? [["New product arrivals!", "All Customers", "Aug 14", "View · Delete"], ["Holiday hours notice", "All Customers", "Aug 10", "View · Delete"], ["App maintenance", "All Users", "Aug 5", "View · Delete"]])
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({})
   const [restoreId, setRestoreId] = useState("")
   const [gcash, setGcash] = useState({ accountName: "", accountNumber: "", qrUrl: "", qrPath: "", enabled: false, canEdit: false })
@@ -114,7 +115,8 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     setLoaded(false)
     if (databaseRows !== undefined) {
       setRows(databaseRows)
-      if (databaseAnnouncements !== undefined) setAnnouncementRows(databaseAnnouncements)
+      if (databaseError) setAnnouncementRows([])
+      else if (databaseAnnouncements !== undefined) setAnnouncementRows(databaseAnnouncements)
       setLoaded(true)
       return
     }
@@ -127,7 +129,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       if (savedNotes) setDecisionNotes(JSON.parse(savedNotes) as Record<string, string>)
     } catch { setRows(config.rows) }
     setLoaded(true)
-  }, [slug, databaseRows, databaseAnnouncements])
+  }, [slug, databaseRows, databaseAnnouncements, databaseError])
   useEffect(() => { if (loaded && !isDatabasePreview) localStorage.setItem(`akp-admin:${slug}`, JSON.stringify(rows)) }, [loaded, isDatabasePreview, rows, slug])
   useEffect(() => { if (loaded && !isDatabasePreview) localStorage.setItem("akp-admin:announcements", JSON.stringify(announcementRows)) }, [loaded, isDatabasePreview, announcementRows])
   useEffect(() => { if (loaded) localStorage.setItem(`akp-admin:notes:${slug}`, JSON.stringify(decisionNotes)) }, [loaded, decisionNotes, slug])
@@ -198,7 +200,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     let uploadedImageUrl = ""
     let uploadedImagePath = ""
     if (isDatabasePreview) {
-      const writable = ["products", "inventory", "orders", "customers", "delivery-personnel", "returns-refunds", "payments", "feedback", "promotions", "notifications", "heritage-showcase"]
+      const writable = ["products", "inventory", "orders", "customers", "delivery-personnel", "returns-refunds", "payments", "feedback", "promotions", "notifications", "heritage-showcase", "users"]
       if (!writable.includes(slug)) {
         setNotice("This module is read-only because its schema has no safe edit operation configured.")
         setDialog(null)
@@ -229,8 +231,8 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           if (uploadedImagePath) await createClient().storage.from("product-images").remove([uploadedImagePath])
           throw new Error(result.error || "Database save failed.")
         }
-        if (["orders", "payments"].includes(slug)) {
-          setNotice(`${dialog.action} saved for ${dialog.row?.[0] ?? "record"}.`)
+        if (["orders", "payments", "users"].includes(slug)) {
+          setNotice(`${dialog.action} saved for ${dialog.row?.[1] ?? dialog.row?.[0] ?? "record"}.`)
           setDialog(null)
           router.refresh()
           return
@@ -508,6 +510,8 @@ function isDestructive(action?: string) {
 
 function confirmMessage(action: string, slug: string) {
   const normalized = action.toLowerCase()
+  if (slug === "users" && normalized.includes("suspend")) return "Suspend this account? The account record will be marked suspended. This does not delete the account or its history."
+  if (slug === "users" && normalized.includes("reactivate")) return "Reactivate this account so its current status is active/available again?"
   if (normalized.includes("archive")) return "Archive this product from the active catalog? It can be reactivated later."
   if (normalized.includes("end")) return "End this promotion? It will become inactive and can be reactivated later."
   if (normalized.includes("delete") || normalized.includes("remove")) return `Remove this ${slug === "feedback" ? "feedback record" : "record"}? This cannot be undone in the local demo.`

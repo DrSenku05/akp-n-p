@@ -3,6 +3,7 @@ import "server-only"
 import { prisma } from "@/prisma/prisma"
 
 type PreviewResult = { rows: string[][]; announcements?: string[][]; error: boolean } | null
+const databaseModules = new Set(["customers", "orders", "delivery-personnel", "returns-refunds", "feedback", "payments", "promotions", "notifications", "audit-logs", "users"])
 type ProductRecord = {
   sku: string
   name: string
@@ -19,6 +20,7 @@ type ProductRecord = {
 
 const money = (amount: string | number) => `₱${Number(amount).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`
 const dateLabel = (value: Date | string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"
+const dateTimeLabel = (value: Date | string | null) => value ? new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }) : "Never"
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 const orderStatusLabel = (status: string, fulfillment: string) => {
   if (status === "pending") return "Pending"
@@ -54,7 +56,8 @@ async function getDemoProducts() {
 }
 
 export async function getAdminDatabasePreview(slug: string): Promise<PreviewResult> {
-  if (!process.env.DATABASE_URL) return null
+  slug = ({ "return-refund": "returns-refunds", "return-and-refund": "returns-refunds", "returns-and-refunds": "returns-refunds", "marketing-notifications": "promotions" } as Record<string, string>)[slug] ?? slug
+  if (!process.env.DATABASE_URL) return databaseModules.has(slug) ? { error: true, rows: [] } : null
 
   try {
     if (slug === "products") {
@@ -88,12 +91,13 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         select c.id::text as id, c.name, c.email, c.phone, c.status,
           count(o.id)::int as orders, coalesce(sum(o.total_amount), 0)::text as spent
         from public.customers c
-        left join public.orders o on o.customer_id = c.id and o.order_number like 'DEMO-ORD-%'
-        where c.email like '%.demo@example.com'
+        left join public.orders o on o.customer_id = c.id and o.order_number not like 'DEMO-ORD-%'
+        where coalesce(c.email, '') not like '%.demo@example.com'
+          and c.name not like 'Demo Customer - %'
         group by c.id, c.name, c.email, c.phone, c.status
         order by c.name
       `
-      return { error: false, rows: customers.map((c, index) => [`CUS-${String(index + 1).padStart(3, "0")}`, c.name, c.email ?? "—", c.phone ?? "—", String(c.orders), money(c.spent), title(c.status), c.status === "active" ? "View · Suspend" : "View · Reactivate"]) }
+      return { error: false, rows: customers.map((c) => [`CUS-${c.id.slice(0, 8).toUpperCase()}`, c.name, c.email ?? "—", c.phone ?? "—", String(c.orders), money(c.spent), title(c.status), `View · Edit · ${c.status === "active" ? "Suspend" : "Reactivate"}`, c.id]) }
     }
 
     if (slug === "orders") {
@@ -116,6 +120,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           from public.payments pay where pay.order_id = o.id
           order by pay.created_at desc limit 1
         ) p on true
+        where o.order_number not like 'DEMO-ORD-%'
         order by o.created_at desc, o.order_number
       `
       return { error: false, rows: orders.map((o) => {
@@ -126,17 +131,18 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "delivery-personnel") {
-      const personnel = await prisma.$queryRaw<{ id: string; name: string; phone: string | null; availability: string; assigned_orders: string | null }[]>`
+      const personnel = await prisma.$queryRaw<{ id: string; name: string; phone: string | null; availability: string; assigned_orders: string | null; suspendable: boolean }[]>`
         select d.id::text as id, d.name, d.phone, d.availability,
-          string_agg(o.order_number, ', ' order by o.order_number) as assigned_orders
+          string_agg(o.order_number, ', ' order by o.order_number) as assigned_orders,
+          (d.availability <> 'on_delivery' and count(o.id) = 0) as suspendable
         from public.delivery_personnel d
         left join public.orders o on o.delivery_personnel_id = d.id
-          and o.order_number like 'DEMO-ORD-%' and o.status in ('processing', 'shipped')
-        where d.name like 'Demo Rider - %'
+          and o.order_number not like 'DEMO-ORD-%' and o.status in ('processing', 'shipped')
+        where d.name not like 'Demo Rider - %'
         group by d.id, d.name, d.phone, d.availability
         order by d.name
       `
-      return { error: false, rows: personnel.map((d, index) => [`DEL-${String(index + 1).padStart(3, "0")}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), d.availability === "available" ? "View · Edit · Assign" : "View · Edit"]) }
+      return { error: false, rows: personnel.map((d) => [`DEL-${d.id.slice(0, 8).toUpperCase()}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), `${d.availability === "available" ? "View · Edit · Assign" : "View · Edit"}${d.suspendable ? " · Suspend" : ""}${d.availability === "suspended" ? " · Reactivate" : ""}`, d.id]) }
     }
 
     if (slug === "returns-refunds") {
@@ -146,7 +152,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         from public.return_requests r
         join public.orders o on o.id = r.order_id
         left join public.customers c on c.id = r.customer_id
-        where r.request_number like 'DEMO-RET-%'
+        where r.request_number not like 'DEMO-RET-%'
+          and o.order_number not like 'DEMO-ORD-%'
         order by r.created_at desc
       `
       return { error: false, rows: returns.map((r) => [r.request_number, r.order_number, r.customer ?? "Unknown", r.reason, "Refund", money(r.amount), title(r.status), r.status === "pending" ? "Review · Approve · Reject" : "View"]) }
@@ -160,10 +167,11 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         left join public.customers c on c.id = f.customer_id
         left join public.products p on p.id = f.product_id
         left join public.orders o on o.id = f.order_id
-        where f.comment like 'DEMO:%'
+        where f.comment not like 'DEMO:%'
+          and coalesce(o.order_number, '') not like 'DEMO-ORD-%'
         order by f.created_at desc
       `
-      return { error: false, rows: feedback.map((f, index) => [`FBK-DEMO-${String(index + 1).padStart(3, "0")}`, f.customer ?? "Unknown", f.product ?? "Product removed", `${"★".repeat(f.rating)}${"☆".repeat(5 - f.rating)}`, f.comment, f.order_number ?? "—", dateLabel(f.created_at), f.moderation_status === "flagged" ? "View · Unflag · Remove" : "View · Flag"]) }
+      return { error: false, rows: feedback.map((f) => [`FBK-${f.id.slice(0, 8).toUpperCase()}`, f.customer ?? "Unknown", f.product ?? "Product removed", `${"★".repeat(f.rating)}${"☆".repeat(5 - f.rating)}`, f.comment, f.order_number ?? "—", dateLabel(f.created_at), f.moderation_status === "flagged" ? "View · Unflag · Remove" : "View · Flag", f.id]) }
     }
 
     if (slug === "payments") {
@@ -173,6 +181,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         from public.payments p
         join public.orders o on o.id = p.order_id
         left join public.customers c on c.id = o.customer_id
+        where o.order_number not like 'DEMO-ORD-%'
+          and coalesce(p.reference, '') not like 'DEMO-PAY-%'
         order by p.created_at desc
       `
       return { error: false, rows: payments.map((p) => {
@@ -191,11 +201,11 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     if (slug === "promotions") {
       const promotions = await prisma.$queryRaw<{ name: string; discount_type: string; discount_value: string; ends_at: Date; status: string }[]>`
         select name, discount_type, discount_value::text as discount_value, ends_at, status
-        from public.promotions where name like 'DEMO:%' order by name
+        from public.promotions where name not like 'DEMO:%' order by name
       `
       const announcements = await prisma.$queryRaw<{ title: string; audience: string; status: string; sent_at: Date | null }[]>`
         select title, audience, status, sent_at
-        from public.announcements where title like 'DEMO:%' order by created_at desc
+        from public.announcements where title not like 'DEMO:%' order by created_at desc
       `
       return {
         error: false,
@@ -207,25 +217,62 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     if (slug === "notifications") {
       const announcements = await prisma.$queryRaw<{ title: string; audience: string; status: string; sent_at: Date | null }[]>`
         select title, audience, status, sent_at
-        from public.announcements where title like 'DEMO:%' order by created_at desc
+        from public.announcements where title not like 'DEMO:%' order by created_at desc
       `
       return { error: false, rows: announcements.map((a) => [a.title, title(a.audience), "Announcement", dateLabel(a.sent_at), title(a.status), "View"]) }
     }
 
     if (slug === "audit-logs") {
-      const logs = await prisma.$queryRaw<{ id: bigint; actor_role: string | null; module: string; action: string; created_at: Date; metadata: { row?: Record<string, unknown> } }[]>`
-        select id, actor_role, module, action, created_at, metadata
-        from public.audit_logs
-        where metadata->'row'->>'sku' like 'AKP-ACT-%'
-          or metadata->'row'->>'order_number' like 'DEMO-ORD-%'
-          or metadata->'row'->>'request_number' like 'DEMO-RET-%'
-          or metadata->'row'->>'reference' like 'DEMO-PAY-%'
-        order by created_at desc limit 100
+      const logs = await prisma.$queryRaw<{ id: bigint; actor_role: string | null; module: string; action: string; created_at: Date; metadata: { row?: Record<string, unknown> }; actor_email: string }[]>`
+        select l.id, l.actor_role, l.module, l.action, l.created_at, l.metadata,
+          coalesce(u.email, 'Admin') as actor_email
+        from public.audit_logs l
+        left join auth.users u on u.id = l.actor_id
+        where l.actor_id is not null
+        order by l.created_at desc limit 100
       `
-      return { error: false, rows: logs.map((log) => [`LOG-${log.id}`, "Demo seed", log.actor_role ? title(log.actor_role) : "—", title(log.module), `${title(log.action)} demo record`, "—", new Date(log.created_at).toLocaleString("en-PH")]) }
+      return { error: false, rows: logs.map((log) => [`LOG-${log.id}`, log.actor_email, log.actor_role ? title(log.actor_role) : "—", title(log.module), title(log.action), "—", new Date(log.created_at).toLocaleString("en-PH")]) }
     }
 
-    if (slug === "backup-restore" || slug === "users") return { error: false, rows: [] }
+    if (slug === "users") {
+      const accounts = await prisma.$queryRaw<{ account_id: string; display_name: string; email: string | null; account_type: string; status: string; last_sign_in_at: Date | null; rank: number; suspendable: boolean }[]>`
+        select 'admin:' || au.user_id::text as account_id, au.display_name,
+          u.email, case when au.role = 'owner' then 'Owner/Admin' else 'Staff' end as account_type,
+          case when au.is_active then 'Active' else 'Suspended' end as status,
+          u.last_sign_in_at, case when au.role = 'owner' then 1 else 2 end as rank,
+          (au.role = 'staff') as suspendable
+        from public.admin_users au
+        left join auth.users u on u.id = au.user_id
+        union all
+        select 'driver:' || d.id::text, d.name, coalesce(u.email, d.email), 'Delivery Driver',
+          case when d.availability = 'suspended' then 'Suspended' else initcap(replace(d.availability, '_', ' ')) end,
+          u.last_sign_in_at, 3,
+          (d.availability <> 'on_delivery')
+        from public.delivery_personnel d
+        left join auth.users u on u.id = d.auth_user_id
+        where d.name not like 'Demo Rider - %'
+        union all
+        select 'customer:' || c.id::text, c.name, c.email, 'Customer', initcap(c.status),
+          u.last_sign_in_at, 4, true
+        from public.customers c
+        left join auth.users u on lower(u.email) = lower(c.email)
+        where coalesce(c.email, '') not like '%.demo@example.com'
+          and c.name not like 'Demo Customer - %'
+        union all
+        select 'customer-auth:' || u.id::text,
+          coalesce(u.raw_user_meta_data ->> 'full_name', u.raw_user_meta_data ->> 'name', u.email, 'Customer'),
+          u.email, 'Customer', 'No customer profile', u.last_sign_in_at, 4, false
+        from auth.users u
+        where coalesce(u.email, '') not like '%.demo@example.com'
+          and not exists (select 1 from public.admin_users au where au.user_id = u.id)
+          and not exists (select 1 from public.delivery_personnel d where d.auth_user_id = u.id)
+          and not exists (select 1 from public.customers c where lower(c.email) = lower(u.email))
+        order by rank, display_name
+      `
+      return { error: false, rows: accounts.map((account) => [account.account_id, account.display_name, account.email ?? "—", account.account_type, account.status, dateTimeLabel(account.last_sign_in_at), account.suspendable ? (account.status === "Suspended" ? "View · Reactivate" : "View · Suspend") : "View"]) }
+    }
+
+    if (slug === "backup-restore") return { error: false, rows: [] }
     return null
   } catch (error) {
     console.error("Admin database preview query failed", error)
@@ -234,22 +281,40 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
 }
 
 export async function getAdminDashboardPreview() {
-  if (!process.env.DATABASE_URL) return null
+  const emptyPreview = { error: true, metrics: { ordersToday: 0, pendingOrders: 0, revenueMonth: money(0), lowStock: 0, openReturns: 0, flaggedFeedback: 0 }, recentOrders: [] as string[][], monthlySales: Array(12).fill(0) as number[], topProducts: [] as [string, number][] }
+  if (!process.env.DATABASE_URL) return emptyPreview
 
   try {
-    const [metrics] = await prisma.$queryRaw<{ orders_today: number; pending_orders: number; revenue_month: string; low_stock: number }[]>`
+    const [metrics] = await prisma.$queryRaw<{ orders_today: number; pending_orders: number; revenue_month: string; low_stock: number; open_returns: number; flagged_feedback: number }[]>`
       select
-        (select count(*)::int from public.orders where order_number like 'DEMO-ORD-%' and created_at >= date_trunc('day', now())) as orders_today,
-        (select count(*)::int from public.orders where order_number like 'DEMO-ORD-%' and status = 'pending') as pending_orders,
-        (select coalesce(sum(amount), 0)::text from public.payments where reference like 'DEMO-PAY-%' and status = 'verified' and created_at >= date_trunc('month', now())) as revenue_month,
-        (select count(*)::int from public.products where sku like 'AKP-ACT-%' and visibility <> 'archived' and stock_quantity <= reorder_level) as low_stock
+        (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and created_at >= date_trunc('day', now())) as orders_today,
+        (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and status = 'pending') as pending_orders,
+        (select coalesce(sum(p.amount), 0)::text from public.payments p join public.orders o on o.id = p.order_id where o.order_number not like 'DEMO-ORD-%' and coalesce(p.reference, '') not like 'DEMO-PAY-%' and p.status = 'verified' and p.created_at >= date_trunc('month', now())) as revenue_month,
+        (select count(*)::int from public.products where sku like 'AKP-ACT-%' and visibility <> 'archived' and stock_quantity <= reorder_level) as low_stock,
+        (select count(*)::int from public.return_requests r join public.orders o on o.id = r.order_id where r.request_number not like 'DEMO-RET-%' and o.order_number not like 'DEMO-ORD-%' and r.status = 'pending') as open_returns,
+        (select count(*)::int from public.feedback f left join public.orders o on o.id = f.order_id where f.comment not like 'DEMO:%' and coalesce(o.order_number, '') not like 'DEMO-ORD-%' and f.moderation_status = 'flagged') as flagged_feedback
     `
     const recentOrders = await prisma.$queryRaw<{ order_number: string; customer: string | null; amount: string; status: string; created_at: Date }[]>`
       select o.order_number, c.name as customer, o.total_amount::text as amount, o.status, o.created_at
       from public.orders o left join public.customers c on c.id = o.customer_id
-      where o.order_number like 'DEMO-ORD-%'
+      where o.order_number not like 'DEMO-ORD-%'
       order by o.created_at desc limit 4
     `
+    const sales = await prisma.$queryRaw<{ month: number; amount: string }[]>`
+      select extract(month from p.created_at)::int as month, coalesce(sum(p.amount), 0)::text as amount
+      from public.payments p join public.orders o on o.id = p.order_id
+      where o.order_number not like 'DEMO-ORD-%' and coalesce(p.reference, '') not like 'DEMO-PAY-%'
+        and p.status = 'verified' and p.created_at >= date_trunc('year', now())
+      group by extract(month from p.created_at)
+    `
+    const topProducts = await prisma.$queryRaw<{ name: string; units: number }[]>`
+      select oi.product_name as name, sum(oi.quantity)::int as units
+      from public.order_items oi join public.orders o on o.id = oi.order_id
+      where o.order_number not like 'DEMO-ORD-%' and o.status = 'delivered'
+      group by oi.product_name order by units desc, oi.product_name limit 4
+    `
+    const monthlySales = Array(12).fill(0) as number[]
+    sales.forEach((sale) => { monthlySales[sale.month - 1] = Number(sale.amount) })
     return {
       error: false,
       metrics: {
@@ -257,11 +322,15 @@ export async function getAdminDashboardPreview() {
         pendingOrders: metrics.pending_orders,
         revenueMonth: money(metrics.revenue_month),
         lowStock: metrics.low_stock,
+        openReturns: metrics.open_returns,
+        flaggedFeedback: metrics.flagged_feedback,
       },
       recentOrders: recentOrders.map((o) => [o.order_number, o.customer ?? "Unknown", money(o.amount), title(o.status), dateLabel(o.created_at)]),
+      monthlySales,
+      topProducts: topProducts.map((product) => [product.name, product.units] as [string, number]),
     }
   } catch (error) {
     console.error("Admin dashboard preview query failed", error)
-    return { error: true, metrics: null, recentOrders: [] as string[][] }
+    return emptyPreview
   }
 }

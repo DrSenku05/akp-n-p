@@ -117,13 +117,50 @@ export async function POST(request: NextRequest) {
     result = await supabase.from("orders").update({ status }).eq("id", order.id).select("id")
   } else if (module === "customers") {
     const email = row[2]
-    if (!email || email === "—") return fail("This customer row has no email identifier, so it cannot be safely updated.")
-    if (action.includes("suspend") || action.includes("reactivate")) result = await supabase.from("customers").update({ status: action.includes("suspend") ? "suspended" : "active" }).eq("email", email).select("id")
-    else result = await supabase.from("customers").update({ name: value("Name") || row[1], email: value("Email") || email, phone: value("Phone") || null }).eq("email", email).select("id")
+    const customerId = row[8]
+    if (!customerId && (!email || email === "—")) return fail("This customer row has no safe database identifier.")
+    const patch = action.includes("suspend") || action.includes("reactivate")
+      ? { status: action.includes("suspend") ? "suspended" : "active" }
+      : { name: value("Name") || row[1], email: value("Email") || email, phone: value("Phone") || null }
+    const update = supabase.from("customers").update(patch)
+    result = await (customerId ? update.eq("id", customerId) : update.eq("email", email)).select("id")
   } else if (module === "delivery-personnel") {
     if (action.includes("edit") || action.includes("save")) {
-      result = await supabase.from("delivery_personnel").update({ name: value("Name") || row[1], phone: value("Contact", "Phone") || null, availability: value("Availability").toLowerCase().replaceAll(" ", "_") || "available" }).eq("name", row[1]).select("id")
+      result = await supabase.from("delivery_personnel").update({ name: value("Name") || row[1], phone: value("Contact", "Phone") || null, availability: value("Availability").toLowerCase().replaceAll(" ", "_") || "available" }).eq("id", row[6] || row[0]).select("id")
     } else return fail("Only editing existing delivery personnel is supported here.")
+  } else if (module === "users") {
+    if (admin.role !== "owner") return fail("Only an owner can change account status.", 403)
+    const [accountType, accountId] = (row[0] ?? "").split(":")
+    if (!accountId || !/^[0-9a-f-]{36}$/i.test(accountId)) return fail("Account identifier is invalid.")
+    const suspend = action.includes("suspend")
+    const reactivate = action.includes("reactivate")
+    if (!suspend && !reactivate) return fail("Unsupported account action.")
+    if (accountType === "admin") {
+      const { data: target, error } = await supabase.from("admin_users").select("role,is_active").eq("user_id", accountId).maybeSingle()
+      if (error) return fail(error.message)
+      if (!target) return fail("Admin account was not found.", 404)
+      if (target.role === "owner") return fail("Owner accounts cannot be suspended from this screen.", 403)
+      if (suspend && accountId === claims.sub) return fail("You cannot suspend your own account.", 403)
+      result = await supabase.from("admin_users").update({ is_active: reactivate }).eq("user_id", accountId).select("user_id")
+    } else if (accountType === "driver") {
+      const { data: driver, error } = await supabase.from("delivery_personnel").select("availability").eq("id", accountId).maybeSingle()
+      if (error) return fail(error.message)
+      if (!driver) return fail("Delivery driver was not found.", 404)
+      if (suspend) {
+        const { count, error: assignmentError } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("delivery_personnel_id", accountId).in("status", ["processing", "shipped"])
+        if (assignmentError) return fail(assignmentError.message)
+        if (driver.availability === "on_delivery" || (count ?? 0) > 0) return fail("Reassign or complete this driver's active deliveries before suspending the account.", 409)
+      }
+      let availability = suspend ? "suspended" : "available"
+      if (reactivate) {
+        const { count, error: assignmentError } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("delivery_personnel_id", accountId).in("status", ["processing", "shipped"])
+        if (assignmentError) return fail(assignmentError.message)
+        if ((count ?? 0) > 0) availability = "on_delivery"
+      }
+      result = await supabase.from("delivery_personnel").update({ availability }).eq("id", accountId).select("id")
+    } else if (accountType === "customer") {
+      result = await supabase.from("customers").update({ status: suspend ? "suspended" : "active" }).eq("id", accountId).select("id")
+    } else return fail("Unsupported account type.")
   } else if (module === "returns-refunds") {
     const status = action.includes("approve") ? "approved" : action.includes("reject") ? "rejected" : ""
     if (!status) return fail("Unsupported return request action.")
@@ -152,7 +189,8 @@ export async function POST(request: NextRequest) {
     result = await supabase.from("payments").update({ status, verified_by: claims.sub, verified_at: new Date().toISOString() }).eq("id", payment.id).eq("status", "pending").select("id")
   } else if (module === "feedback") {
     const status = action.includes("remove") ? "removed" : action.includes("flag") && !action.includes("unflag") ? "flagged" : "visible"
-    result = await supabase.from("feedback").update({ moderation_status: status }).eq("comment", row[4].replace(/^\[flagged content\]$/, "DEMO: sample feedback; replace with a verified customer review.")).select("id")
+    if (!row[8]) return fail("Feedback identifier is missing. Refresh and try again.")
+    result = await supabase.from("feedback").update({ moderation_status: status }).eq("id", row[8]).select("id")
   } else if (module === "promotions") {
     if (action === "create") {
       const promoName = value("Promo Name")
