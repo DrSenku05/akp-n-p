@@ -125,6 +125,34 @@ export async function POST(request: NextRequest) {
     const update = supabase.from("customers").update(patch)
     result = await (customerId ? update.eq("id", customerId) : update.eq("email", email)).select("id")
   } else if (module === "delivery-personnel") {
+    if (action === "unassign") {
+      const driverId = row[6]
+      const orderNumber = value("Assigned Order").split(" · ")[0].replace(/^#/, "").trim()
+      if (!driverId || !/^[0-9a-f-]{36}$/i.test(driverId)) return fail("Driver identifier is invalid.")
+      if (!orderNumber) return fail("Choose an assigned order to remove.")
+
+      const { data: order, error: orderError } = await supabase.from("orders")
+        .select("id,status,fulfillment_method,delivery_personnel_id,delivery_status")
+        .eq("order_number", orderNumber)
+        .maybeSingle()
+      if (orderError) return fail(orderError.message)
+      if (!order) return fail("Delivery order was not found.", 404)
+      if (order.delivery_personnel_id !== driverId) return fail("This order is no longer assigned to that driver. Refresh and try again.", 409)
+      if (order.fulfillment_method !== "delivery") return fail("Only delivery orders can be removed from a driver.", 409)
+      if (order.delivery_status !== "assigned") return fail("This delivery has already been accepted or started and cannot be unassigned here.", 409)
+      if (!( ["pending", "processing", "shipped"] as string[]).includes(order.status)) return fail("Only open deliveries can be unassigned.", 409)
+
+      const { data: unassigned, error: unassignError } = await supabase.from("orders")
+        .update({ delivery_personnel_id: null })
+        .eq("id", order.id)
+        .eq("delivery_personnel_id", driverId)
+        .eq("delivery_status", "assigned")
+        .in("status", ["pending", "processing", "shipped"])
+        .select("id")
+      if (unassignError) return fail(unassignError.message)
+      if (!unassigned?.length) return fail("This delivery changed while you were removing it. Refresh and try again.", 409)
+      return NextResponse.json({ ok: true })
+    }
     if (action === "assign") {
       const driverId = row[6]
       const orderNumber = value("Delivery Order").split(" · ")[0].replace(/^#/, "").trim()
