@@ -2,7 +2,7 @@ import "server-only"
 
 import { prisma } from "@/prisma/prisma"
 
-type PreviewResult = { rows: string[][]; announcements?: string[][]; error: boolean } | null
+type PreviewResult = { rows: string[][]; announcements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; error: boolean } | null
 const databaseModules = new Set(["customers", "orders", "delivery-personnel", "returns-refunds", "feedback", "payments", "promotions", "notifications", "audit-logs", "users"])
 type ProductRecord = {
   sku: string
@@ -148,18 +148,34 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "delivery-personnel") {
-      const personnel = await prisma.$queryRaw<{ id: string; name: string; phone: string | null; availability: string; assigned_orders: string | null; suspendable: boolean }[]>`
-        select d.id::text as id, d.name, d.phone, d.availability,
-          string_agg(o.order_number, ', ' order by o.order_number) as assigned_orders,
-          (d.availability <> 'on_delivery' and count(o.id) = 0) as suspendable
-        from public.delivery_personnel d
-        left join public.orders o on o.delivery_personnel_id = d.id
-          and o.order_number not like 'DEMO-ORD-%' and o.status in ('processing', 'shipped')
-        where d.name not like 'Demo Rider - %'
-        group by d.id, d.name, d.phone, d.availability
-        order by d.name
-      `
-      return { error: false, rows: personnel.map((d) => [`DEL-${d.id.slice(0, 8).toUpperCase()}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), `${d.availability === "available" ? "View · Edit · Assign" : "View · Edit"}${d.suspendable ? " · Suspend" : ""}${d.availability === "suspended" ? " · Reactivate" : ""}`, d.id]) }
+      const [personnel, assignableOrders] = await Promise.all([
+        prisma.$queryRaw<{ id: string; name: string; phone: string | null; availability: string; assigned_orders: string | null; suspendable: boolean }[]>`
+          select d.id::text as id, d.name, d.phone, d.availability,
+            string_agg(o.order_number, ', ' order by o.order_number) as assigned_orders,
+            (d.availability <> 'on_delivery' and count(o.id) = 0) as suspendable
+          from public.delivery_personnel d
+          left join public.orders o on o.delivery_personnel_id = d.id
+            and o.order_number not like 'DEMO-ORD-%' and o.status in ('pending', 'processing', 'shipped')
+          where d.name not like 'Demo Rider - %'
+          group by d.id, d.name, d.phone, d.availability
+          order by d.name
+        `,
+        prisma.$queryRaw<{ order_number: string; customer: string | null }[]>`
+          select o.order_number, c.name as customer
+          from public.orders o
+          left join public.customers c on c.id = o.customer_id
+          where o.delivery_personnel_id is null
+            and o.fulfillment_method = 'delivery'
+            and o.status in ('pending', 'processing', 'shipped')
+            and o.order_number not like 'DEMO-ORD-%'
+          order by o.created_at desc
+        `,
+      ])
+      return {
+        error: false,
+        rows: personnel.map((d) => [`DEL-${d.id.slice(0, 8).toUpperCase()}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), `${d.availability === "available" ? "View · Edit · Assign" : "View · Edit"}${d.suspendable ? " · Suspend" : ""}${d.availability === "suspended" ? " · Reactivate" : ""}`, d.id]),
+        assignableOrders: assignableOrders.map((order) => ({ orderNumber: order.order_number, customer: order.customer ?? "Customer" })),
+      }
     }
 
     if (slug === "returns-refunds") {

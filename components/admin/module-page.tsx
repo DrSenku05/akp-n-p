@@ -79,7 +79,7 @@ function saveCsv(filename: string, headings: string[], rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
-export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnouncements, databaseError = false }: { slug: string; databaseRows?: string[][]; databaseAnnouncements?: string[][]; databaseError?: boolean }) {
+export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnouncements, assignableOrders = [], databaseError = false }: { slug: string; databaseRows?: string[][]; databaseAnnouncements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; databaseError?: boolean }) {
   const router = useRouter()
   const slug = slugAliases[rawSlug] ?? rawSlug
   const config = modules[slug] ?? extras[slug] ?? { title: titleCase(slug), subtitle: `Manage ${titleCase(slug).toLowerCase()} for AKP Native Products`, columns: ["Name", "Details", "Status", "Actions"], rows: [], search: "Search..." }
@@ -220,7 +220,11 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       return
     }
     if (lower === "assign") {
-      openForm(`Assign ${row[0]}`, row, index, action, ["Assigned Orders"])
+      if (isDatabasePreview && !assignableOrders.length) {
+        setNotice("There are no unassigned delivery orders ready to assign.")
+        return
+      }
+      openForm(`Assign an order to ${row[1]}`, row, index, action, ["Delivery Order"])
       return
     }
     if (slug === "returns-refunds" && (lower === "approve" || lower === "reject")) {
@@ -241,7 +245,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         return
       }
       const action = dialog.kind === "form"
-        ? dialog.action === "Record Movement" ? "record-movement" : slug === "returns-refunds" ? dialog.action ?? "edit" : dialog.row ? "edit" : "create"
+        ? dialog.action === "Record Movement" ? "record-movement" : dialog.action?.toLowerCase() === "assign" ? "assign" : slug === "returns-refunds" ? dialog.action ?? "edit" : dialog.row ? "edit" : "create"
         : dialog.action ?? ""
       try {
         setSaving(true)
@@ -283,6 +287,12 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         if (!response.ok) {
           if (uploadedImagePath) await createClient().storage.from("product-images").remove([uploadedImagePath])
           throw new Error(result.error || "Database save failed.")
+        }
+        if (slug === "delivery-personnel" && action === "assign") {
+          setNotice(`Assigned ${values["Delivery Order"]?.split(" · ")[0] ?? "order"} to ${dialog.row?.[1] ?? "driver"}.`)
+          setDialog(null)
+          router.refresh()
+          return
         }
         if (["orders", "payments", "users"].includes(slug)) {
           setNotice(`${dialog.action} saved for ${dialog.row?.[1] ?? dialog.row?.[0] ?? "record"}.`)
@@ -515,7 +525,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
                 <div className={`grid gap-3 sm:grid-cols-2 ${slug === "products" ? "lg:col-start-2" : ""}`}>
                   {Object.entries(dialog.values ?? {}).map(([field, value]) => (
                     <div key={field} className={["Description", "Image URL", "Craft / Origin", "Reason"].includes(field) ? "sm:col-span-2" : ""}>
-                      <DialogField field={field} value={value} choicesOverride={field === "Product" ? rows.map((item) => slug === "inventory" ? item[1] : item[0]).filter(Boolean) : undefined} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), [field]: next } } : current)} />
+                      <DialogField field={field} value={value} choicesOverride={field === "Product" ? rows.map((item) => slug === "inventory" ? item[1] : item[0]).filter(Boolean) : field === "Delivery Order" ? assignableOrders.map((order) => `${order.orderNumber} · ${order.customer}`) : undefined} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), [field]: next } } : current)} />
                     </div>
                   ))}
                 </div>
