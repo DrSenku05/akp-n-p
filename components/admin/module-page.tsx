@@ -113,12 +113,27 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   useEffect(() => () => { if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current); if (gcashObjectUrl.current) URL.revokeObjectURL(gcashObjectUrl.current) }, [])
   useEffect(() => {
     if (slug !== "settings") return
-    fetch("/api/admin/payment-settings", { cache: "no-store" }).then(async (response) => {
-      const result = await response.json() as { settings?: { accountName?: string; accountNumber?: string; qrUrl?: string; qrPath?: string; enabled?: boolean }; canEdit?: boolean; error?: string }
-      if (!response.ok) throw new Error(result.error || "Could not load GCash settings.")
-      setGcash({ accountName: result.settings?.accountName ?? "", accountNumber: result.settings?.accountNumber ?? "", qrUrl: result.settings?.qrUrl ?? "", qrPath: result.settings?.qrPath ?? "", enabled: result.settings?.enabled ?? false, canEdit: result.canEdit ?? false })
-      setGcashPreview(result.settings?.qrUrl ?? "")
-    }).catch((error: unknown) => setGcashMessage(error instanceof Error ? error.message : "Could not load GCash settings."))
+    let active = true
+    let settingsLoading = false
+    const loadSettings = async () => {
+      if (settingsLoading) return
+      settingsLoading = true
+      try {
+        const response = await fetch("/api/admin/payment-settings", { cache: "no-store" })
+        const result = await response.json() as { settings?: { accountName?: string; accountNumber?: string; qrUrl?: string; qrPath?: string; enabled?: boolean }; canEdit?: boolean; error?: string }
+        if (!response.ok) throw new Error(result.error || "Could not load GCash settings.")
+        if (!active || document.querySelector('[role="dialog"]')) return
+        setGcash({ accountName: result.settings?.accountName ?? "", accountNumber: result.settings?.accountNumber ?? "", qrUrl: result.settings?.qrUrl ?? "", qrPath: result.settings?.qrPath ?? "", enabled: result.settings?.enabled ?? false, canEdit: result.canEdit ?? false })
+        setGcashPreview(result.settings?.qrUrl ?? "")
+      } catch (error) {
+        if (active && !document.querySelector('[role="dialog"]')) setGcashMessage(error instanceof Error ? error.message : "Could not load GCash settings.")
+      } finally { settingsLoading = false }
+    }
+    void loadSettings()
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible" && !document.querySelector('[role="dialog"]')) void loadSettings()
+    }, 3000)
+    return () => { active = false; window.clearInterval(interval) }
   }, [slug])
   useEffect(() => {
     setLoaded(false)
