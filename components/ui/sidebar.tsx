@@ -8,6 +8,7 @@ import {
   BarChart3,
   Bell,
   Boxes,
+  ChevronDown,
   ClipboardList,
   LayoutDashboard,
   MessageSquareText,
@@ -55,10 +56,15 @@ function isCurrent(pathname: string, href: string) {
 
 export default function SideBar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname()
-  const [today, setToday] = useState("")
-  const closeButton = useRef<HTMLButtonElement>(null)
   const activeSection = sections.find((section) => section.links.some((link) => isCurrent(pathname, link.href)))
     ?? sections[0]
+  const [today, setToday] = useState("")
+  const [expandedSections, setExpandedSections] = useState(() => new Set([activeSection.label]))
+  const closeButton = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setExpandedSections((expanded) => new Set(expanded).add(activeSection.label))
+  }, [activeSection.label])
 
   useEffect(() => {
     setToday(new Intl.DateTimeFormat("en-PH", {
@@ -112,28 +118,50 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
         </Link>
         {sections.filter((section) => section.links.length > 0).map((section) => {
           const SectionIcon = section.icon
+          const expanded = expandedSections.has(section.label)
+          const panelId = `admin-section-${section.label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`
           return <div key={section.label} className="mb-4">
-            <div
-              className={`flex min-h-10 items-center gap-3 rounded-lg border px-3 text-xs font-semibold uppercase tracking-wide ${section === activeSection ? "border-accent/50 bg-accent/15 text-accent" : "border-default-200 text-default-500"}`}
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={panelId}
+              onClick={() => setExpandedSections((current) => {
+                const next = new Set(current)
+                if (next.has(section.label)) next.delete(section.label)
+                else next.add(section.label)
+                return next
+              })}
+              className={`flex min-h-10 w-full items-center gap-3 rounded-lg border px-3 text-left text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-primary ${section === activeSection ? "border-accent/50 bg-accent/15 text-accent" : "border-default-200 text-default-500 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
             >
               <SectionIcon size={16} strokeWidth={1.8} aria-hidden="true" />
-              {section.label}
-            </div>
-            <div className="mt-1 grid gap-1">
-              {section.links.map((link) => {
-                const active = isCurrent(pathname, link.href)
-                const Icon = link.icon
-                return <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={onClose}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex min-h-10 items-center gap-3 rounded-lg border py-2 pl-10 pr-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-accent/50 bg-accent/15 font-semibold text-accent" : "border-default-200 text-foreground/80 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
-                >
-                  <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
-                  {link.label}
-                </Link>
-              })}
+              <span className="flex-1">{section.label}</span>
+              <ChevronDown size={15} aria-hidden="true" className={`transition-transform duration-200 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} />
+            </button>
+            <div
+              id={panelId}
+              aria-hidden={!expanded}
+              inert={!expanded}
+              className={`grid transition-[grid-template-rows,opacity] duration-200 ease-in-out motion-reduce:transition-none ${expanded ? "opacity-100" : "opacity-0"}`}
+              style={{ gridTemplateRows: expanded ? "1fr" : "0fr" }}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div className="mt-1 grid gap-1">
+                  {section.links.map((link) => {
+                    const active = isCurrent(pathname, link.href)
+                    const Icon = link.icon
+                    return <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={onClose}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex min-h-10 items-center gap-3 rounded-lg border py-2 pl-10 pr-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-accent/50 bg-accent/15 font-semibold text-accent" : "border-default-200 text-foreground/80 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
+                    >
+                      <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+                      {link.label}
+                    </Link>
+                  })}
+                </div>
+              </div>
             </div>
           </div>;
         })}
