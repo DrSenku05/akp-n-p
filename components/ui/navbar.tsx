@@ -40,6 +40,9 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
     else setMessage("No matching admin section. Try orders, products, customers, or reports.")
   }
   return <header inert={inert} className="relative z-10 flex min-h-[66px] shrink-0 items-center gap-3 border-t-2 border-amber-600 bg-[#211e18] px-3 text-stone-50 shadow-sm shadow-black/10 sm:gap-4 sm:px-5 md:px-8">
+    <button type="button" aria-label="Open admin navigation" onClick={onOpenMenu} className="flex size-10 shrink-0 items-center justify-center rounded-lg text-stone-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-300">
+      <Menu size={21} strokeWidth={1.8} aria-hidden="true" />
+    </button>
     <Link href="/" className="flex shrink-0 items-center gap-3 text-stone-50 no-underline">
       <span
         className="flex size-11 items-center justify-center rounded-md border border-amber-300/55 text-[11px] font-bold tracking-tight text-white shadow-sm shadow-black/30 ring-1 ring-black/20"
@@ -67,8 +70,5 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
         </div>
       </div>
     </div>
-    <button type="button" aria-label="Open admin navigation" onClick={onOpenMenu} className="flex size-10 shrink-0 items-center justify-center rounded-lg text-stone-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-300">
-      <Menu size={21} strokeWidth={1.8} aria-hidden="true" />
-    </button>
   </header>
 }
