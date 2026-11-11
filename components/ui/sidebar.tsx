@@ -113,15 +113,12 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
         {sections.filter((section) => section.links.length > 0).map((section) => {
           const SectionIcon = section.icon
           return <div key={section.label} className="mb-4">
-            <Link
-              href={section.href}
-              onClick={onClose}
-              aria-current={section === activeSection ? "page" : undefined}
-              className={`flex min-h-10 items-center gap-3 rounded-lg border px-3 text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-primary ${section === activeSection ? "border-accent/50 bg-accent/15 text-accent" : "border-default-200 text-default-500 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
+            <div
+              className={`flex min-h-10 items-center gap-3 rounded-lg border px-3 text-xs font-semibold uppercase tracking-wide ${section === activeSection ? "border-accent/50 bg-accent/15 text-accent" : "border-default-200 text-default-500"}`}
             >
               <SectionIcon size={16} strokeWidth={1.8} aria-hidden="true" />
               {section.label}
-            </Link>
+            </div>
             <div className="mt-1 grid gap-1">
               {section.links.map((link) => {
                 const active = isCurrent(pathname, link.href)
