@@ -105,7 +105,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
           href="/"
           onClick={onClose}
           aria-current={pathname === "/" ? "page" : undefined}
-          className={`mb-3 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${pathname === "/" ? "bg-accent font-semibold text-accent-foreground" : "text-foreground hover:bg-default-100"}`}
+          className={`mb-3 flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${pathname === "/" ? "border-accent/50 bg-accent/15 font-semibold text-accent" : "border-default-200 text-foreground hover:border-accent/50 hover:bg-accent/10"}`}
         >
           <LayoutDashboard size={17} strokeWidth={1.8} aria-hidden="true" />
           Dashboard
@@ -117,7 +117,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
               href={section.href}
               onClick={onClose}
               aria-current={section === activeSection ? "page" : undefined}
-              className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-primary ${section === activeSection ? "text-accent" : "text-default-500 hover:bg-default-100 hover:text-foreground"}`}
+              className={`flex min-h-10 items-center gap-3 rounded-lg border px-3 text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-primary ${section === activeSection ? "border-accent/50 bg-accent/15 text-accent" : "border-default-200 text-default-500 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
             >
               <SectionIcon size={16} strokeWidth={1.8} aria-hidden="true" />
               {section.label}
@@ -131,7 +131,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
                   href={link.href}
                   onClick={onClose}
                   aria-current={active ? "page" : undefined}
-                  className={`flex min-h-10 items-center gap-3 rounded-lg py-2 pl-10 pr-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "bg-default-100 font-semibold text-accent" : "text-foreground/80 hover:bg-default-100 hover:text-foreground"}`}
+                  className={`flex min-h-10 items-center gap-3 rounded-lg border py-2 pl-10 pr-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-accent/50 bg-accent/15 font-semibold text-accent" : "border-default-200 text-foreground/80 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
                 >
                   <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
                   {link.label}
