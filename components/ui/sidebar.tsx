@@ -85,14 +85,14 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
       tabIndex={open ? 0 : -1}
       aria-label="Close admin navigation"
       onClick={onClose}
-      className={`absolute inset-0 h-full w-full bg-black/50 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`}
+      className={`absolute inset-0 h-full w-full bg-black/30 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`}
     />
     <aside
       role="dialog"
       aria-modal={open}
       aria-label="Admin navigation"
       inert={!open}
-      className={`absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-default-200 bg-content1 shadow-2xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
+      className={`absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-default-200 bg-background/95 shadow-2xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
     >
       <div className="flex min-h-[66px] items-center justify-between border-t-2 border-amber-600 bg-[#211e18] px-5 text-stone-50">
         <span className="text-sm font-bold tracking-wide">Admin navigation</span>
