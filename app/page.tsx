@@ -35,8 +35,8 @@ export default async function Home() {
 
   return <div className="relative isolate -mx-4 -my-5 min-h-full px-4 py-5 text-foreground md:-mx-7 md:-my-6 md:px-7 md:py-6">
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <Image src="/images/banig-badian.jpg" alt="" fill sizes="100vw" className="scale-105 object-cover opacity-45 blur-md" />
-      <div className="absolute inset-0 bg-background/75" />
+      <Image src="/images/banig-badian.jpg" alt="" fill sizes="100vw" className="scale-105 object-cover opacity-70 blur-lg" />
+      <div className="absolute inset-0 bg-background/45 dark:bg-black/50" />
     </div>
     <div className="relative z-10 mx-auto max-w-[1540px] space-y-6">
     {preview.error && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">Could not load dashboard records from Supabase. Check the server database connection.</div>}
@@ -55,17 +55,19 @@ export default async function Home() {
     <section aria-label="Store metrics" className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
       {metricValues.map(([label, value], index) => {
         const { icon: Icon, color, tint } = metricStyles[index]
-        return <Card key={label} className="rounded-xl border border-default-200 shadow-none">
-          <Card.Content className="flex items-center justify-between gap-3 p-4 sm:p-5">
-            <div className="min-w-0"><p className="text-xs font-medium text-default-500">{label}</p><p className="mt-2 truncate text-2xl font-bold tracking-tight">{value}</p></div>
-            <span className={`rounded-xl p-2.5 ${tint} ${color}`}><Icon size={19} aria-hidden="true" /></span>
+        return <Card key={label} className="rounded-xl border border-default-200 bg-content1/85 shadow-none backdrop-blur-sm">
+          <Card.Content className="p-4 sm:p-5">
+            <div className="grid min-h-16 grid-cols-[1fr_auto] items-start gap-3">
+              <div className="min-w-0"><p className="text-xs font-medium text-default-500">{label}</p><p className="mt-2 truncate text-2xl font-bold tracking-tight">{value}</p></div>
+              <span className={`rounded-xl p-2.5 ${tint} ${color}`}><Icon size={19} aria-hidden="true" /></span>
+            </div>
           </Card.Content>
         </Card>
       })}
     </section>
 
     <div className="grid min-w-0 gap-4 xl:grid-cols-[1.4fr_0.8fr]">
-      <Card className="min-w-0 rounded-xl border border-default-200 shadow-none">
+      <Card className="min-w-0 rounded-xl border border-default-200 bg-content1/85 shadow-none backdrop-blur-sm">
         <Card.Content className="min-w-0 space-y-4 p-0">
           <div className="flex items-center justify-between gap-3 px-5 pt-5">
             <SectionTitle title="Recent orders" action={<Link href="/orders" className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-default-600 transition hover:bg-default-100">View all<ArrowUpRight size={13} /></Link>} />
@@ -85,7 +87,7 @@ export default async function Home() {
         </Card.Content>
       </Card>
 
-      <Card className="min-w-0 rounded-xl border border-default-200 shadow-none">
+      <Card className="min-w-0 rounded-xl border border-default-200 bg-content1/85 shadow-none backdrop-blur-sm">
         <Card.Content className="space-y-4 p-5">
           <SectionTitle title="Needs attention" />
           {attention.length ? <div className="space-y-2">{attention.map(({ count, label, detail, href, tone, icon: Icon }) => {
