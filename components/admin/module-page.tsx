@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Bell, CircleAlert, Download, Filter, ImagePlus, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus, Smartphone, Upload } from "lucide-react"
+import { Archive, Bell, ChevronDown, CircleAlert, Download, Filter, Folder, ImagePlus, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus, Smartphone, Upload } from "lucide-react"
 import { Button, Card, Chip, Input, Modal } from "@heroui/react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -157,7 +157,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   useEffect(() => { if (loaded && !isDatabasePreview) localStorage.setItem(`akp-admin:${slug}`, JSON.stringify(rows)) }, [loaded, isDatabasePreview, rows, slug])
   useEffect(() => { if (loaded && !isDatabasePreview) localStorage.setItem("akp-admin:announcements", JSON.stringify(announcementRows)) }, [loaded, isDatabasePreview, announcementRows])
   useEffect(() => { if (loaded) localStorage.setItem(`akp-admin:notes:${slug}`, JSON.stringify(decisionNotes)) }, [loaded, decisionNotes, slug])
-  const filteredRows = useMemo(() => rows.filter((row) => row.join(" ").toLowerCase().includes(query.toLowerCase()) && (filter === "All" || row.some((cell) => cell.toLowerCase().includes(filter.toLowerCase())))), [rows, filter, query])
+  const filteredRows = useMemo(() => rows.filter((row) => (slug === "orders" ? row.slice(0, config.columns.length) : row).join(" ").toLowerCase().includes(query.toLowerCase()) && (filter === "All" || row.some((cell) => cell.toLowerCase().includes(filter.toLowerCase())))), [rows, filter, query, slug, config.columns.length])
   const selectedRows = rows.filter((row) => selectedIds.includes(row[0]))
   const toggleSelected = (row: string[], checked: boolean) => setSelectedIds((current) => checked ? current.includes(row[0]) ? current : current.length < 100 ? [...current, row[0]] : current : current.filter((id) => id !== row[0]))
   const startBulkAction = () => {
@@ -560,8 +560,60 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
 }
 
 function DataTable({ config, rows, compact = false, selectable = false, selectedIds = [], onToggle, onToggleAll, onAction }: { config: ModuleConfig; rows: string[][]; compact?: boolean; selectable?: boolean; selectedIds?: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
+  if (config.title === "Order Management") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
   const statusValues = ["Active", "Suspended", "Pending", "Processing", "Preparing", "Ready for Pickup", "Out for Delivery", "Paid", "Shipped", "Delivered", "Completed", "Cancelled", "Normal", "Low Stock", "Out of Stock", "Verified", "Refunded", "Failed", "Open", "Approved", "Rejected", "Successful", "Inactive", "Archived", "Available", "On Delivery", "Off Duty", "Under Review", "Published", "Draft", "Flagged", "Unflagged"]
   return <div className="overflow-x-auto"><table className={`w-full ${compact ? "min-w-[540px]" : "min-w-[760px]"} text-left text-xs`}><thead className="bg-default-50 text-default-500"><tr>{selectable && <th className="w-10 px-3 py-3"><input aria-label="Select all visible records" type="checkbox" checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row[0]))} onChange={(event) => onToggleAll?.(event.target.checked)} /></th>}{config.columns.map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t border-default-100 transition-colors hover:bg-default-50/70">{selectable && <td className="px-3 py-2"><input aria-label={`Select ${row[0]}`} type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} /></td>}{config.columns.map((heading, cellIndex) => { const cell = row[cellIndex] ?? ""; if (heading === "Actions") { const actions = cell.split(" · ").map((item) => item.trim()).filter(Boolean); return <td key={heading} className="px-3 py-2 align-middle"><div className="flex flex-wrap gap-x-1 gap-y-1">{actions.map((action) => { const lower = action.toLowerCase(); const Icon = lower.includes("delete") || lower.includes("remove") ? Trash2 : lower.includes("edit") || lower.includes("adjust") ? Pencil : lower.includes("view") || lower.includes("review") || lower.includes("detail") || lower.includes("receipt") || lower.includes("track") ? Eye : lower.includes("download") ? Download : lower.includes("record") ? PackagePlus : undefined; const destructive = ["delete", "remove", "reject", "suspend", "archive", "end"].some((word) => lower.includes(word)); return <Button key={action} size="sm" variant="ghost" className={`h-7 min-w-0 px-1.5 text-[11px] ${destructive ? "text-danger" : "text-[#315f43]"}`} onPress={() => onAction?.(action, row, index)}>{Icon && <Icon size={12} />}{action}</Button> })}</div></td> } if (heading === "Image") return <td key={heading} className="px-3 py-2 align-middle">{cell && cell !== "—" ? <Image src={cell} alt={`${row[config.columns.indexOf("Product Name")] || "Product"} image`} width={52} height={52} unoptimized className="size-12 rounded-lg border border-default-200 object-cover" /> : <span className="text-default-400">No image</span>}</td>; return <td key={`${cellIndex}-${cell}`} className="max-w-64 px-3 py-3 align-middle text-default-700">{statusValues.includes(cell) ? <Chip size="sm" variant="soft" color={statusColor(cell)}>{cell}</Chip> : <span className={cellIndex === 0 ? "font-semibold" : ""}>{cell}</span>}</td> })}</tr>)}</tbody></table>{rows.length === 0 && <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No records found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>}<div className="flex items-center justify-between border-t border-default-100 pt-3 text-[11px] text-default-500"><span>Showing {rows.length} records</span><div className="flex gap-2"><Button size="sm" variant="outline" isDisabled>Previous</Button><Button size="sm" variant="outline" isDisabled>Next</Button></div></div></div>
+}
+
+function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAction }: { config: ModuleConfig; rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
+  const groupedOrders = new Map<string, { name: string; orders: { row: string[]; index: number }[] }>()
+  rows.forEach((row, index) => {
+    const key = row[15] || row[1] || row[0]
+    const group = groupedOrders.get(key) ?? { name: row[1] || "Unknown customer", orders: [] }
+    group.orders.push({ row, index })
+    groupedOrders.set(key, group)
+  })
+
+  if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No orders found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
+
+  return <div className="space-y-3">
+    {[...groupedOrders.entries()].map(([key, group]) => <details key={key} className="group rounded-xl border border-default-200 bg-content1/60">
+      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 transition hover:bg-default-50/70">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{group.name}</span><span className="mt-1 block text-xs text-default-500">{group.orders.length} {group.orders.length === 1 ? "order" : "orders"}</span></span>
+        <ChevronDown size={17} className="shrink-0 text-default-500 transition-transform group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="space-y-2 border-t border-default-200 p-3 sm:p-4">
+        {group.orders.map(({ row, index }) => <details key={row[0]} className="group/order rounded-lg border border-default-200 bg-background/70">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-3 transition hover:bg-default-50/70 sm:px-4">
+            <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{row[0]}</span><span className="mt-1 block text-[11px] text-default-500">{row[2]} · {row[3]} {row[3] === "1" ? "item" : "items"}</span></span>
+            <span className="hidden text-xs font-semibold sm:block">{row[4]}</span>
+            <Chip size="sm" variant="soft" color={statusColor(row[7])}>{row[7]}</Chip>
+            <ChevronDown size={15} className="shrink-0 text-default-500 transition-transform group-open/order:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="space-y-4 border-t border-default-100 p-3 sm:p-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {config.columns.map((heading, columnIndex) => {
+                if (["Customer", "Order ID", "Actions"].includes(heading)) return null
+                const value = row[columnIndex] || "—"
+                return <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
+                  <p className="text-[11px] text-default-500">{heading}</p>
+                  {["Order Status", "Payment Status"].includes(heading) ? <div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(value)}>{value}</Chip></div> : <p className="mt-1 break-words text-xs font-medium">{value}</p>}
+                </div>
+              })}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default-100 pt-3">
+              {selectable && <label className="flex items-center gap-2 text-xs text-default-500"><input type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} />Select order</label>}
+              <div className="flex flex-wrap gap-1">
+                {(row[9] ?? "").split(" · ").map((action) => action.trim()).filter(Boolean).map((action) => <Button key={action} size="sm" variant="ghost" className={`h-8 min-w-0 px-2 text-xs ${isDestructive(action) ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
+              </div>
+            </div>
+          </div>
+        </details>)}
+      </div>
+    </details>)}
+    <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} {rows.length === 1 ? "order" : "orders"} across {groupedOrders.size} {groupedOrders.size === 1 ? "customer" : "customers"}</div>
+  </div>
 }
 
 function DialogField({ field, value, onChange, choicesOverride }: { field: string; value: string; onChange: (value: string) => void; choicesOverride?: string[] }) {

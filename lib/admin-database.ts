@@ -111,8 +111,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "orders") {
-      const orders = await prisma.$queryRaw<{ order_number: string; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; latitude: number | null; longitude: number | null; created_at: Date }[]>`
-        select o.order_number, c.name as customer, coalesce(items.item_count, 0)::int as item_count,
+      const orders = await prisma.$queryRaw<{ order_number: string; customer_id: string | null; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; latitude: number | null; longitude: number | null; created_at: Date }[]>`
+        select o.order_number, o.customer_id::text as customer_id, c.name as customer, coalesce(items.item_count, 0)::int as item_count,
           items.summary as items, o.total_amount::text as total,
           coalesce(nullif(o.payment_method, ''), p.method) as method,
           coalesce(p.status, o.payment_status) as payment,
@@ -143,7 +143,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         const fulfillment = o.fulfillment?.toLowerCase() ?? "delivery"
         const method = o.method ? paymentMethodLabel(o.method) : "—"
         const pin = o.latitude !== null && o.longitude !== null ? `${o.latitude},${o.longitude}` : ""
-        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin]
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number]
       }) }
     }
 
