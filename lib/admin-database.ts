@@ -326,7 +326,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
 }
 
 export async function getAdminDashboardPreview() {
-  const emptyPreview = { error: true, metrics: { ordersToday: 0, pendingOrders: 0, revenueMonth: money(0), lowStock: 0, openReturns: 0, flaggedFeedback: 0 }, recentOrders: [] as string[][], monthlySales: Array(12).fill(0) as number[], topProducts: [] as [string, number][] }
+  const emptyPreview = { error: true, metrics: { ordersToday: 0, pendingOrders: 0, revenueMonth: money(0), lowStock: 0, openReturns: 0, flaggedFeedback: 0 }, recentOrders: [] as string[][] }
   if (!process.env.DATABASE_URL) return emptyPreview
 
   try {
@@ -345,21 +345,6 @@ export async function getAdminDashboardPreview() {
       where o.order_number not like 'DEMO-ORD-%'
       order by o.created_at desc limit 4
     `
-    const sales = await prisma.$queryRaw<{ month: number; amount: string }[]>`
-      select extract(month from p.created_at)::int as month, coalesce(sum(p.amount), 0)::text as amount
-      from public.payments p join public.orders o on o.id = p.order_id
-      where o.order_number not like 'DEMO-ORD-%' and coalesce(p.reference, '') not like 'DEMO-PAY-%'
-        and p.status = 'verified' and p.created_at >= date_trunc('year', now())
-      group by extract(month from p.created_at)
-    `
-    const topProducts = await prisma.$queryRaw<{ name: string; units: number }[]>`
-      select oi.product_name as name, sum(oi.quantity)::int as units
-      from public.order_items oi join public.orders o on o.id = oi.order_id
-      where o.order_number not like 'DEMO-ORD-%' and o.status = 'delivered'
-      group by oi.product_name order by units desc, oi.product_name limit 4
-    `
-    const monthlySales = Array(12).fill(0) as number[]
-    sales.forEach((sale) => { monthlySales[sale.month - 1] = Number(sale.amount) })
     return {
       error: false,
       metrics: {
@@ -371,8 +356,6 @@ export async function getAdminDashboardPreview() {
         flaggedFeedback: metrics.flagged_feedback,
       },
       recentOrders: recentOrders.map((o) => [o.order_number, o.customer ?? "Unknown", money(o.amount), title(o.status), dateLabel(o.created_at)]),
-      monthlySales,
-      topProducts: topProducts.map((product) => [product.name, product.units] as [string, number]),
     }
   } catch (error) {
     console.error("Admin dashboard preview query failed", error)
