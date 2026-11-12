@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, Eye, EyeOff, LockKeyhole } from "lucide-react"
+import { ArrowLeft, Check, Eye, EyeOff, LoaderCircle, LockKeyhole } from "lucide-react"
 import { Button } from "@heroui/react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -23,6 +23,7 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
+  const [loadingMessage, setLoadingMessage] = useState("Please wait…")
   const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""])
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -39,11 +40,13 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
     let alive = true
     createClient().auth.getSession().then(({ data }) => {
       if (!alive) return
-      if (!data.session) router.replace("/forgot-password")
+      if (!data.session) {
+        router.replace("/forgot-password")
+        return
+      }
       setCheckingRecoverySession(false)
     }).catch(() => {
       if (!alive) return
-      setCheckingRecoverySession(false)
       router.replace("/forgot-password")
     })
     return () => { alive = false }
@@ -67,7 +70,9 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError("")
+    setLoadingMessage(step === "login" ? "Signing you in…" : step === "forgot-password" ? "Sending reset code…" : step === "verify-code" ? "Verifying code…" : "Updating password…")
     setBusy(true)
+    let navigating = false
     try {
       const supabase = createClient()
       if (step === "login") {
@@ -79,11 +84,13 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
           throw new Error("This account does not have active admin access.")
         }
         const next = new URLSearchParams(window.location.search).get("next")
+        navigating = true
         router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/")
         return
       }
       if (step === "forgot-password") {
         await requestRecoveryCode(email)
+        navigating = true
         go("/verify-code")
         return
       }
@@ -92,6 +99,7 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
         if (!email || token.length !== 6) throw new Error("Enter the six-digit code from your email.")
         const { error: verifyError } = await supabase.auth.verifyOtp({ email, token, type: "recovery" })
         if (verifyError) throw new Error("That code is invalid or expired. Request a new reset code and try again.")
+        navigating = true
         go("/reset-password")
         return
       }
@@ -101,19 +109,21 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
         const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
         if (updateError) throw updateError
         sessionStorage.removeItem("akp-admin-recovery-email")
+        navigating = true
         go("/password-updated")
         return
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to complete this request. Please try again.")
     } finally {
-      setBusy(false)
+      if (!navigating) setBusy(false)
     }
   }
 
   async function resendCode() {
     if (!email || resendSeconds > 0 || busy) return
     setError("")
+    setLoadingMessage("Requesting another reset code…")
     setBusy(true)
     try {
       await requestRecoveryCode(email)
@@ -125,7 +135,7 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
     }
   }
 
-  if (checkingRecoverySession) return <main className="grid min-h-dvh place-items-center bg-background text-sm text-default-500">Checking password reset session…</main>
+  if (checkingRecoverySession || busy) return <main className="grid min-h-dvh place-items-center bg-background px-4 text-foreground" role="status" aria-live="polite"><div className="flex flex-col items-center gap-3 text-center"><LoaderCircle size={30} className="animate-spin text-primary" aria-hidden="true" /><p className="text-sm text-default-600">{checkingRecoverySession ? "Checking password reset session…" : loadingMessage}</p></div></main>
 
   return <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-10 text-foreground">
     <section className="w-full max-w-[520px] rounded-xl border border-default-200 bg-content1 p-6 shadow-[0_20px_60px_rgba(44,40,30,0.12)] sm:p-9">
