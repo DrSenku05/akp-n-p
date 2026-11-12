@@ -566,6 +566,8 @@ function DataTable({ config, rows, compact = false, selectable = false, selected
 }
 
 function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAction }: { config: ModuleConfig; rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
   const groupedOrders = new Map<string, { name: string; orders: { row: string[]; index: number }[] }>()
   rows.forEach((row, index) => {
     const key = row[15] || row[1] || row[0]
@@ -577,20 +579,30 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
   if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No orders found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
 
   return <div className="space-y-3">
-    {[...groupedOrders.entries()].map(([key, group]) => <details key={key} className="group rounded-xl border border-default-200 bg-content1/60">
-      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-4 py-4 transition hover:bg-default-50/70">
+    {[...groupedOrders.entries()].map(([key, group]) => {
+      const customerExpanded = expandedCustomers.has(key)
+      const customerPanelId = `customer-orders-${encodeURIComponent(key)}`
+      return <section key={key} className="group rounded-xl border border-default-200 bg-content1/60">
+      <button type="button" aria-expanded={customerExpanded} aria-controls={customerPanelId} onClick={() => setExpandedCustomers((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next })} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-4 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{group.name}</span><span className="mt-1 block text-xs text-default-500">{group.orders.length} {group.orders.length === 1 ? "order" : "orders"}</span></span>
-        <ChevronDown size={17} className="shrink-0 text-default-500 transition-transform group-open:rotate-180" aria-hidden="true" />
-      </summary>
-      <div className="space-y-2 border-t border-default-200 p-3 sm:p-4">
-        {group.orders.map(({ row, index }) => <details key={row[0]} className="group/order rounded-lg border border-default-200 bg-background/70">
-          <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-3 transition hover:bg-default-50/70 sm:px-4">
+        <ChevronDown size={17} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${customerExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      <div id={customerPanelId} aria-hidden={!customerExpanded} inert={!customerExpanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${customerExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+        <div className="min-h-0 overflow-hidden">
+        <div className="space-y-2 border-t border-default-200 p-3 sm:p-4">
+        {group.orders.map(({ row, index }) => {
+          const orderExpanded = expandedOrders.has(row[0])
+          const orderPanelId = `order-details-${encodeURIComponent(row[0])}`
+          return <section key={row[0]} className="group/order rounded-lg border border-default-200 bg-background/70">
+          <button type="button" aria-expanded={orderExpanded} aria-controls={orderPanelId} onClick={() => setExpandedOrders((current) => { const next = new Set(current); if (next.has(row[0])) next.delete(row[0]); else next.add(row[0]); return next })} className="flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary sm:px-4">
             <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{row[0]}</span><span className="mt-1 block text-[11px] text-default-500">{row[2]} · {row[3]} {row[3] === "1" ? "item" : "items"}</span></span>
             <span className="hidden text-xs font-semibold sm:block">{row[4]}</span>
             <Chip size="sm" variant="soft" color={statusColor(row[7])}>{row[7]}</Chip>
-            <ChevronDown size={15} className="shrink-0 text-default-500 transition-transform group-open/order:rotate-180" aria-hidden="true" />
-          </summary>
+            <ChevronDown size={15} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${orderExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
+          </button>
+          <div id={orderPanelId} aria-hidden={!orderExpanded} inert={!orderExpanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${orderExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+          <div className="min-h-0 overflow-hidden">
           <div className="space-y-4 border-t border-default-100 p-3 sm:p-4">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {config.columns.map((heading, columnIndex) => {
@@ -609,9 +621,14 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
               </div>
             </div>
           </div>
-        </details>)}
+          </div>
+          </div>
+        </section>})}
+        </div>
+        </div>
       </div>
-    </details>)}
+      </section>
+    })}
     <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} {rows.length === 1 ? "order" : "orders"} across {groupedOrders.size} {groupedOrders.size === 1 ? "customer" : "customers"}</div>
   </div>
 }
