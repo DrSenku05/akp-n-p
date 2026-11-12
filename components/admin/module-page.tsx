@@ -595,12 +595,15 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
           const orderExpanded = expandedOrders.has(row[0])
           const orderPanelId = `order-details-${encodeURIComponent(row[0])}`
           return <section key={row[0]} className="group/order rounded-lg border border-default-200 bg-background/70">
-          <button type="button" aria-expanded={orderExpanded} aria-controls={orderPanelId} onClick={() => setExpandedOrders((current) => { const next = new Set(current); if (next.has(row[0])) next.delete(row[0]); else next.add(row[0]); return next })} className="flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary sm:px-4">
+          <div className="flex items-center gap-3 px-3 sm:px-4">
+            {selectable && <label aria-label={`Select order ${row[0]}`} className="flex size-8 shrink-0 cursor-pointer items-center justify-center"><input type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} /></label>}
+            <button type="button" aria-expanded={orderExpanded} aria-controls={orderPanelId} onClick={() => setExpandedOrders((current) => { const next = new Set(current); if (next.has(row[0])) next.delete(row[0]); else next.add(row[0]); return next })} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-3 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
             <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{row[0]}</span><span className="mt-1 block text-[11px] text-default-500">{row[2]} · {row[3]} {row[3] === "1" ? "item" : "items"}</span></span>
             <span className="hidden text-xs font-semibold sm:block">{row[4]}</span>
             <Chip size="sm" variant="soft" color={statusColor(row[7])}>{row[7]}</Chip>
             <ChevronDown size={15} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${orderExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
-          </button>
+            </button>
+          </div>
           <div id={orderPanelId} aria-hidden={!orderExpanded} inert={!orderExpanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${orderExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
           <div className="min-h-0 overflow-hidden">
           <div className="space-y-4 border-t border-default-100 p-3 sm:p-4">
@@ -613,11 +616,18 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
                   {["Order Status", "Payment Status"].includes(heading) ? <div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(value)}>{value}</Chip></div> : <p className="mt-1 break-words text-xs font-medium">{value}</p>}
                 </div>
               })}
+              {[
+                ["Delivery address", row[10] || "Pickup at store / no address provided"],
+                ["Ordered products", row[11] || "No item details available"],
+                ["GCash reference", row[12] || "Not applicable"],
+              ].map(([heading, value]) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
+                <p className="text-[11px] text-default-500">{heading}</p>
+                <p className="mt-1 break-words text-xs font-medium">{value}</p>
+              </div>)}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default-100 pt-3">
-              {selectable && <label className="flex items-center gap-2 text-xs text-default-500"><input type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} />Select order</label>}
               <div className="flex flex-wrap gap-1">
-                {(row[9] ?? "").split(" · ").map((action) => action.trim()).filter(Boolean).map((action) => <Button key={action} size="sm" variant="ghost" className={`h-8 min-w-0 px-2 text-xs ${isDestructive(action) ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
+                {(row[9] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action)).map((action) => <Button key={action} size="sm" variant="ghost" className={`h-8 min-w-0 px-2 text-xs ${isDestructive(action) ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
               </div>
             </div>
           </div>
