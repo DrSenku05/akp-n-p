@@ -19,7 +19,6 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""])
@@ -72,14 +71,10 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
       if (step === "login") {
         const { data, error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
         if (authError || !data.user) throw new Error("Email or password is incorrect.")
-        const { data: admin, error: roleError } = await supabase.from("admin_users").select("role, is_active").eq("user_id", data.user.id).maybeSingle()
-        if (roleError || !admin?.is_active) {
+        const { data: admin, error: adminError } = await supabase.from("admin_users").select("is_active").eq("user_id", data.user.id).maybeSingle()
+        if (adminError || !admin?.is_active) {
           await supabase.auth.signOut()
           throw new Error("This account does not have active admin access.")
-        }
-        if (admin.role !== role) {
-          await supabase.auth.signOut()
-          throw new Error(`This account is not registered for the ${role === "owner" ? "Owner" : "Staff"} role.`)
         }
         const next = new URLSearchParams(window.location.search).get("next")
         router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/")
@@ -138,7 +133,6 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
           <h1 className="text-xl font-bold tracking-tight">{title}</h1><p className="mt-2 text-sm leading-6 text-default-500">{description}</p>
           <form className="mt-7 space-y-4" onSubmit={submit}>
             {step === "login" && <>
-              <label className="block space-y-1.5 text-xs font-medium">Role<select required aria-label="Admin role" value={role} onChange={(event) => setRole(event.target.value)} className="h-11 w-full rounded-lg border border-default-200 bg-background px-3 text-sm text-foreground outline-none focus:border-primary"><option value="">Select role...</option><option value="owner">Owner</option><option value="staff">Staff</option></select></label>
               <label className="block space-y-1.5 text-xs font-medium">Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" placeholder="Enter your admin email" className="h-11 w-full rounded-lg border border-default-200 bg-background px-3 text-sm text-foreground placeholder:text-default-400 outline-none focus:border-primary" /></label>
               <label className="block space-y-1.5 text-xs font-medium">Password<span className="relative block"><input required value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter your password" className="h-11 w-full rounded-lg border border-default-200 bg-background px-3 pr-10 text-sm text-foreground placeholder:text-default-400 outline-none focus:border-primary" /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-default-400">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span></label>
               <div className="text-right"><button type="button" onClick={() => go("/forgot-password")} className="text-xs font-medium text-primary">Forgot password?</button></div>
