@@ -1,5 +1,5 @@
 "use client"
-import { Bell, Menu, Search } from "lucide-react"
+import { Bell, LoaderCircle, Menu, Search } from "lucide-react"
 import { Button } from "@heroui/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -12,6 +12,8 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [message, setMessage] = useState("")
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState("")
   const [profile, setProfile] = useState({ name: "Admin", role: "Administrator" })
   useEffect(() => {
     let active = true
@@ -26,10 +28,18 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
     return () => { active = false }
   }, [])
   const signOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.replace("/login")
-    router.refresh()
+    if (signingOut) return
+    setSignOutError("")
+    setSigningOut(true)
+    try {
+      const { error } = await createClient().auth.signOut()
+      if (error) throw error
+      router.replace("/login")
+      router.refresh()
+    } catch (cause) {
+      setSignOutError(cause instanceof Error ? cause.message : "Unable to sign out. Please try again.")
+      setSigningOut(false)
+    }
   }
   const search = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -39,7 +49,10 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
     if (match) { router.push(match[1]); setMessage("") }
     else setMessage("No matching admin section. Try orders, products, customers, or reports.")
   }
-  return <header inert={inert} className="relative z-10 flex min-h-[66px] shrink-0 items-center gap-3 border-t-2 border-amber-600 bg-[#211e18] px-3 text-stone-50 shadow-sm shadow-black/10 sm:gap-4 sm:px-5 md:px-8">
+  return <>
+    {signingOut && <div className="fixed inset-0 z-[100] grid place-items-center bg-background px-4 text-foreground" role="status" aria-live="polite"><div className="flex flex-col items-center gap-3 text-center"><LoaderCircle size={30} className="animate-spin text-primary" aria-hidden="true" /><p className="text-sm text-default-600">Signing you out…</p></div></div>}
+    {signOutError && <p role="alert" className="fixed right-4 top-4 z-[101] max-w-sm rounded-lg bg-danger px-4 py-3 text-sm text-white shadow-lg">{signOutError}</p>}
+    <header inert={inert} className="relative z-10 flex min-h-[66px] shrink-0 items-center gap-3 border-t-2 border-amber-600 bg-[#211e18] px-3 text-stone-50 shadow-sm shadow-black/10 sm:gap-4 sm:px-5 md:px-8">
     <button type="button" aria-label="Open admin navigation" onClick={onOpenMenu} className="flex size-10 shrink-0 items-center justify-center rounded-lg text-stone-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-300">
       <Menu size={21} strokeWidth={1.8} aria-hidden="true" />
     </button>
@@ -70,5 +83,6 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
         </div>
       </div>
     </div>
-  </header>
+    </header>
+  </>
 }
