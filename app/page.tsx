@@ -1,6 +1,7 @@
 import { ArrowUpRight, Bell, Boxes, CircleDollarSign, Package, ShoppingBag } from "lucide-react"
 import { Card, Chip } from "@heroui/react"
 import Link from "next/link"
+import Image from "next/image"
 import { getAdminDashboardPreview } from "@/lib/admin-database"
 
 export const dynamic = "force-dynamic"
@@ -32,7 +33,12 @@ export default async function Home() {
   ].filter((item) => item.count > 0)
   const today = new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date())
 
-  return <div className="mx-auto max-w-[1540px] space-y-6 text-foreground">
+  return <div className="relative isolate -mx-4 -my-5 min-h-full px-4 py-5 text-foreground md:-mx-7 md:-my-6 md:px-7 md:py-6">
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      <Image src="/images/banig-badian.jpg" alt="" fill sizes="100vw" className="scale-105 object-cover opacity-45 blur-md" />
+      <div className="absolute inset-0 bg-background/75" />
+    </div>
+    <div className="relative z-10 mx-auto max-w-[1540px] space-y-6">
     {preview.error && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">Could not load dashboard records from Supabase. Check the server database connection.</div>}
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
@@ -92,6 +98,7 @@ export default async function Home() {
           })}</div> : <p className="rounded-xl bg-success/10 p-4 text-xs text-success">You’re all caught up. Nothing needs attention.</p>}
         </Card.Content>
       </Card>
+    </div>
     </div>
   </div>
 }
