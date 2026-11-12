@@ -42,7 +42,6 @@ export default async function Home() {
         <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent"><Leaf size={12} />Gawang Pilipino</span>
         <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-default-500">{today}</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
-        <p className="mt-1 text-sm text-default-600">A clear view of the orders, people, and locally made goods in your care.</p>
       </div>
       <div className="hidden items-end gap-4 sm:flex">
         <p className="mb-0.5 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 py-1.5 text-[10px] font-medium text-white backdrop-blur-sm"><MapPin size={12} />Banig from Badian · Cebu</p>
