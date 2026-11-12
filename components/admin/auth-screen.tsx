@@ -71,8 +71,8 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
       if (step === "login") {
         const { data, error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
         if (authError || !data.user) throw new Error("Email or password is incorrect.")
-        const { data: admin, error: adminError } = await supabase.from("admin_users").select("is_active").eq("user_id", data.user.id).maybeSingle()
-        if (adminError || !admin?.is_active) {
+        const { data: admin, error: adminError } = await supabase.from("admin_users").select("role, is_active").eq("user_id", data.user.id).maybeSingle()
+        if (adminError || !admin?.is_active || !["owner", "staff"].includes(admin.role)) {
           await supabase.auth.signOut()
           throw new Error("This account does not have active admin access.")
         }
