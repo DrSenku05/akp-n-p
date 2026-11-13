@@ -828,16 +828,16 @@ function InventoryDirectory({ config, rows, onAction }: { config: ModuleConfig; 
               </div>
               <section aria-label={`Movement history for ${row[1]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
                 <h3 className="border-b border-dashed border-default-300 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Movement receipts</h3>
-                {movements.length ? <ul className="divide-y divide-dashed divide-default-200">
-                  {movements.map((movement, movementIndex) => <li key={`${movement.created_at}-${movementIndex}`} className="px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold capitalize">{movement.movement_type.replaceAll("_", " ")}</span>
-                      <span className={`font-semibold tabular-nums ${movement.quantity_delta > 0 ? "text-success" : "text-danger"}`}>{movement.quantity_delta > 0 ? "+" : ""}{movement.quantity_delta}</span>
+                {movements.length ? <ul className="max-h-[40rem] divide-y divide-dashed divide-default-200 overflow-y-auto overscroll-contain">
+                  {movements.map((movement, movementIndex) => <li key={`${movement.created_at}-${movementIndex}`} className="h-32 overflow-hidden px-4 py-2">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate font-semibold capitalize">{movement.movement_type.replaceAll("_", " ")}</span>
+                      <span className={`shrink-0 font-semibold tabular-nums ${movement.quantity_delta > 0 ? "text-success" : "text-danger"}`}>{movement.quantity_delta > 0 ? "+" : ""}{movement.quantity_delta}</span>
                     </div>
-                    <p className="mt-1 text-[11px] text-default-500">{new Date(movement.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })}</p>
-                    <div className="mt-3 border-t border-dashed border-default-200 pt-2">
+                    <p className="mt-1 truncate text-[11px] text-default-500">{new Date(movement.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })}</p>
+                    <div className="mt-2 border-t border-dashed border-default-200 pt-1.5">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-default-500">Reason</p>
-                      <p className="mt-1 break-words text-xs">{movement.reason}</p>
+                      <p className="mt-0.5 line-clamp-2 break-words text-xs">{movement.reason}</p>
                     </div>
                   </li>)}
                 </ul> : <p className="px-4 py-3 text-xs text-default-500">No movement activity recorded.</p>}
@@ -985,9 +985,9 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
               <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 border-b border-default-100 bg-default-50/70 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-default-500">
                 <span>Product</span><span className="text-right">Qty</span>
               </div>
-              {orderedItems.length ? <ul className="divide-y divide-dashed divide-default-200">
-                {orderedItems.map((item, itemIndex) => <li key={`${item.name}-${itemIndex}`} className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 px-4 py-3 text-xs">
-                  <span className="break-words font-medium">{item.name}</span><span className="text-right tabular-nums text-default-600">{item.quantity}</span>
+              {orderedItems.length ? <ul className="max-h-60 divide-y divide-dashed divide-default-200 overflow-y-auto overscroll-contain">
+                {orderedItems.map((item, itemIndex) => <li key={`${item.name}-${itemIndex}`} className="grid h-12 grid-cols-[minmax(0,1fr)_5rem] items-center gap-3 px-4 text-xs">
+                  <span className="truncate font-medium">{item.name}</span><span className="text-right tabular-nums text-default-600">{item.quantity}</span>
                 </li>)}
               </ul> : <p className="px-4 py-3 text-xs text-default-500">No item details available.</p>}
             </section>
