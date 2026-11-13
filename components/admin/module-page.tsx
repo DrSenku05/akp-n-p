@@ -31,7 +31,7 @@ const modules: Record<string, ModuleConfig> = {
   orders: { title: "Order Management", subtitle: "Review customer orders, payment details, and pickup or delivery progress", action: "Export Orders", stats: [["Awaiting Action", "0"], ["Preparing", "0"], ["In Fulfillment", "0"], ["Completed", "0"]], search: "Search order ID or customer...", filter: "Order status", filterOptions: ["Pending", "Preparing", "Ready for Pickup", "Out for Delivery", "Completed", "Cancelled"], columns: ["Order ID", "Customer", "Order Type", "Items", "Total", "Payment Method", "Payment Status", "Order Status", "Date", "Actions"], rows: [["#ORD-0041", "Maria Santos", "Delivery", "3", "₱1,200", "GCash", "Pending", "Pending", "Aug 14", "View · Accept Order · Cancel"], ["#ORD-0040", "Jose Reyes", "Walk-in", "2", "₱840", "COD", "Pending", "Preparing", "Aug 14", "View · Ready for Pickup · Cancel"], ["#ORD-0039", "Ana Cruz", "Delivery", "5", "₱2,100", "GCash", "Paid", "Out for Delivery", "Aug 13", "View · Complete Order"]], note: "GCash references are not proof of payment. Confirm funds manually in the platform's GCash account. Walk-in orders progress to Ready for Pickup; delivery orders progress to Out for Delivery." },
   inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Movement History", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "2 activities", "Normal", "", "[{\"movement_type\":\"restock\",\"quantity_delta\":20,\"reason\":\"Supplier delivery\",\"created_at\":\"2026-08-12T09:00:00.000Z\"},{\"movement_type\":\"sale\",\"quantity_delta\":-8,\"reason\":\"Customer orders\",\"created_at\":\"2026-08-13T10:30:00.000Z\"}]"], ["SKU-002", "Native Rattan Basket", "8", "1 activity", "Low Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-3,\"reason\":\"Store sale\",\"created_at\":\"2026-08-10T09:00:00.000Z\"}]"], ["SKU-003", "Handwoven Table Runner", "25", "1 activity", "Normal", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-5,\"reason\":\"Customer order\",\"created_at\":\"2026-08-14T08:30:00.000Z\"}]"], ["SKU-004", "Bamboo Jewelry Set", "2", "1 activity", "Low Stock", "", "[{\"movement_type\":\"damage\",\"quantity_delta\":-4,\"reason\":\"Damaged during inspection\",\"created_at\":\"2026-08-13T08:00:00.000Z\"}]"], ["SKU-005", "Native Buri Hat", "0", "1 activity", "Out of Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-6,\"reason\":\"Customer order\",\"created_at\":\"2026-08-11T09:00:00.000Z\"}]"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
   customers: { title: "Customer Management", subtitle: "Manage customer accounts, information, and transaction records", action: "Export Customers", search: "Search by name, email, or phone...", filter: "Filter by Status", columns: ["Customer ID", "Name", "Email", "Phone", "Total Orders", "Total Spent", "Status", "Actions"], rows: [["CUS-001", "Maria Santos", "maria@email.com", "09XX-XXX-XXX", "6", "₱5,400", "Active", "View · Suspend"], ["CUS-002", "Jose Reyes", "jose@email.com", "09XX-XXX-XXX", "3", "₱2,100", "Active", "View · Suspend"], ["CUS-003", "Ana Cruz", "ana@email.com", "09XX-XXX-XXX", "10", "₱9,800", "Active", "View · Suspend"], ["CUS-004", "Pedro Lim", "pedro@email.com", "09XX-XXX-XXX", "1", "₱560", "Suspended", "View · Reactivate"]], note: "Customer details include profile information, address book, order history, and feedback records." },
-  "delivery-personnel": { title: "Delivery Personnel Management", subtitle: "Manage delivery staff accounts, availability, and assignments", action: "Add Personnel", stats: [["Total Personnel", "8"], ["Available", "5"], ["On Delivery", "3"], ["Deliveries Today", "11"]], search: "Search personnel...", columns: ["Personnel ID", "Name", "Contact", "Assigned Orders", "Availability", "Actions"], rows: [["DEL-001", "Ramon Dela Cruz", "09XX-XXX-XXX", "#ORD-0041, #ORD-0039", "On Delivery", "View · Edit"], ["DEL-002", "Julio Marcos", "09XX-XXX-XXX", "#ORD-0040", "On Delivery", "View · Edit"], ["DEL-003", "Benito Aquino", "09XX-XXX-XXX", "—", "Available", "View · Edit · Assign"], ["DEL-004", "Carlos Ramos", "09XX-XXX-XXX", "—", "Off Duty", "View · Edit"]], note: "Assign pending orders to available personnel. Availability updates when an order is picked up or delivered." },
+  "delivery-personnel": { title: "Delivery Personnel Management", subtitle: "Manage delivery staff availability and order assignments", stats: [["Total Personnel", "8"], ["Available", "5"], ["On Delivery", "3"], ["Deliveries Today", "11"]], search: "Search personnel...", columns: ["Personnel ID", "Name", "Contact", "Assigned Orders", "Availability", "Actions"], rows: [["DEL-001", "Ramon Dela Cruz", "09XX-XXX-XXX", "#ORD-0041, #ORD-0039", "On Delivery", "View · Unassign"], ["DEL-002", "Julio Marcos", "09XX-XXX-XXX", "#ORD-0040", "On Delivery", "View · Unassign"], ["DEL-003", "Benito Aquino", "09XX-XXX-XXX", "—", "Available", "View · Suspend"], ["DEL-004", "Carlos Ramos", "09XX-XXX-XXX", "—", "Off Duty", "View · Suspend"]], note: "Use Assign for a specific driver and order, or Auto-assign to balance open deliveries across available personnel." },
   "returns-refunds": { title: "Return and Refund Management", subtitle: "Handle eligible return and refund requests from customers", action: "Export", stats: [["Open Requests", "4"], ["Under Review", "2"], ["Approved", "1"], ["Rejected", "1"]], search: "Search by request, order, or customer...", filter: "All Status", columns: ["Request ID", "Order ID", "Customer", "Reason", "Type", "Amount", "Status", "Actions"], rows: [["RET-007", "#ORD-0033", "Rosa Tan", "Defective item", "Refund", "₱780", "Open", "Review · Approve · Reject"], ["RET-006", "#ORD-0030", "Ana Cruz", "Wrong item received", "Return + Refund", "₱1,200", "Under Review", "Review · Approve · Reject"], ["RET-005", "#ORD-0028", "Jose Reyes", "Changed mind", "Return", "₱430", "Rejected", "View"], ["RET-004", "#ORD-0025", "Maria Santos", "Item not as described", "Refund", "₱650", "Approved", "View"]], note: "Approved refunds create a payment reversal and notify the customer. Requests must be within the return window." },
   feedback: { title: "Customer Feedback Management", subtitle: "Monitor ratings and feedback on products and completed transactions", action: "Export Feedback", stats: [["Avg. Product Rating", "4.3 ★"], ["Total Reviews", "128"], ["Flagged Feedback", "2"], ["Unread", "7"]], search: "Search by product or customer...", filter: "All Ratings", filterOptions: ["★★★★★", "★★★★☆", "★★★☆☆", "★★☆☆☆", "★☆☆☆☆"], columns: ["Feedback ID", "Customer", "Product", "Rating", "Comment", "Order ID", "Date", "Actions"], rows: [["FBK-128", "Maria Santos", "Woven Abaca Bag", "★★★★★", "Beautiful craftsmanship!", "#ORD-0038", "Aug 14", "View · Flag"], ["FBK-127", "Ana Cruz", "Rattan Basket", "★★★★☆", "Good quality, fast delivery", "#ORD-0035", "Aug 13", "View · Flag"], ["FBK-126", "Unknown", "Bamboo Jewelry Set", "★☆☆☆☆", "[flagged content]", "#ORD-0032", "Aug 12", "View · Unflag · Remove"], ["FBK-125", "Jose Reyes", "Table Runner", "★★★★☆", "Nice product", "#ORD-0030", "Aug 11", "View · Flag"]], note: "Flagged feedback is hidden from the storefront pending review. Feedback is linked to verified purchases." },
   payments: { title: "Payment Management", subtitle: "Manually verify GCash transfers and record cash collected for COD orders", action: "Export Records", stats: [["GCash Verification", "0"], ["COD Collection Due", "0"], ["Paid", "0"], ["Rejected", "0"]], search: "Search payment, order, or customer...", filter: "Payment method", filterOptions: ["GCash", "COD"], columns: ["Payment ID", "Order ID", "Customer", "Amount", "Method", "GCash Reference", "Payment Status", "Date", "Actions"], rows: [["PAY-DEMO-001", "#ORD-0041", "Maria Santos", "₱1,200", "GCash", "DEMO-PAY-1001", "Pending", "Aug 14", "Confirm Payment · Reject Payment"], ["PAY-DEMO-002", "#ORD-0040", "Jose Reyes", "₱840", "COD", "—", "Pending", "Aug 14", "Mark Cash Collected"]], note: "GCash is manual verification only: independently confirm the exact amount and reference in the platform's GCash account. Never mark a transfer paid from a reference number or screenshot alone. COD stays pending until cash is physically collected." },
@@ -128,6 +128,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const [productImagePreview, setProductImagePreview] = useState("")
   const previewObjectUrl = useRef("")
   const [saving, setSaving] = useState(false)
+  const [autoAssignBusy, setAutoAssignBusy] = useState(false)
   const [notice, setNotice] = useState("")
   const [dateRange, setDateRange] = useState("This month")
   const [customStart, setCustomStart] = useState("")
@@ -345,7 +346,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         const response = await fetch("/api/admin/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ module: slug, action, row: dialog.row ?? (slug === "inventory" ? rows.find((item) => item[0] === values.Product) : undefined), values }),
+          body: JSON.stringify({ module: slug, action, row: dialog.row ?? (slug === "inventory" ? rows.find((item) => item[0] === values.Product) : slug === "delivery-personnel" && action === "assign" ? rows.find((item) => `${item[1]} · ${item[0]}` === values["Delivery Personnel"]) : undefined), values }),
         })
         const result = await response.json() as { error?: string }
         if (!response.ok) {
@@ -353,7 +354,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           throw new Error(result.error || "Database save failed.")
         }
         if (slug === "delivery-personnel" && action === "assign") {
-          setNotice(`Assigned ${values["Delivery Order"]?.split(" · ")[0] ?? "order"} to ${dialog.row?.[1] ?? "driver"}.`)
+          setNotice(`Assigned ${values["Delivery Order"]?.split(" · ")[0] ?? "order"} to ${dialog.row?.[1] ?? values["Delivery Personnel"]?.split(" · ")[0] ?? "driver"}.`)
           setDialog(null)
           router.refresh()
           return
@@ -599,11 +600,77 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const secondary = slug === "promotions" || slug === "notifications" ? "Catalog & Marketing" : ["customers", "feedback", "payments"].includes(slug) ? "Customers" : ["reports", "audit-logs", "backup-restore", "users", "settings"].includes(slug) ? "System" : "Operations"
   const displayStats = getDisplayStats(slug, config.stats, rows, isDatabasePreview)
   const movementProduct = dialog?.action === "Record Movement" ? rows.find((item) => item[0] === dialog.values?.Product) : undefined
+  const personnelAvailabilityColumn = config.columns.indexOf("Availability")
+  const availablePersonnel = rows.filter((row) => row[personnelAvailabilityColumn]?.toLowerCase() === "available")
+  const openManualAssign = () => {
+    if (!availablePersonnel.length) {
+      setNotice("There are no available delivery personnel to assign.")
+      return
+    }
+    if (!assignableOrders.length) {
+      setNotice("There are no unassigned delivery orders ready to assign.")
+      return
+    }
+    openForm("Assign a delivery order", undefined, undefined, "Assign", ["Delivery Personnel", "Delivery Order"])
+  }
+  const autoAssignOrders = async () => {
+    if (!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy) return
+    const assignedOrdersColumn = config.columns.indexOf("Assigned Orders")
+    const drivers = availablePersonnel.map((row, index) => ({
+      row,
+      index,
+      assigned: row[assignedOrdersColumn] && row[assignedOrdersColumn] !== "—" ? row[assignedOrdersColumn].split(",").length : 0,
+    }))
+    let succeeded = 0
+    const failures: string[] = []
+    setAutoAssignBusy(true)
+    try {
+      for (const order of assignableOrders) {
+        drivers.sort((a, b) => a.assigned - b.assigned || a.index - b.index)
+        const driver = drivers[0]
+        try {
+          const response = await fetch("/api/admin/records", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ module: slug, action: "assign", row: driver.row, values: { "Delivery Order": `${order.orderNumber} · ${order.customer}` } }),
+          })
+          const result = await response.json() as { error?: string }
+          if (!response.ok) {
+            failures.push(`${order.orderNumber}: ${result.error || "Assignment failed"}`)
+            if ([401, 403, 503].includes(response.status)) break
+            continue
+          }
+          driver.assigned += 1
+          succeeded += 1
+        } catch (error) {
+          failures.push(`${order.orderNumber}: ${error instanceof Error ? error.message : "Assignment failed"}`)
+          break
+        }
+      }
+      setNotice(`Auto-assigned ${succeeded} of ${assignableOrders.length} orders.${failures.length ? ` Issues: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? `; and ${failures.length - 3} more` : ""}` : ""}`)
+      if (succeeded) router.refresh()
+    } finally {
+      setAutoAssignBusy(false)
+    }
+  }
   return <div className="mx-auto max-w-[1540px] space-y-5">
     <div className="flex flex-wrap items-center gap-2 text-xs text-default-500"><Leaf size={13} className="text-accent" /><span>{secondary}</span><span className="text-default-300">/</span><span className="font-medium text-foreground">{config.title}</span></div>
     {isDatabasePreview && databaseError && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">Could not load records from Supabase. Check the server database connection.</div>}
     {slug === "inventory" && thresholdMessage && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{thresholdMessage}</div>}
-    <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">AKP Native Products · {secondary}</p><h1 className="text-2xl font-bold tracking-tight">{config.title}</h1><p className="mt-1 text-sm text-default-500">{config.subtitle}</p></div><div className="flex flex-wrap gap-2">{slug === "products" && <Button size="sm" variant="outline" onPress={() => location.assign("/heritage-showcase")}>Heritage Showcase</Button>}{slug === "inventory" && <Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export</Button>}{slug === "reports" && <><Button size="sm" variant="outline" onPress={() => exportRows("pdf")}><Download size={15}/>Export PDF</Button><Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export CSV</Button></>}{slug === "promotions" && <><Button size="sm" variant="outline" onPress={() => triggerTopAction("Announcement")}><Plus size={15}/>Announcement</Button><Button size="sm" variant="primary" onPress={() => triggerTopAction("New Promotion")}><Plus size={15}/>New Promotion</Button></>}{config.action && !["reports", "promotions"].includes(slug) && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}>{config.action.toLowerCase().includes("export") ? <Download size={15} /> : <Plus size={15} />}{config.action}</Button>}</div></div>
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">AKP Native Products · {secondary}</p><h1 className="text-2xl font-bold tracking-tight">{config.title}</h1><p className="mt-1 text-sm text-default-500">{config.subtitle}</p></div>
+      <div className="flex flex-wrap gap-2">
+        {slug === "products" && <Button size="sm" variant="outline" onPress={() => location.assign("/heritage-showcase")}>Heritage Showcase</Button>}
+        {slug === "inventory" && <Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export</Button>}
+        {slug === "reports" && <><Button size="sm" variant="outline" onPress={() => exportRows("pdf")}><Download size={15}/>Export PDF</Button><Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export CSV</Button></>}
+        {slug === "promotions" && <><Button size="sm" variant="outline" onPress={() => triggerTopAction("Announcement")}><Plus size={15}/>Announcement</Button><Button size="sm" variant="primary" onPress={() => triggerTopAction("New Promotion")}><Plus size={15}/>New Promotion</Button></>}
+        {slug === "delivery-personnel" && <>
+          <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={autoAssignOrders}><PackagePlus size={15}/>{autoAssignBusy ? "Auto-assigning…" : "Auto-assign"}</Button>
+          <Button size="sm" variant="primary" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={openManualAssign}><Plus size={15}/>Assign</Button>
+        </>}
+        {config.action && !["reports", "promotions", "delivery-personnel"].includes(slug) && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}>{config.action.toLowerCase().includes("export") ? <Download size={15} /> : <Plus size={15} />}{config.action}</Button>}
+      </div>
+    </div>
     {notice && <div role="status" className="flex items-center justify-between rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{notice}<Button size="sm" variant="ghost" onPress={() => setNotice("")}>Dismiss</Button></div>}
     {slug === "payments" && <Card className="rounded-md border border-warning/30 bg-warning/5 shadow-none"><Card.Content className="grid gap-4 p-4 md:grid-cols-2"><div><p className="text-xs font-semibold text-foreground">GCash · verify outside the website</p><p className="mt-1 text-xs leading-5 text-default-600">Open the platform’s official GCash account separately. Match the actual incoming transfer, exact amount, and customer reference before confirming. A screenshot or reference alone is not proof.</p></div><div><p className="text-xs font-semibold text-foreground">Cash on Delivery · collect first</p><p className="mt-1 text-xs leading-5 text-default-600">Keep COD pending until the full cash amount is physically received. Record collection with “Mark Cash Collected.”</p></div></Card.Content></Card>}
     {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="flex flex-wrap items-center gap-5 p-5"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning"><PackagePlus size={19}/></span><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Low-stock warning threshold</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-default-500">Use one store-wide stock quantity for low-stock warnings across inventory and the dashboard. Products at or below this quantity are flagged.</p>{thresholdMessage && <p role={thresholdMessage.includes("saved") ? "status" : "alert"} className={`mt-2 text-xs ${thresholdMessage.includes("saved") ? "text-success" : "text-danger"}`}>{thresholdMessage}</p>}</div><label className="flex items-center gap-2 text-xs font-medium">Units<input aria-label="Low-stock warning threshold" type="number" min="0" max="100000" step="1" value={thresholdDraft} disabled={!thresholdCanEdit || thresholdBusy} onChange={(event) => setThresholdDraft(event.target.value)} className="h-9 w-24 rounded-md border border-default-200 bg-background px-2 text-sm disabled:opacity-60"/></label><Button size="sm" variant="primary" isDisabled={!thresholdCanEdit || thresholdBusy || !thresholdDraft.trim()} onPress={saveInventoryThreshold}>{thresholdBusy ? "Saving…" : "Save threshold"}</Button></Card.Content></Card>}
@@ -674,7 +741,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
                 <div className={`grid gap-3 sm:grid-cols-2 ${slug === "products" ? "lg:col-start-2" : ""}`}>
                   {Object.entries(dialog.values ?? {}).map(([field, value]) => (
                     <div key={field} className={["Description", "Image URL", "Craft / Origin", "Reason"].includes(field) ? "sm:col-span-2" : ""}>
-                      <DialogField field={field} value={value} choicesOverride={field === "Product" ? rows.map((item) => slug === "inventory" ? item[1] : item[0]).filter(Boolean) : field === "Delivery Order" ? assignableOrders.map((order) => `${order.orderNumber} · ${order.customer}`) : field === "Assigned Order" ? unassignableOrders.filter((order) => order.driverId === dialog.row?.[6]).map((order) => `${order.orderNumber} · ${order.customer}`) : undefined} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), [field]: next } } : current)} />
+                      <DialogField field={field} value={value} choicesOverride={field === "Product" ? rows.map((item) => slug === "inventory" ? item[1] : item[0]).filter(Boolean) : field === "Delivery Personnel" ? availablePersonnel.map((item) => `${item[1]} · ${item[0]}`) : field === "Delivery Order" ? assignableOrders.map((order) => `${order.orderNumber} · ${order.customer}`) : field === "Assigned Order" ? unassignableOrders.filter((order) => order.driverId === dialog.row?.[6]).map((order) => `${order.orderNumber} · ${order.customer}`) : undefined} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), [field]: next } } : current)} />
                     </div>
                   ))}
                 </div>
@@ -764,7 +831,6 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
   const [expandedPersonnel, setExpandedPersonnel] = useState<Set<string>>(new Set())
   const idColumn = config.columns.indexOf("Personnel ID")
   const nameColumn = config.columns.indexOf("Name")
-  const contactColumn = config.columns.indexOf("Contact")
   const ordersColumn = config.columns.indexOf("Assigned Orders")
   const availabilityColumn = config.columns.indexOf("Availability")
   const actionsColumn = config.columns.indexOf("Actions")
@@ -790,7 +856,7 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
           <div className="min-h-0 overflow-hidden">
             <div className="space-y-4 border-t border-default-200 p-3 sm:p-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">Contact</p><p className="mt-1 break-words text-xs font-medium">{row[contactColumn] || "—"}</p></div>
+                <div className="rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">Personnel ID</p><p className="mt-1 break-words text-xs font-medium">{row[idColumn] || "—"}</p></div>
                 <div className="rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">Availability</p><div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(availability)}>{availability}</Chip></div></div>
               </div>
               <section aria-label={`Assigned orders for ${row[nameColumn]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">

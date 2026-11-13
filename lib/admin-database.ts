@@ -206,7 +206,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       ])
       return {
         error: false,
-        rows: personnel.map((d) => [`DEL-${d.id.slice(0, 8).toUpperCase()}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), `${d.availability === "available" ? "View · Edit · Assign" : "View · Edit"}${unassignableOrders.some((order) => order.driver_id === d.id) ? " · Unassign" : ""}${d.suspendable ? " · Suspend" : ""}${d.availability === "suspended" ? " · Reactivate" : ""}`, d.id]),
+        rows: personnel.map((d) => [`DEL-${d.id.slice(0, 8).toUpperCase()}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), `View${unassignableOrders.some((order) => order.driver_id === d.id) ? " · Unassign" : ""}${d.suspendable ? " · Suspend" : ""}${d.availability === "suspended" ? " · Reactivate" : ""}`, d.id]),
         assignableOrders: assignableOrders.map((order) => ({ orderNumber: order.order_number, customer: order.customer ?? "Customer" })),
         unassignableOrders: unassignableOrders.map((order) => ({ driverId: order.driver_id, orderNumber: order.order_number, customer: order.customer ?? "Customer" })),
       }
