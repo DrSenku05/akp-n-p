@@ -29,7 +29,7 @@ function parseInventoryMovements(value: string | undefined): InventoryMovement[]
 
 const modules: Record<string, ModuleConfig> = {
   orders: { title: "Order Management", subtitle: "Review customer orders, payment details, and pickup or delivery progress", action: "Export Orders", stats: [["Awaiting Action", "0"], ["Preparing", "0"], ["In Fulfillment", "0"], ["Completed", "0"]], search: "Search order ID or customer...", filter: "Order status", filterOptions: ["Pending", "Preparing", "Ready for Pickup", "Out for Delivery", "Completed", "Cancelled"], columns: ["Order ID", "Customer", "Order Type", "Items", "Total", "Payment Method", "Payment Status", "Order Status", "Date", "Actions"], rows: [["#ORD-0041", "Maria Santos", "Delivery", "3", "₱1,200", "GCash", "Pending", "Pending", "Aug 14", "View · Accept Order · Cancel"], ["#ORD-0040", "Jose Reyes", "Walk-in", "2", "₱840", "COD", "Pending", "Preparing", "Aug 14", "View · Ready for Pickup · Cancel"], ["#ORD-0039", "Ana Cruz", "Delivery", "5", "₱2,100", "GCash", "Paid", "Out for Delivery", "Aug 13", "View · Complete Order"]], note: "GCash references are not proof of payment. Confirm funds manually in the platform's GCash account. Walk-in orders progress to Ready for Pickup; delivery orders progress to Out for Delivery." },
-  inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Movement History", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "2 activities", "Normal", "Adjust", "[{\"movement_type\":\"restock\",\"quantity_delta\":20,\"reason\":\"Supplier delivery\",\"created_at\":\"2026-08-12T09:00:00.000Z\"},{\"movement_type\":\"sale\",\"quantity_delta\":-8,\"reason\":\"Customer orders\",\"created_at\":\"2026-08-13T10:30:00.000Z\"}]"], ["SKU-002", "Native Rattan Basket", "8", "1 activity", "Low Stock", "Adjust", "[{\"movement_type\":\"sale\",\"quantity_delta\":-3,\"reason\":\"Store sale\",\"created_at\":\"2026-08-10T09:00:00.000Z\"}]"], ["SKU-003", "Handwoven Table Runner", "25", "1 activity", "Normal", "Adjust", "[{\"movement_type\":\"sale\",\"quantity_delta\":-5,\"reason\":\"Customer order\",\"created_at\":\"2026-08-14T08:30:00.000Z\"}]"], ["SKU-004", "Bamboo Jewelry Set", "2", "1 activity", "Low Stock", "Adjust", "[{\"movement_type\":\"damage\",\"quantity_delta\":-4,\"reason\":\"Damaged during inspection\",\"created_at\":\"2026-08-13T08:00:00.000Z\"}]"], ["SKU-005", "Native Buri Hat", "0", "1 activity", "Out of Stock", "Adjust", "[{\"movement_type\":\"sale\",\"quantity_delta\":-6,\"reason\":\"Customer order\",\"created_at\":\"2026-08-11T09:00:00.000Z\"}]"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
+  inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Movement History", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "2 activities", "Normal", "", "[{\"movement_type\":\"restock\",\"quantity_delta\":20,\"reason\":\"Supplier delivery\",\"created_at\":\"2026-08-12T09:00:00.000Z\"},{\"movement_type\":\"sale\",\"quantity_delta\":-8,\"reason\":\"Customer orders\",\"created_at\":\"2026-08-13T10:30:00.000Z\"}]"], ["SKU-002", "Native Rattan Basket", "8", "1 activity", "Low Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-3,\"reason\":\"Store sale\",\"created_at\":\"2026-08-10T09:00:00.000Z\"}]"], ["SKU-003", "Handwoven Table Runner", "25", "1 activity", "Normal", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-5,\"reason\":\"Customer order\",\"created_at\":\"2026-08-14T08:30:00.000Z\"}]"], ["SKU-004", "Bamboo Jewelry Set", "2", "1 activity", "Low Stock", "", "[{\"movement_type\":\"damage\",\"quantity_delta\":-4,\"reason\":\"Damaged during inspection\",\"created_at\":\"2026-08-13T08:00:00.000Z\"}]"], ["SKU-005", "Native Buri Hat", "0", "1 activity", "Out of Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-6,\"reason\":\"Customer order\",\"created_at\":\"2026-08-11T09:00:00.000Z\"}]"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
   customers: { title: "Customer Management", subtitle: "Manage customer accounts, information, and transaction records", action: "Export Customers", search: "Search by name, email, or phone...", filter: "Filter by Status", columns: ["Customer ID", "Name", "Email", "Phone", "Total Orders", "Total Spent", "Status", "Actions"], rows: [["CUS-001", "Maria Santos", "maria@email.com", "09XX-XXX-XXX", "6", "₱5,400", "Active", "View · Suspend"], ["CUS-002", "Jose Reyes", "jose@email.com", "09XX-XXX-XXX", "3", "₱2,100", "Active", "View · Suspend"], ["CUS-003", "Ana Cruz", "ana@email.com", "09XX-XXX-XXX", "10", "₱9,800", "Active", "View · Suspend"], ["CUS-004", "Pedro Lim", "pedro@email.com", "09XX-XXX-XXX", "1", "₱560", "Suspended", "View · Reactivate"]], note: "Customer details include profile information, address book, order history, and feedback records." },
   "delivery-personnel": { title: "Delivery Personnel Management", subtitle: "Manage delivery staff accounts, availability, and assignments", action: "Add Personnel", stats: [["Total Personnel", "8"], ["Available", "5"], ["On Delivery", "3"], ["Deliveries Today", "11"]], search: "Search personnel...", columns: ["Personnel ID", "Name", "Contact", "Assigned Orders", "Availability", "Actions"], rows: [["DEL-001", "Ramon Dela Cruz", "09XX-XXX-XXX", "#ORD-0041, #ORD-0039", "On Delivery", "View · Edit"], ["DEL-002", "Julio Marcos", "09XX-XXX-XXX", "#ORD-0040", "On Delivery", "View · Edit"], ["DEL-003", "Benito Aquino", "09XX-XXX-XXX", "—", "Available", "View · Edit · Assign"], ["DEL-004", "Carlos Ramos", "09XX-XXX-XXX", "—", "Off Duty", "View · Edit"]], note: "Assign pending orders to available personnel. Availability updates when an order is picked up or delivered." },
   "returns-refunds": { title: "Return and Refund Management", subtitle: "Handle eligible return and refund requests from customers", action: "Export", stats: [["Open Requests", "4"], ["Under Review", "2"], ["Approved", "1"], ["Rejected", "1"]], search: "Search by request, order, or customer...", filter: "All Status", columns: ["Request ID", "Order ID", "Customer", "Reason", "Type", "Amount", "Status", "Actions"], rows: [["RET-007", "#ORD-0033", "Rosa Tan", "Defective item", "Refund", "₱780", "Open", "Review · Approve · Reject"], ["RET-006", "#ORD-0030", "Ana Cruz", "Wrong item received", "Return + Refund", "₱1,200", "Under Review", "Review · Approve · Reject"], ["RET-005", "#ORD-0028", "Jose Reyes", "Changed mind", "Return", "₱430", "Rejected", "View"], ["RET-004", "#ORD-0025", "Maria Santos", "Item not as described", "Refund", "₱650", "Approved", "View"]], note: "Approved refunds create a payment reversal and notify the customer. Requests must be within the return window." },
@@ -345,7 +345,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         const response = await fetch("/api/admin/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ module: slug, action, row: dialog.row, values }),
+          body: JSON.stringify({ module: slug, action, row: dialog.row ?? (slug === "inventory" ? rows.find((item) => item[0] === values.Product) : undefined), values }),
         })
         const result = await response.json() as { error?: string }
         if (!response.ok) {
@@ -404,11 +404,12 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         const stockColumn = config.columns.indexOf("Current Stock")
         const movementColumn = config.columns.indexOf("Movement History")
         const statusColumn = config.columns.indexOf("Status")
-        const target = rows.findIndex((item) => item[productColumn]?.toLowerCase() === product.toLowerCase())
-        if (target < 0) { setNotice("Product not found. Enter an exact product name from Inventory."); return }
+        const target = rows.findIndex((item) => item[0] === product)
+        if (target < 0) { setNotice("Choose a product from the inventory list."); return }
         const stock = Number(rows[target][stockColumn])
-        const movementType = type.toLowerCase().includes("damage") ? "damage" : type.toLowerCase().includes("sale") || type.toLowerCase().includes("out") ? "sale" : "restock"
-        const delta = movementType === "sale" || movementType === "damage" ? -quantity : quantity
+        const movementType = type === "Stock correction" ? "adjustment" : type === "Damage" ? "damage" : type === "Sale / stock out" ? "sale" : "restock"
+        const decreasesStock = ["damage", "sale"].includes(movementType) || movementType === "adjustment" && dialog.values?.["Correction Direction"] === "Decrease"
+        const delta = decreasesStock ? -quantity : quantity
         const nextStock = stock + delta
         if (nextStock < 0) { setNotice("This movement would make stock negative."); return }
         const reason = dialog.values?.Reason?.trim()
@@ -424,7 +425,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           updated[6] = JSON.stringify([movement, ...history])
           return updated
         }))
-        setNotice(`Recorded stock ${delta > 0 ? "in" : "out"} for ${product}.`)
+        setNotice(`Recorded ${type.toLowerCase()} for ${rows[target][productColumn]}.`)
         setDialog(null)
         return
       }
@@ -443,7 +444,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       const current = dialog.row ? [...dialog.row] : Array(config.columns.length).fill("")
       if (!dialog.row) {
         const optional = new Set(["Product ID", "SKU", "Customer ID", "Personnel ID", "User ID", "Image", "Last Login", "Actions", "Status"])
-        const missing = fields.filter((field) => !optional.has(field) && !dialog.values?.[field]?.trim())
+        const missing = fields.filter((field) => !(field === "Correction Direction" && dialog.values?.["Movement Type"] !== "Stock correction") && !optional.has(field) && !dialog.values?.[field]?.trim())
         if (missing.length) { setNotice(`Complete required fields: ${missing.join(", ")}.`); return }
       }
       fields.forEach((field, index) => {
@@ -466,22 +467,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         if (actionIndex >= 0) current[actionIndex] = defaultRowAction(slug)
         setRows((existing) => [current, ...existing])
       } else if (dialog.rowIndex !== undefined) {
-        if (dialog.action === "Adjust") {
-          const stockColumn = config.columns.indexOf("Current Stock")
-          const movementColumn = config.columns.indexOf("Movement History")
-          const statusColumn = config.columns.indexOf("Status")
-          const stock = Number(current[stockColumn])
-          if (!Number.isFinite(stock) || stock < 0) { setNotice("Stock quantity must be zero or greater."); return }
-          const oldStock = Number(dialog.row[stockColumn])
-          const delta = stock - oldStock
-          const reason = dialog.values?.Reason?.trim()
-          if (delta === 0) { setNotice("Stock is already at that quantity; no movement was recorded."); return }
-          if (!reason) { setNotice("Enter a reason for this inventory adjustment."); return }
-          const history = parseInventoryMovements(dialog.row[6])
-          current[movementColumn] = `${history.length + 1} ${history.length === 0 ? "activity" : "activities"}`
-          current[6] = JSON.stringify([{ movement_type: "adjustment", quantity_delta: delta, reason, created_at: new Date().toISOString() }, ...history])
-          if (statusColumn >= 0) current[statusColumn] = stock === 0 ? "Out of Stock" : stock <= inventoryThreshold ? "Low Stock" : "Normal"
-        }
         if (dialog.action === "Assign") {
           const availabilityIndex = config.columns.indexOf("Availability")
           if (availabilityIndex >= 0) current[availabilityIndex] = "On Delivery"
@@ -549,7 +534,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       setNotice(`Manual backup ${id} created in this browser prototype.`)
       return
     }
-    if (action === "Record Movement") { openForm(action, undefined, undefined, action, ["Product", "Movement Type", "Quantity", "Reason"]); return }
+    if (action === "Record Movement") { openForm(action, undefined, undefined, action, ["Product", "Movement Type", "Quantity", "Correction Direction", "Reason"]); return }
     openForm(action, undefined, undefined, action)
   }
   const saveGcashSettings = async () => {
@@ -613,6 +598,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   }
   const secondary = slug === "promotions" || slug === "notifications" ? "Catalog & Marketing" : ["customers", "feedback", "payments"].includes(slug) ? "Customers" : ["reports", "audit-logs", "backup-restore", "users", "settings"].includes(slug) ? "System" : "Operations"
   const displayStats = getDisplayStats(slug, config.stats, rows, isDatabasePreview)
+  const movementProduct = dialog?.action === "Record Movement" ? rows.find((item) => item[0] === dialog.values?.Product) : undefined
   return <div className="mx-auto max-w-[1540px] space-y-5">
     <div className="flex flex-wrap items-center gap-2 text-xs text-default-500"><Leaf size={13} className="text-accent" /><span>{secondary}</span><span className="text-default-300">/</span><span className="font-medium text-foreground">{config.title}</span></div>
     {isDatabasePreview && databaseError && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">Could not load records from Supabase. Check the server database connection.</div>}
@@ -630,13 +616,55 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     {config.note && !["inventory", "customers", "products", "reports", "promotions", "notifications", "heritage-showcase"].includes(slug) && <div className="flex items-start gap-2 rounded-md border border-default-200 bg-default-50 px-3 py-2.5 text-xs leading-5 text-default-500"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-[#55745e]" />{config.note}</div>}
     <Modal.Backdrop isOpen={Boolean(dialog)} onOpenChange={(isOpen) => { if (!isOpen) setDialog(null) }}>
       <Modal.Container>
-        <Modal.Dialog className={slug === "products" ? "max-h-[calc(100dvh-2rem)] w-[min(96vw,72rem)] max-w-[72rem] overflow-y-auto" : "max-h-[85dvh] overflow-y-auto sm:max-w-lg"}>
+        <Modal.Dialog className={dialog?.action === "Record Movement" ? "max-h-[calc(100dvh-2rem)] w-[min(96vw,42rem)] max-w-[42rem] overflow-y-auto" : slug === "products" ? "max-h-[calc(100dvh-2rem)] w-[min(96vw,72rem)] max-w-[72rem] overflow-y-auto" : "max-h-[85dvh] overflow-y-auto sm:max-w-lg"}>
           <Modal.CloseTrigger />
           <Modal.Header><Modal.Heading>{dialog?.title}</Modal.Heading></Modal.Header>
           <Modal.Body>
             {dialog?.kind === "view" && dialog.row && (slug === "products" ? <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">{dialog.row[12] ? <Image src={dialog.row[12]} alt={`${dialog.row[2]} product`} width={960} height={720} unoptimized className="max-h-[26rem] w-full rounded-xl border border-default-200 object-cover" /> : <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-default-300 bg-default-50 text-sm text-default-500"><ImagePlus size={18} className="mr-2" />No product image uploaded</div>}<dl className="grid content-start grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).filter((column) => column !== "Image").map((column) => { const index = config.columns.indexOf(column); return <div key={column} className="min-w-0 rounded-lg border border-default-200 bg-default-50/70 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 break-words text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div> })}{dialog.extraFields?.map(([label, value]) => <div key={label} className="min-w-0 rounded-lg border border-default-200 bg-default-50/70 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value}</dd></div>)}</dl></div> : <div className="space-y-4"><dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).map((column, index) => <div key={column} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div>)}{dialog.extraFields?.map(([label, value]) => <div key={label} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl>{(slug === "orders" || slug === "customers") && (() => { const pin = slug === "orders" ? dialog.row?.[14] : dialog.row?.[10]; const [latitude, longitude] = (pin ?? "").split(",").map(Number); if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null; const src = `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - 0.01}%2C${latitude - 0.01}%2C${longitude + 0.01}%2C${latitude + 0.01}&layer=mapnik&marker=${latitude}%2C${longitude}`; const title = slug === "orders" ? "Delivery location" : "Default saved address"; return <section className="space-y-2"><h3 className="text-sm font-semibold">{title}</h3><iframe title={`${title} map pin`} src={src} className="h-64 w-full rounded-lg border border-default-200" loading="lazy" referrerPolicy="no-referrer" /></section> })()}</div>)}
             {dialog?.kind === "form" && (
-              <div className={slug === "products" ? "grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]" : "space-y-3"}>
+              dialog.action === "Record Movement" ? <div className="space-y-5">
+                <p className="text-sm leading-6 text-default-600">Log stock received, sales, damage, or a counted-stock correction. Each entry is saved as a separate movement receipt with its own reason.</p>
+                <label className="block space-y-1.5 text-xs font-medium">Product
+                  <select aria-label="Product" value={dialog.values?.Product ?? ""} onChange={(event) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), Product: event.target.value } } : current)} className="h-11 w-full rounded-lg border border-default-200 bg-background px-3 text-sm">
+                    <option value="">Choose a product</option>{rows.map((item) => <option key={item[0]} value={item[0]}>{item[1]} · {item[0]}</option>)}
+                  </select>
+                </label>
+                {movementProduct && <div className="flex items-center justify-between gap-3 rounded-xl border border-default-200 bg-default-50/70 p-4">
+                  <div className="min-w-0"><p className="truncate text-sm font-semibold">{movementProduct[1]}</p><p className="mt-1 text-xs text-default-500">{movementProduct[0]}</p></div>
+                  <div className="shrink-0 text-right"><p className="text-[10px] font-medium uppercase tracking-wide text-default-500">Current stock</p><p className="mt-0.5 text-xl font-bold tabular-nums">{movementProduct[2]} <span className="text-xs font-normal text-default-500">units</span></p></div>
+                </div>}
+                <fieldset className="space-y-2">
+                  <legend className="text-xs font-medium">Movement type</legend>
+                  <div className="grid gap-2 sm:grid-cols-2">{[
+                    ["Stock received", "Adds incoming supplier or returned stock."],
+                    ["Sale / stock out", "Removes items sold or otherwise issued."],
+                    ["Damage", "Removes unsellable or damaged items."],
+                    ["Stock correction", "Adjusts stock after a physical count."],
+                  ].map(([type, description]) => <button key={type} type="button" aria-pressed={dialog.values?.["Movement Type"] === type} onClick={() => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), "Movement Type": type } } : current)} className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary ${dialog.values?.["Movement Type"] === type ? "border-accent bg-accent/5" : "border-default-200 hover:bg-default-50"}`}><span className="block text-xs font-semibold">{type}</span><span className="mt-1 block text-[11px] leading-4 text-default-500">{description}</span></button>)}</div>
+                </fieldset>
+                {dialog.values?.["Movement Type"] === "Stock correction" && <fieldset className="space-y-2">
+                  <legend className="text-xs font-medium">Correction direction</legend>
+                  <div className="grid grid-cols-2 gap-2">{["Increase", "Decrease"].map((direction) => <button key={direction} type="button" aria-pressed={dialog.values?.["Correction Direction"] === direction} onClick={() => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), "Correction Direction": direction } } : current)} className={`rounded-lg border px-3 py-2.5 text-xs font-medium ${dialog.values?.["Correction Direction"] === direction ? "border-accent bg-accent/5" : "border-default-200 hover:bg-default-50"}`}>{direction} stock</button>)}</div>
+                </fieldset>}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block space-y-1.5 text-xs font-medium">Quantity
+                    <div className="relative"><input aria-label="Quantity" type="number" min="1" step="1" inputMode="numeric" value={dialog.values?.Quantity ?? ""} onChange={(event) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), Quantity: event.target.value } } : current)} placeholder="Enter whole units" className="h-11 w-full rounded-lg border border-default-200 bg-background px-3 pr-14 text-sm tabular-nums"/><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-default-400">units</span></div>
+                  </label>
+                  <div className="flex items-end"><div className="w-full rounded-lg bg-default-50 px-3 py-2.5"><p className="text-[10px] font-medium uppercase tracking-wide text-default-500">After movement</p><p className="mt-1 text-sm font-semibold tabular-nums">{(() => {
+                    if (!movementProduct) return "Choose a product"
+                    const quantity = Number(dialog.values?.Quantity)
+                    if (!Number.isInteger(quantity) || quantity <= 0) return `${movementProduct[2]} units`
+                    const type = dialog.values?.["Movement Type"]
+                    const decreases = ["Damage", "Sale / stock out"].includes(type ?? "") || type === "Stock correction" && dialog.values?.["Correction Direction"] === "Decrease"
+                    const projected = Number(movementProduct[2]) + (decreases ? -quantity : quantity)
+                    return projected < 0 ? "Insufficient stock" : `${projected} units`
+                  })()}</p></div></div>
+                </div>
+                <label className="block space-y-1.5 text-xs font-medium">Reason <span className="font-normal text-default-500">· Required for the receipt</span>
+                  <textarea aria-label="Reason" maxLength={500} value={dialog.values?.Reason ?? ""} onChange={(event) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), Reason: event.target.value } } : current)} placeholder="e.g. Supplier delivery, order #, inspection damage, or count correction" className="min-h-24 w-full rounded-lg border border-default-200 bg-background p-3 text-sm font-normal"/>
+                  <span className="block text-right text-[10px] font-normal text-default-400">{dialog.values?.Reason?.length ?? 0}/500</span>
+                </label>
+              </div> : <div className={slug === "products" ? "grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]" : "space-y-3"}>
                 {dialog.message && <p className={slug === "products" ? "text-sm text-default-600 lg:col-span-2" : "text-sm text-default-600"}>{dialog.message}</p>}
                 {slug === "products" && <section className="space-y-3 rounded-xl border border-default-200 bg-default-50/60 p-4 lg:col-start-1" aria-label="Product image upload">
                   <div className="flex items-start gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success"><ImagePlus size={18} /></span><div><h3 className="text-sm font-semibold">Product photo</h3><p className="mt-1 text-xs leading-5 text-default-500">Choose an image from your device. JPG, PNG, WEBP, GIF, or AVIF · up to 10 MB.</p></div></div>
@@ -650,11 +678,10 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              </div>)}
             {dialog?.kind === "confirm" && <div className="space-y-3"><p className="text-sm leading-6 text-default-600">{dialog.message ?? `Continue with ${dialog.action?.toLowerCase()} for ${dialog.row?.[0]}?`}</p><p className="rounded-md bg-warning/10 p-3 text-xs leading-5 text-warning">{isDatabasePreview ? "This action is recorded to the admin database. Payment decisions must be made only after independently checking the official GCash account or physically collecting COD cash." : "This is an illustrative browser preview; live payment and order changes require the connected database."}</p></div>}
           </Modal.Body>
-          {dialog?.kind !== "view" && <Modal.Footer><Button variant="outline" slot="close" isDisabled={saving}>Cancel</Button><Button variant={dialog?.kind === "confirm" && isDestructive(dialog.action) ? "danger" : "primary"} isDisabled={saving} onPress={commitDialog}>{saving ? "Saving…" : dialog?.kind === "confirm" ? "Confirm" : "Save changes"}</Button></Modal.Footer>}
+          {dialog?.kind !== "view" && <Modal.Footer><Button variant="outline" slot="close" isDisabled={saving}>Cancel</Button><Button variant={dialog?.kind === "confirm" && isDestructive(dialog.action) ? "danger" : "primary"} isDisabled={saving || dialog?.action === "Record Movement" && (!dialog.values?.Product || !dialog.values?.["Movement Type"] || !dialog.values?.Quantity || !dialog.values?.Reason?.trim() || dialog.values?.["Movement Type"] === "Stock correction" && !dialog.values?.["Correction Direction"])} onPress={commitDialog}>{saving ? "Saving…" : dialog?.action === "Record Movement" ? "Record movement" : dialog?.kind === "confirm" ? "Confirm" : "Save changes"}</Button></Modal.Footer>}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>
@@ -668,6 +695,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
 function DataTable({ config, rows, compact = false, selectable = false, selectedIds = [], onToggle, onToggleAll, onAction }: { config: ModuleConfig; rows: string[][]; compact?: boolean; selectable?: boolean; selectedIds?: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
   if (config.title === "Order Management") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
   if (config.title === "Inventory Management") return <InventoryDirectory config={config} rows={rows} onAction={onAction} />
+  if (config.title === "Delivery Personnel Management") return <PersonnelDirectory config={config} rows={rows} onAction={onAction} />
   const statusValues = ["Active", "Suspended", "Pending", "Processing", "Preparing", "Ready for Pickup", "Out for Delivery", "Paid", "Shipped", "Delivered", "Completed", "Cancelled", "Normal", "Low Stock", "Out of Stock", "Verified", "Refunded", "Failed", "Open", "Approved", "Rejected", "Successful", "Inactive", "Archived", "Available", "On Delivery", "Off Duty", "Under Review", "Published", "Draft", "Flagged", "Unflagged"]
   return <div className="overflow-x-auto"><table className={`w-full ${compact ? "min-w-[540px]" : "min-w-[760px]"} text-left text-xs`}><thead className="bg-default-50 text-default-500"><tr>{selectable && <th className="w-10 px-3 py-3"><input aria-label="Select all visible records" type="checkbox" checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row[0]))} onChange={(event) => onToggleAll?.(event.target.checked)} /></th>}{config.columns.map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t border-default-100 transition-colors hover:bg-default-50/70">{selectable && <td className="px-3 py-2"><input aria-label={`Select ${row[0]}`} type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} /></td>}{config.columns.map((heading, cellIndex) => { const cell = row[cellIndex] ?? ""; if (heading === "Actions") { const actions = cell.split(" · ").map((item) => item.trim()).filter(Boolean); return <td key={heading} className="px-3 py-2 align-middle"><div className="flex flex-wrap gap-x-1 gap-y-1">{actions.map((action) => { const lower = action.toLowerCase(); const Icon = lower.includes("delete") || lower.includes("remove") ? Trash2 : lower.includes("edit") || lower.includes("adjust") ? Pencil : lower.includes("view") || lower.includes("review") || lower.includes("detail") || lower.includes("receipt") || lower.includes("track") ? Eye : lower.includes("download") ? Download : lower.includes("record") ? PackagePlus : undefined; const destructive = ["delete", "remove", "reject", "suspend", "archive", "end"].some((word) => lower.includes(word)); return <Button key={action} size="sm" variant="ghost" className={`h-7 min-w-0 px-1.5 text-[11px] ${destructive ? "text-danger" : "text-[#315f43]"}`} onPress={() => onAction?.(action, row, index)}>{Icon && <Icon size={12} />}{action}</Button> })}</div></td> } if (heading === "Image") return <td key={heading} className="px-3 py-2 align-middle">{cell && cell !== "—" ? <Image src={cell} alt={`${row[config.columns.indexOf("Product Name")] || "Product"} image`} width={52} height={52} unoptimized className="size-12 rounded-lg border border-default-200 object-cover" /> : <span className="text-default-400">No image</span>}</td>; return <td key={`${cellIndex}-${cell}`} className="max-w-64 px-3 py-3 align-middle text-default-700">{statusValues.includes(cell) ? <Chip size="sm" variant="soft" color={statusColor(cell)}>{cell}</Chip> : <span className={cellIndex === 0 ? "font-semibold" : ""}>{cell}</span>}</td> })}</tr>)}</tbody></table>{rows.length === 0 && <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No records found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>}<div className="flex items-center justify-between border-t border-default-100 pt-3 text-[11px] text-default-500"><span>Showing {rows.length} records</span><div className="flex gap-2"><Button size="sm" variant="outline" isDisabled>Previous</Button><Button size="sm" variant="outline" isDisabled>Next</Button></div></div></div>
 }
@@ -729,6 +757,53 @@ function InventoryDirectory({ config, rows, onAction }: { config: ModuleConfig; 
       </section>
     })}
     <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} inventory {rows.length === 1 ? "item" : "items"}</div>
+  </div>
+}
+
+function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; rows: string[][]; onAction?: (action: string, row: string[], index: number) => void }) {
+  const [expandedPersonnel, setExpandedPersonnel] = useState<Set<string>>(new Set())
+  const idColumn = config.columns.indexOf("Personnel ID")
+  const nameColumn = config.columns.indexOf("Name")
+  const contactColumn = config.columns.indexOf("Contact")
+  const ordersColumn = config.columns.indexOf("Assigned Orders")
+  const availabilityColumn = config.columns.indexOf("Availability")
+  const actionsColumn = config.columns.indexOf("Actions")
+
+  if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No delivery personnel found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
+
+  return <div className="space-y-3">
+    {rows.map((row, index) => {
+      const id = row[idColumn] || row[6] || String(index)
+      const expanded = expandedPersonnel.has(id)
+      const panelId = `personnel-details-${encodeURIComponent(id)}`
+      const assignedOrders = (row[ordersColumn] ?? "").split(",").map((order) => order.trim()).filter((order) => order && order !== "—")
+      const actions = (row[actionsColumn] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action))
+      const availability = row[availabilityColumn] || "Unknown"
+      return <section key={id} className="rounded-xl border border-default-200 bg-content1/60">
+        <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpandedPersonnel((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-4 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{row[nameColumn] || "Unnamed personnel"}</span><span className="mt-1 block text-xs text-default-500">{row[idColumn] || "No personnel ID"} · {assignedOrders.length} {assignedOrders.length === 1 ? "assigned order" : "assigned orders"}</span></span>
+          <Chip size="sm" variant="soft" color={statusColor(availability)}>{availability}</Chip>
+          <ChevronDown size={17} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
+        <div id={panelId} aria-hidden={!expanded} inert={!expanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+          <div className="min-h-0 overflow-hidden">
+            <div className="space-y-4 border-t border-default-200 p-3 sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">Contact</p><p className="mt-1 break-words text-xs font-medium">{row[contactColumn] || "—"}</p></div>
+                <div className="rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">Availability</p><div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(availability)}>{availability}</Chip></div></div>
+              </div>
+              <section aria-label={`Assigned orders for ${row[nameColumn]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
+                <div className="flex items-center justify-between border-b border-dashed border-default-300 px-4 py-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Assigned orders</h3><span className="text-[11px] text-default-500">{assignedOrders.length}</span></div>
+                {assignedOrders.length ? <ul className="divide-y divide-dashed divide-default-200">{assignedOrders.map((order) => <li key={order} className="flex items-center gap-3 px-4 py-3 text-xs"><span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><PackagePlus size={14} aria-hidden="true" /></span><span className="font-medium">{order}</span><span className="ml-auto text-[11px] text-default-500">Assigned</span></li>)}</ul> : <p className="px-4 py-3 text-xs text-default-500">No active orders assigned.</p>}
+              </section>
+              {actions.length > 0 && <div className="flex flex-wrap justify-end gap-1 border-t border-default-100 pt-3">{actions.map((action) => <Button key={action} size="sm" variant={action.toLowerCase().includes("suspend") ? "outline" : "ghost"} className={`h-8 min-w-0 px-2 text-xs ${action.toLowerCase().includes("suspend") ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}</div>}
+            </div>
+          </div>
+        </div>
+      </section>
+    })}
+    <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} {rows.length === 1 ? "delivery person" : "delivery personnel"}</div>
   </div>
 }
 

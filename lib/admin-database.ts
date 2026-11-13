@@ -105,7 +105,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       `, getLowStockThreshold()])
       return { error: false, rows: products.map((p) => {
         const movements = p.movement_history ?? []
-        return [p.sku, p.name, String(p.stock), `${movements.length} ${movements.length === 1 ? "activity" : "activities"}`, p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Normal", "Adjust", JSON.stringify(movements)]
+        return [p.sku, p.name, String(p.stock), `${movements.length} ${movements.length === 1 ? "activity" : "activities"}`, p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Normal", "", JSON.stringify(movements)]
       }) }
     }
 

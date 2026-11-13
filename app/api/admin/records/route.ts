@@ -75,15 +75,25 @@ export async function POST(request: NextRequest) {
     const { data: product } = await productLookup
     if (!product) return fail("Product was not found.", 404)
     const rawQuantity = Number(value("Quantity", "Current Stock"))
-    const type = value("Movement Type").toLowerCase()
+    const type = value("Movement Type")
     const reason = value("Reason")
     if (!Number.isInteger(rawQuantity) || (action === "record-movement" ? rawQuantity <= 0 : rawQuantity < 0)) {
       return fail(action === "record-movement" ? "Enter a whole-number stock quantity greater than zero." : "Stock must be a whole number zero or greater.")
     }
-    if (!reason) return fail("Enter a reason for this inventory movement.")
-    const movementType = type.includes("damage") ? "damage" : type.includes("sale") || type.includes("out") ? "sale" : type.includes("adjust") ? "adjustment" : "restock"
+    if (!reason || reason.length > 500) return fail("Enter a reason of 1 to 500 characters for this inventory movement.")
+    const movementTypes: Record<string, string> = {
+      "Stock received": "restock",
+      "Sale / stock out": "sale",
+      Damage: "damage",
+      "Stock correction": "adjustment",
+    }
+    const movementType = movementTypes[type] ?? (action === "record-movement" ? "" : "adjustment")
+    if (action === "record-movement" && !movementType) return fail("Choose a valid movement type.")
+    if (action === "record-movement" && movementType === "adjustment" && !["Increase", "Decrease"].includes(value("Correction Direction"))) {
+      return fail("Choose whether the stock correction increases or decreases stock.")
+    }
     const delta = action === "record-movement"
-      ? movementType === "sale" || movementType === "damage" ? -rawQuantity : rawQuantity
+      ? ["sale", "damage"].includes(movementType) || movementType === "adjustment" && value("Correction Direction") === "Decrease" ? -rawQuantity : rawQuantity
       : rawQuantity - product.stock_quantity
     if (delta === 0) return fail("Stock is already at that quantity; no movement was recorded.")
     const actualType = action === "record-movement" ? movementType : "adjustment"
