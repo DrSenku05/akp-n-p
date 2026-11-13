@@ -11,7 +11,7 @@ type ModuleConfig = { title: string; subtitle: string; action?: string; stats?: 
 
 const modules: Record<string, ModuleConfig> = {
   orders: { title: "Order Management", subtitle: "Review customer orders, payment details, and pickup or delivery progress", action: "Export Orders", stats: [["Awaiting Action", "0"], ["Preparing", "0"], ["In Fulfillment", "0"], ["Completed", "0"]], search: "Search order ID or customer...", filter: "Order status", filterOptions: ["Pending", "Preparing", "Ready for Pickup", "Out for Delivery", "Completed", "Cancelled"], columns: ["Order ID", "Customer", "Order Type", "Items", "Total", "Payment Method", "Payment Status", "Order Status", "Date", "Actions"], rows: [["#ORD-0041", "Maria Santos", "Delivery", "3", "₱1,200", "GCash", "Pending", "Pending", "Aug 14", "View · Accept Order · Cancel"], ["#ORD-0040", "Jose Reyes", "Walk-in", "2", "₱840", "COD", "Pending", "Preparing", "Aug 14", "View · Ready for Pickup · Cancel"], ["#ORD-0039", "Ana Cruz", "Delivery", "5", "₱2,100", "GCash", "Paid", "Out for Delivery", "Aug 13", "View · Complete Order"]], note: "GCash references are not proof of payment. Confirm funds manually in the platform's GCash account. Walk-in orders progress to Ready for Pickup; delivery orders progress to Out for Delivery." },
-  inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "Below reorder threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Reorder Level", "Last Movement", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "10", "Aug 12 · +20 received", "Normal", "View · Adjust"], ["SKU-002", "Native Rattan Basket", "8", "10", "Aug 10 · -3 sold", "Low Stock", "View · Adjust"], ["SKU-003", "Handwoven Table Runner", "25", "8", "Aug 14 · -5 sold", "Normal", "View · Adjust"], ["SKU-004", "Bamboo Jewelry Set", "2", "5", "Aug 13 · -4 sold", "Low Stock", "View · Adjust"], ["SKU-005", "Native Buri Hat", "0", "5", "Aug 11 · -6 sold", "Out of Stock", "View · Adjust"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Reorder thresholds trigger dashboard alerts." },
+  inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Last Movement", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "Aug 12 · +20 received", "Normal", "Adjust"], ["SKU-002", "Native Rattan Basket", "8", "Aug 10 · -3 sold", "Low Stock", "Adjust"], ["SKU-003", "Handwoven Table Runner", "25", "Aug 14 · -5 sold", "Normal", "Adjust"], ["SKU-004", "Bamboo Jewelry Set", "2", "Aug 13 · -4 sold", "Low Stock", "Adjust"], ["SKU-005", "Native Buri Hat", "0", "Aug 11 · -6 sold", "Out of Stock", "Adjust"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
   customers: { title: "Customer Management", subtitle: "Manage customer accounts, information, and transaction records", action: "Export Customers", search: "Search by name, email, or phone...", filter: "Filter by Status", columns: ["Customer ID", "Name", "Email", "Phone", "Total Orders", "Total Spent", "Status", "Actions"], rows: [["CUS-001", "Maria Santos", "maria@email.com", "09XX-XXX-XXX", "6", "₱5,400", "Active", "View · Suspend"], ["CUS-002", "Jose Reyes", "jose@email.com", "09XX-XXX-XXX", "3", "₱2,100", "Active", "View · Suspend"], ["CUS-003", "Ana Cruz", "ana@email.com", "09XX-XXX-XXX", "10", "₱9,800", "Active", "View · Suspend"], ["CUS-004", "Pedro Lim", "pedro@email.com", "09XX-XXX-XXX", "1", "₱560", "Suspended", "View · Reactivate"]], note: "Customer details include profile information, address book, order history, and feedback records." },
   "delivery-personnel": { title: "Delivery Personnel Management", subtitle: "Manage delivery staff accounts, availability, and assignments", action: "Add Personnel", stats: [["Total Personnel", "8"], ["Available", "5"], ["On Delivery", "3"], ["Deliveries Today", "11"]], search: "Search personnel...", columns: ["Personnel ID", "Name", "Contact", "Assigned Orders", "Availability", "Actions"], rows: [["DEL-001", "Ramon Dela Cruz", "09XX-XXX-XXX", "#ORD-0041, #ORD-0039", "On Delivery", "View · Edit"], ["DEL-002", "Julio Marcos", "09XX-XXX-XXX", "#ORD-0040", "On Delivery", "View · Edit"], ["DEL-003", "Benito Aquino", "09XX-XXX-XXX", "—", "Available", "View · Edit · Assign"], ["DEL-004", "Carlos Ramos", "09XX-XXX-XXX", "—", "Off Duty", "View · Edit"]], note: "Assign pending orders to available personnel. Availability updates when an order is picked up or delivered." },
   "returns-refunds": { title: "Return and Refund Management", subtitle: "Handle eligible return and refund requests from customers", action: "Export", stats: [["Open Requests", "4"], ["Under Review", "2"], ["Approved", "1"], ["Rejected", "1"]], search: "Search by request, order, or customer...", filter: "All Status", columns: ["Request ID", "Order ID", "Customer", "Reason", "Type", "Amount", "Status", "Actions"], rows: [["RET-007", "#ORD-0033", "Rosa Tan", "Defective item", "Refund", "₱780", "Open", "Review · Approve · Reject"], ["RET-006", "#ORD-0030", "Ana Cruz", "Wrong item received", "Return + Refund", "₱1,200", "Under Review", "Review · Approve · Reject"], ["RET-005", "#ORD-0028", "Jose Reyes", "Changed mind", "Return", "₱430", "Rejected", "View"], ["RET-004", "#ORD-0025", "Maria Santos", "Item not as described", "Refund", "₱650", "Approved", "View"]], note: "Approved refunds create a payment reversal and notify the customer. Requests must be within the return window." },
@@ -29,7 +29,7 @@ const extras: Record<string, ModuleConfig> = {
   "heritage-showcase": { title: "Native Heritage Showcase", subtitle: "Curate local products and the stories behind their craft", action: "Add to Showcase", search: "Search showcased products...", columns: ["Product", "Craft / Origin", "Category", "Visibility", "Featured", "Actions"], rows: [["Woven Abaca Bag", "Handwoven abaca · South Cotabato", "Bags", "Published", "Yes", "Edit · Remove"], ["Native Rattan Basket", "Traditional rattan weaving", "Baskets", "Published", "Yes", "Edit · Remove"], ["Bamboo Jewelry Set", "Locally crafted bamboo", "Accessories", "Draft", "No", "Edit · Publish"]], note: "Showcase entries connect to catalog products and explain local materials, makers, and craft traditions." },
   "returns-and-refunds": { title: "Return and Refund Management", subtitle: "Handle eligible return and refund requests from customers", action: "Export", stats: [["Open Requests", "4"], ["Under Review", "2"], ["Approved", "1"], ["Rejected", "1"]], search: "Search requests...", columns: ["Request ID", "Order ID", "Customer", "Reason", "Type", "Amount", "Status", "Actions"], rows: [["RET-007", "#ORD-0033", "Rosa Tan", "Defective item", "Refund", "₱780", "Open", "Review · Approve · Reject"]] },
   users: { title: "User Management", subtitle: "Review real owner, staff, delivery driver, and customer accounts", stats: [["Owner/Admin", "0"], ["Staff", "0"], ["Delivery Drivers", "0"], ["Customers", "0"]], search: "Search by name or email...", filter: "Account type", filterOptions: ["Owner/Admin", "Staff", "Delivery Driver", "Customer"], columns: ["Account ID", "Name", "Email", "Account Type", "Status", "Last Sign In", "Actions"], rows: [], note: "Accounts are ranked by type. Suspending a driver with active deliveries is blocked; owner accounts cannot be suspended from this screen. Customer and driver status changes update their records and depend on the customer app enforcing those statuses." },
-  settings: { title: "Settings", subtitle: "Configure store, operational, and account preferences", columns: ["Setting", "Current value", "Description", "Actions"], search: "", rows: [["Store name", "AKP Native Products Trading", "Displayed in admin and customer surfaces", "Edit"], ["Currency", "PHP (₱)", "Local transaction currency", "Edit"], ["Low stock threshold", "Per product", "Reorder level is set for each SKU", "Manage"], ["Return window", "7 days", "Eligible return period", "Edit"], ["Automatic backups", "Daily at 2:00 AM", "Backup schedule", "Configure"]] },
+  settings: { title: "Settings", subtitle: "Configure store, operational, and account preferences", columns: ["Setting", "Current value", "Description", "Actions"], search: "", rows: [["Store name", "AKP Native Products Trading", "Displayed in admin and customer surfaces", "Edit"], ["Currency", "PHP (₱)", "Local transaction currency", "Edit"], ["Return window", "7 days", "Eligible return period", "Edit"], ["Automatic backups", "Daily at 2:00 AM", "Backup schedule", "Configure"]] },
 }
 
 const slugAliases: Record<string, string> = { "return-refund": "returns-refunds", "return-and-refund": "returns-refunds", "marketing-notifications": "promotions" }
@@ -57,7 +57,7 @@ function getDisplayStats(slug: string, stats: ModuleConfig["stats"], rows: strin
   const countStatus = (index: number, value: string) => rows.filter((row) => row[index]?.toLowerCase() === value).length
   const today = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date())
   if (slug === "orders") return [["Awaiting Action", String(countStatus(7, "pending"))], ["Preparing", String(countStatus(7, "preparing"))], ["In Fulfillment", String(rows.filter((row) => ["ready for pickup", "out for delivery"].includes(row[7]?.toLowerCase())).length)], ["Completed", String(countStatus(7, "completed"))]] as [string, string, string?][]
-  if (slug === "inventory") return [["Total SKUs", String(rows.length)], ["Low Stock Items", String(rows.filter((row) => ["low stock", "out of stock"].includes(row[5]?.toLowerCase())).length), "At or below reorder threshold"], ["Out of Stock", String(countStatus(5, "out of stock"))], ["Last Updated", today, "Philippine time"]] as [string, string, string?][]
+  if (slug === "inventory") return [["Total SKUs", String(rows.length)], ["Low Stock Items", String(rows.filter((row) => ["low stock", "out of stock"].includes(row[4]?.toLowerCase())).length), "At or below store-wide threshold"], ["Out of Stock", String(countStatus(4, "out of stock"))], ["Last Updated", today, "Philippine time"]] as [string, string, string?][]
   if (slug === "delivery-personnel") return [["Total Personnel", String(rows.length)], ["Available", String(countStatus(4, "available"))], ["On Delivery", String(countStatus(4, "on delivery"))], ["Assigned Orders", String(rows.filter((row) => row[3] && row[3] !== "—").length)]] as [string, string, string?][]
   if (slug === "users") return [["Owner/Admin", String(rows.filter((row) => row[3] === "Owner/Admin").length)], ["Staff", String(rows.filter((row) => row[3] === "Staff").length)], ["Delivery Drivers", String(rows.filter((row) => row[3] === "Delivery Driver").length)], ["Customers", String(rows.filter((row) => row[3] === "Customer").length)]] as [string, string, string?][]
   if (slug === "returns-refunds") return [["Open Requests", String(countStatus(6, "pending"))], ["Under Review", String(countStatus(6, "under review"))], ["Approved", String(countStatus(6, "approved"))], ["Rejected", String(countStatus(6, "rejected"))]] as [string, string, string?][]
@@ -124,6 +124,11 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const [gcashBusy, setGcashBusy] = useState(false)
   const [gcashMessage, setGcashMessage] = useState("")
   const gcashObjectUrl = useRef("")
+  const [inventoryThreshold, setInventoryThreshold] = useState(10)
+  const [thresholdDraft, setThresholdDraft] = useState("10")
+  const [thresholdCanEdit, setThresholdCanEdit] = useState(false)
+  const [thresholdBusy, setThresholdBusy] = useState(false)
+  const [thresholdMessage, setThresholdMessage] = useState("")
   const isDatabasePreview = databaseRows !== undefined
   useEffect(() => () => { if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current); if (gcashObjectUrl.current) URL.revokeObjectURL(gcashObjectUrl.current) }, [])
   useEffect(() => {
@@ -149,6 +154,23 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       if (document.visibilityState === "visible" && !document.querySelector('[role="dialog"]')) void loadSettings()
     }, 3000)
     return () => { active = false; window.clearInterval(interval) }
+  }, [slug])
+  useEffect(() => {
+    if (!["inventory", "settings"].includes(slug)) return
+    let active = true
+    fetch("/api/admin/inventory-settings", { cache: "no-store" }).then(async (response) => {
+      const result = await response.json() as { threshold?: number; canEdit?: boolean; error?: string }
+      if (!response.ok) throw new Error(result.error || "Could not load inventory settings.")
+      if (!active) return
+      const threshold = result.threshold ?? 10
+      setInventoryThreshold(threshold)
+      setThresholdDraft(String(threshold))
+      setThresholdCanEdit(result.canEdit ?? false)
+      setThresholdMessage("")
+    }).catch((error: unknown) => {
+      if (active) setThresholdMessage(error instanceof Error ? error.message : "Could not load inventory settings.")
+    })
+    return () => { active = false }
   }, [slug])
   useEffect(() => {
     setLoaded(false)
@@ -183,12 +205,12 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current)
     previewObjectUrl.current = ""
     setProductImage(null)
-    setProductImagePreview(slug === "products" ? row?.[13] || "" : "")
+    setProductImagePreview(slug === "products" ? row?.[12] || "" : "")
     const fields = customFields ?? config.columns.filter((column) => column !== "Actions" && column !== "Status" && !(slug === "products" && column === "Image"))
     const productValues: Record<string, string> = {
       "Product Name": row?.[2] ?? "", Description: row?.[8] ?? "",
-      Category: row?.[3] ?? "", Price: (row?.[4] ?? "").replace(/^₱/, ""), "Reorder Level": row?.[9] ?? "",
-      "Craft / Origin": row?.[12] ?? "", Visibility: row?.[10] ?? "", Featured: row?.[11] ?? "No",
+      Category: row?.[3] ?? "", Price: (row?.[4] ?? "").replace(/^₱/, ""),
+      "Craft / Origin": row?.[11] ?? "", Visibility: row?.[9] ?? "", Featured: row?.[10] ?? "No",
     }
     const values = Object.fromEntries(fields.map((field) => [field, slug === "products" ? (productValues[field] ?? "") : row?.[config.columns.indexOf(field)] ?? ""]))
     setDialog({ title, kind: "form", row, rowIndex, action, values })
@@ -220,7 +242,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       if (slug === "returns-refunds" && decisionNotes[row[0]]) extraFields.push(["Decision notes", decisionNotes[row[0]]])
       if (slug === "orders") extraFields.push(["Delivery address", row[10] || "Pickup at store / no address provided"], ["Ordered products", row[11] || "No item details available"], ["GCash reference", row[12] || "Not applicable"])
       if (slug === "payments") extraFields.push(["GCash transaction reference", row[5] || "Not provided"], ["Receipt screenshot", row[10] ? "Attached · use View Receipt to open the private image" : "Not attached"], ["Verification rule", row[4] === "Online payment (GCash)" ? "Compare the exact amount and reference against the incoming transaction in the platform's GCash account. A reference or screenshot alone is not confirmation." : "Mark paid only after cash has physically been collected."])
-      if (slug === "products") extraFields.push(["Description", row[8] || "No description provided"], ["Reorder level", row[9] || "0"], ["Visibility", row[10] || "—"], ["Featured", row[11] || "No"], ["Craft / Origin", row[12] || "Not provided"], ["Image URL", row[13] || "No image uploaded"])
+      if (slug === "products") extraFields.push(["Description", row[8] || "No description provided"], ["Visibility", row[9] || "—"], ["Featured", row[10] || "No"], ["Craft / Origin", row[11] || "Not provided"], ["Image URL", row[12] || "No image uploaded"])
       setDialog({ title: `${action}: ${row[0]}`, kind: "view", row, fields: table === "announcements" ? ["Title", "Target", "Sent"] : config.columns.filter((column) => column !== "Actions"), extraFields })
       return
     }
@@ -230,7 +252,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       return
     }
     if (lower.includes("edit") || lower === "adjust") {
-      const fields = lower === "adjust" ? ["Current Stock", "Reason"] : slug === "products" ? ["Product Name", "Image URL", "Description", "Category", "Price", "Reorder Level", "Craft / Origin", "Visibility", "Featured"] : undefined
+      const fields = lower === "adjust" ? ["Current Stock", "Reason"] : slug === "products" ? ["Product Name", "Image URL", "Description", "Category", "Price", "Craft / Origin", "Visibility", "Featured"] : undefined
       openForm(`${action}: ${row[0]}`, row, index, action, fields)
       return
     }
@@ -356,7 +378,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         if (!product || !type || !Number.isFinite(quantity) || quantity <= 0) { setNotice("Choose a product, movement type, and quantity greater than zero."); return }
         const productColumn = config.columns.indexOf("Product Name")
         const stockColumn = config.columns.indexOf("Current Stock")
-        const reorderColumn = config.columns.indexOf("Reorder Level")
         const movementColumn = config.columns.indexOf("Last Movement")
         const statusColumn = config.columns.indexOf("Status")
         const target = rows.findIndex((item) => item[productColumn]?.toLowerCase() === product.toLowerCase())
@@ -364,8 +385,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         const stock = Number(rows[target][stockColumn])
         const delta = type.toLowerCase().includes("out") || type.toLowerCase().includes("sale") || type.toLowerCase().includes("damage") ? -quantity : quantity
         const nextStock = Math.max(0, stock + delta)
-        const reorder = Number(rows[target][reorderColumn])
-        setRows((existing) => existing.map((item, index) => index === target ? item.map((cell, column) => column === stockColumn ? String(nextStock) : column === movementColumn ? `${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${delta > 0 ? "+" : ""}${delta} ${dialog.values?.Reason || type}` : column === statusColumn ? nextStock === 0 ? "Out of Stock" : nextStock <= reorder ? "Low Stock" : "Normal" : cell) : item))
+        setRows((existing) => existing.map((item, index) => index === target ? item.map((cell, column) => column === stockColumn ? String(nextStock) : column === movementColumn ? `${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${delta > 0 ? "+" : ""}${delta} ${dialog.values?.Reason || type}` : column === statusColumn ? nextStock === 0 ? "Out of Stock" : nextStock <= inventoryThreshold ? "Low Stock" : "Normal" : cell) : item))
         setNotice(`Recorded stock ${delta > 0 ? "in" : "out"} for ${product}.`)
         setDialog(null)
         return
@@ -393,7 +413,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         if (columnIndex >= 0) current[columnIndex] = dialog.values?.[field] ?? ""
         else if (field === "Image URL" && uploadedImageUrl) {
           current[config.columns.indexOf("Image")] = uploadedImageUrl
-          current[13] = uploadedImageUrl
+          current[12] = uploadedImageUrl
         }
         else if (field === "Assigned Orders") {
           const assignedIndex = config.columns.indexOf("Assigned Orders")
@@ -410,13 +430,12 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       } else if (dialog.rowIndex !== undefined) {
         if (dialog.action === "Adjust") {
           const stockColumn = config.columns.indexOf("Current Stock")
-          const reorderColumn = config.columns.indexOf("Reorder Level")
           const movementColumn = config.columns.indexOf("Last Movement")
           const statusColumn = config.columns.indexOf("Status")
           const stock = Number(current[stockColumn])
           if (!Number.isFinite(stock) || stock < 0) { setNotice("Stock quantity must be zero or greater."); return }
           if (movementColumn >= 0) current[movementColumn] = `${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} · adjusted${dialog.values?.Reason ? `: ${dialog.values.Reason}` : ""}`
-          if (statusColumn >= 0) current[statusColumn] = stock === 0 ? "Out of Stock" : stock <= Number(current[reorderColumn]) ? "Low Stock" : "Normal"
+          if (statusColumn >= 0) current[statusColumn] = stock === 0 ? "Out of Stock" : stock <= inventoryThreshold ? "Low Stock" : "Normal"
         }
         if (dialog.action === "Assign") {
           const availabilityIndex = config.columns.indexOf("Availability")
@@ -522,14 +541,41 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     }
     finally { setGcashBusy(false) }
   }
+  const saveInventoryThreshold = async () => {
+    const threshold = Number(thresholdDraft)
+    if (!Number.isInteger(threshold) || threshold < 0 || threshold > 100000) {
+      setThresholdMessage("Enter a whole number from 0 to 100,000.")
+      return
+    }
+    setThresholdBusy(true)
+    setThresholdMessage("")
+    try {
+      const response = await fetch("/api/admin/inventory-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threshold }),
+      })
+      const result = await response.json() as { error?: string }
+      if (!response.ok) throw new Error(result.error || "Could not save inventory settings.")
+      setInventoryThreshold(threshold)
+      setThresholdDraft(String(threshold))
+      setThresholdMessage("Low-stock warning threshold saved.")
+    } catch (error) {
+      setThresholdMessage(error instanceof Error ? error.message : "Could not save inventory settings.")
+    } finally {
+      setThresholdBusy(false)
+    }
+  }
   const secondary = slug === "promotions" || slug === "notifications" ? "Catalog & Marketing" : ["customers", "feedback", "payments"].includes(slug) ? "Customers" : ["reports", "audit-logs", "backup-restore", "users", "settings"].includes(slug) ? "System" : "Operations"
   const displayStats = getDisplayStats(slug, config.stats, rows, isDatabasePreview)
   return <div className="mx-auto max-w-[1540px] space-y-5">
     <div className="flex flex-wrap items-center gap-2 text-xs text-default-500"><Leaf size={13} className="text-accent" /><span>{secondary}</span><span className="text-default-300">/</span><span className="font-medium text-foreground">{config.title}</span></div>
     {isDatabasePreview && databaseError && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">Could not load records from Supabase. Check the server database connection.</div>}
+    {slug === "inventory" && thresholdMessage && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{thresholdMessage}</div>}
     <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">AKP Native Products · {secondary}</p><h1 className="text-2xl font-bold tracking-tight">{config.title}</h1><p className="mt-1 text-sm text-default-500">{config.subtitle}</p></div><div className="flex flex-wrap gap-2">{slug === "products" && <Button size="sm" variant="outline" onPress={() => location.assign("/heritage-showcase")}>Heritage Showcase</Button>}{slug === "inventory" && <Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export</Button>}{slug === "reports" && <><Button size="sm" variant="outline" onPress={() => exportRows("pdf")}><Download size={15}/>Export PDF</Button><Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export CSV</Button></>}{slug === "promotions" && <><Button size="sm" variant="outline" onPress={() => triggerTopAction("Announcement")}><Plus size={15}/>Announcement</Button><Button size="sm" variant="primary" onPress={() => triggerTopAction("New Promotion")}><Plus size={15}/>New Promotion</Button></>}{config.action && !["reports", "promotions"].includes(slug) && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}>{config.action.toLowerCase().includes("export") ? <Download size={15} /> : <Plus size={15} />}{config.action}</Button>}</div></div>
     {notice && <div role="status" className="flex items-center justify-between rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{notice}<Button size="sm" variant="ghost" onPress={() => setNotice("")}>Dismiss</Button></div>}
     {slug === "payments" && <Card className="rounded-md border border-warning/30 bg-warning/5 shadow-none"><Card.Content className="grid gap-4 p-4 md:grid-cols-2"><div><p className="text-xs font-semibold text-foreground">GCash · verify outside the website</p><p className="mt-1 text-xs leading-5 text-default-600">Open the platform’s official GCash account separately. Match the actual incoming transfer, exact amount, and customer reference before confirming. A screenshot or reference alone is not proof.</p></div><div><p className="text-xs font-semibold text-foreground">Cash on Delivery · collect first</p><p className="mt-1 text-xs leading-5 text-default-600">Keep COD pending until the full cash amount is physically received. Record collection with “Mark Cash Collected.”</p></div></Card.Content></Card>}
+    {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="flex flex-wrap items-center gap-5 p-5"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning"><PackagePlus size={19}/></span><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Low-stock warning threshold</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-default-500">Use one store-wide stock quantity for low-stock warnings across inventory and the dashboard. Products at or below this quantity are flagged.</p>{thresholdMessage && <p role={thresholdMessage.includes("saved") ? "status" : "alert"} className={`mt-2 text-xs ${thresholdMessage.includes("saved") ? "text-success" : "text-danger"}`}>{thresholdMessage}</p>}</div><label className="flex items-center gap-2 text-xs font-medium">Units<input aria-label="Low-stock warning threshold" type="number" min="0" max="100000" step="1" value={thresholdDraft} disabled={!thresholdCanEdit || thresholdBusy} onChange={(event) => setThresholdDraft(event.target.value)} className="h-9 w-24 rounded-md border border-default-200 bg-background px-2 text-sm disabled:opacity-60"/></label><Button size="sm" variant="primary" isDisabled={!thresholdCanEdit || thresholdBusy || !thresholdDraft.trim()} onPress={saveInventoryThreshold}>{thresholdBusy ? "Saving…" : "Save threshold"}</Button></Card.Content></Card>}
     {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success"><Smartphone size={19}/></span><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold">GCash online payments</h2><Chip size="sm" variant="soft" color={gcash.enabled ? "success" : "default"}>{gcash.enabled ? "Enabled" : "Not enabled"}</Chip></div><p className="mt-1 max-w-2xl text-xs leading-5 text-default-500">Set the account details and QR image customers should see after choosing GCash in the app. This displays payment instructions only; transfers still require manual verification.</p><p className="mt-2 text-xs text-default-600">{gcash.accountName || "Account name not set"}{gcash.accountNumber ? ` · ${gcash.accountNumber}` : ""}</p>{gcashMessage && <p role="status" className="mt-2 text-xs text-success">{gcashMessage}</p>}</div></div><div className="flex items-center gap-3">{gcashPreview ? <img src={gcashPreview} alt="Configured GCash QR code" className="size-16 rounded-lg border border-default-200 bg-white object-contain p-1"/> : <div className="flex size-16 items-center justify-center rounded-lg border border-dashed border-default-300 text-default-400"><ImagePlus size={20}/></div>}<Button size="sm" variant="outline" isDisabled={!gcash.canEdit} onPress={() => { setGcashMessage(""); setGcashDialogOpen(true) }}>{gcash.qrUrl ? "Manage GCash" : "Set up GCash"}</Button></div></Card.Content></Card>}
     {displayStats && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{displayStats.map(([label, value, note]) => <Card key={label} className="rounded-md border border-default-200 shadow-none"><Card.Content className="p-4"><p className="text-xs text-default-500">{label}</p><p className="mt-2 text-xl font-bold">{value}</p>{note && <p className="mt-1 text-[11px] text-default-400">{note}</p>}</Card.Content></Card>)}</div>}
     {slug === "backup-restore" && <Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="grid gap-5 p-4 md:grid-cols-[1.1fr_0.9fr]"><div><div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Archive size={16} /> Backup history</div><p className="text-xs text-default-500">Select a backup to restore. Restoring overwrites current data and must be confirmed.</p></div><div className="flex flex-wrap items-center gap-2"><select aria-label="Select backup to restore" value={restoreId} onChange={(event) => setRestoreId(event.target.value)} className="h-9 min-w-48 rounded-md border border-default-200 bg-background px-3 text-xs"><option value="">Select backup to restore</option>{rows.map((r) => <option key={r[0]} value={r[0]}>{r[0]} · {r[3]}</option>)}</select><Button size="sm" variant="danger" isDisabled={!restoreId} onPress={() => setDialog({ title: "Restore backup", kind: "confirm", row: [restoreId], action: "Restore", message: "This irreversible operation normally replaces live business data. Here it only simulates restore because this prototype has no database." })}><RotateCcw size={14} />Restore selected</Button></div></Card.Content></Card>}
@@ -543,7 +589,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           <Modal.CloseTrigger />
           <Modal.Header><Modal.Heading>{dialog?.title}</Modal.Heading></Modal.Header>
           <Modal.Body>
-            {dialog?.kind === "view" && dialog.row && (slug === "products" ? <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">{dialog.row[13] ? <Image src={dialog.row[13]} alt={`${dialog.row[2]} product`} width={960} height={720} unoptimized className="max-h-[26rem] w-full rounded-xl border border-default-200 object-cover" /> : <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-default-300 bg-default-50 text-sm text-default-500"><ImagePlus size={18} className="mr-2" />No product image uploaded</div>}<dl className="grid content-start grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).filter((column) => column !== "Image").map((column) => { const index = config.columns.indexOf(column); return <div key={column} className="min-w-0 rounded-lg border border-default-200 bg-default-50/70 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 break-words text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div> })}{dialog.extraFields?.map(([label, value]) => <div key={label} className="min-w-0 rounded-lg border border-default-200 bg-default-50/70 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value}</dd></div>)}</dl></div> : <div className="space-y-4"><dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).map((column, index) => <div key={column} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div>)}{dialog.extraFields?.map(([label, value]) => <div key={label} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl>{(slug === "orders" || slug === "customers") && (() => { const pin = slug === "orders" ? dialog.row?.[14] : dialog.row?.[10]; const [latitude, longitude] = (pin ?? "").split(",").map(Number); if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null; const src = `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - 0.01}%2C${latitude - 0.01}%2C${longitude + 0.01}%2C${latitude + 0.01}&layer=mapnik&marker=${latitude}%2C${longitude}`; const title = slug === "orders" ? "Delivery location" : "Default saved address"; return <section className="space-y-2"><h3 className="text-sm font-semibold">{title}</h3><iframe title={`${title} map pin`} src={src} className="h-64 w-full rounded-lg border border-default-200" loading="lazy" referrerPolicy="no-referrer" /></section> })()}</div>)}
+            {dialog?.kind === "view" && dialog.row && (slug === "products" ? <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">{dialog.row[12] ? <Image src={dialog.row[12]} alt={`${dialog.row[2]} product`} width={960} height={720} unoptimized className="max-h-[26rem] w-full rounded-xl border border-default-200 object-cover" /> : <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-default-300 bg-default-50 text-sm text-default-500"><ImagePlus size={18} className="mr-2" />No product image uploaded</div>}<dl className="grid content-start grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).filter((column) => column !== "Image").map((column) => { const index = config.columns.indexOf(column); return <div key={column} className="min-w-0 rounded-lg border border-default-200 bg-default-50/70 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 break-words text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div> })}{dialog.extraFields?.map(([label, value]) => <div key={label} className="min-w-0 rounded-lg border border-default-200 bg-default-50/70 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value}</dd></div>)}</dl></div> : <div className="space-y-4"><dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">{(dialog.fields ?? config.columns.filter((column) => column !== "Actions")).map((column, index) => <div key={column} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{column}</dt><dd className="mt-1 text-sm font-medium">{dialog.row?.[index] || "—"}</dd></div>)}{dialog.extraFields?.map(([label, value]) => <div key={label} className="rounded-md bg-default-50 p-3"><dt className="text-xs text-default-500">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}</dl>{(slug === "orders" || slug === "customers") && (() => { const pin = slug === "orders" ? dialog.row?.[14] : dialog.row?.[10]; const [latitude, longitude] = (pin ?? "").split(",").map(Number); if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null; const src = `https://www.openstreetmap.org/export/embed.html?bbox=${longitude - 0.01}%2C${latitude - 0.01}%2C${longitude + 0.01}%2C${latitude + 0.01}&layer=mapnik&marker=${latitude}%2C${longitude}`; const title = slug === "orders" ? "Delivery location" : "Default saved address"; return <section className="space-y-2"><h3 className="text-sm font-semibold">{title}</h3><iframe title={`${title} map pin`} src={src} className="h-64 w-full rounded-lg border border-default-200" loading="lazy" referrerPolicy="no-referrer" /></section> })()}</div>)}
             {dialog?.kind === "form" && (
               <div className={slug === "products" ? "grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]" : "space-y-3"}>
                 {dialog.message && <p className={slug === "products" ? "text-sm text-default-600 lg:col-span-2" : "text-sm text-default-600"}>{dialog.message}</p>}

@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
       description: value("Description") || null,
       category_id: category?.id ?? null,
       price: money(value("Price")),
-      reorder_level: Number(value("Reorder Level") || 0),
       craft_origin: value("Craft / Origin") || null,
       is_featured: ["yes", "true"].includes(value("Featured").toLowerCase()),
       visibility: visibilityInput ? visibilityInput === "active" ? "published" : visibilityInput : undefined,
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
       if (values["Craft / Origin"] !== undefined) productPatch.craft_origin = value("Craft / Origin") || null
       if (values["Image URL"] !== undefined) productPatch.image_url = value("Image URL") || null
       if (values.Featured !== undefined) productPatch.is_featured = ["yes", "true"].includes(value("Featured").toLowerCase())
-      if (values["Reorder Level"] !== undefined) productPatch.reorder_level = Number(value("Reorder Level") || 0)
       if (visibilityInput) productPatch.visibility = visibilityInput === "active" ? "published" : visibilityInput
       let query = supabase.from("products").update(productPatch)
       query = module === "products" ? query.eq("sku", sku) : query.eq("name", row[0])

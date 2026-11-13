@@ -10,7 +10,6 @@ type ProductRecord = {
   category: string | null
   price: string
   stock: number
-  reorder: number
   visibility: string
   featured: boolean
   craft_origin: string | null
@@ -47,7 +46,7 @@ const paymentStatusLabel = (status: string) => ["verified", "paid"].includes(sta
 async function getDemoProducts() {
   return prisma.$queryRaw<ProductRecord[]>`
     select p.sku, p.name, c.name as category, p.price::text as price,
-      p.stock_quantity as stock, p.reorder_level as reorder, p.visibility,
+      p.stock_quantity as stock, p.visibility,
       p.is_featured as featured, p.craft_origin, p.description, p.image_url
     from public.products p
     left join public.product_categories c on c.id = p.category_id
@@ -56,20 +55,28 @@ async function getDemoProducts() {
   `
 }
 
+async function getLowStockThreshold() {
+  const [settings] = await prisma.$queryRaw<{ threshold: number }[]>`
+    select low_stock_threshold as threshold
+    from public.store_inventory_settings where id = true
+  `
+  return settings?.threshold ?? 10
+}
+
 export async function getAdminDatabasePreview(slug: string): Promise<PreviewResult> {
   slug = ({ "return-refund": "returns-refunds", "return-and-refund": "returns-refunds", "returns-and-refunds": "returns-refunds", "marketing-notifications": "promotions" } as Record<string, string>)[slug] ?? slug
   if (!process.env.DATABASE_URL) return databaseModules.has(slug) ? { error: true, rows: [] } : null
 
   try {
     if (slug === "products") {
-      const products = await getDemoProducts()
-      return { error: false, rows: products.map((p) => [p.sku, p.image_url ?? "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= p.reorder ? "Low Stock" : "Active", "View · Edit · Archive", p.description ?? "", String(p.reorder), p.visibility, p.featured ? "Yes" : "No", p.craft_origin ?? "", p.image_url ?? ""]) }
+      const [products, threshold] = await Promise.all([getDemoProducts(), getLowStockThreshold()])
+      return { error: false, rows: products.map((p) => [p.sku, p.image_url ?? "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Active", "View · Edit · Archive", p.description ?? "", p.visibility, p.featured ? "Yes" : "No", p.craft_origin ?? "", p.image_url ?? ""]) }
     }
 
     if (slug === "inventory") {
-      const products = await prisma.$queryRaw<(ProductRecord & { last_delta: number | null; last_reason: string | null; last_date: Date | null })[]>`
+      const [products, threshold] = await Promise.all([prisma.$queryRaw<(ProductRecord & { last_delta: number | null; last_reason: string | null; last_date: Date | null })[]>`
         select p.sku, p.name, c.name as category, p.price::text as price,
-          p.stock_quantity as stock, p.reorder_level as reorder, p.visibility,
+          p.stock_quantity as stock, p.visibility,
           p.is_featured as featured, p.craft_origin, p.description, p.image_url,
           movement.quantity_delta as last_delta, movement.reason as last_reason,
           movement.created_at as last_date
@@ -83,8 +90,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         ) movement on true
         where p.sku like 'AKP-ACT-%'
         order by p.sku
-      `
-      return { error: false, rows: products.map((p) => [p.sku, p.name, String(p.stock), String(p.reorder), p.last_delta === null ? "No movements" : `${dateLabel(p.last_date)} · ${p.last_delta > 0 ? "+" : ""}${p.last_delta} ${p.last_reason ?? "movement"}`, p.stock === 0 ? "Out of Stock" : p.stock <= p.reorder ? "Low Stock" : "Normal", "View · Adjust"]) }
+      `, getLowStockThreshold()])
+      return { error: false, rows: products.map((p) => [p.sku, p.name, String(p.stock), p.last_delta === null ? "No movements" : `${dateLabel(p.last_date)} · ${p.last_delta > 0 ? "+" : ""}${p.last_delta} ${p.last_reason ?? "movement"}`, p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Normal", "Adjust"]) }
     }
 
     if (slug === "customers") {
@@ -335,7 +342,7 @@ export async function getAdminDashboardPreview() {
         (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and created_at >= date_trunc('day', now())) as orders_today,
         (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and status = 'pending') as pending_orders,
         (select coalesce(sum(p.amount), 0)::text from public.payments p join public.orders o on o.id = p.order_id where o.order_number not like 'DEMO-ORD-%' and coalesce(p.reference, '') not like 'DEMO-PAY-%' and p.status = 'verified' and p.created_at >= date_trunc('month', now())) as revenue_month,
-        (select count(*)::int from public.products where sku like 'AKP-ACT-%' and visibility <> 'archived' and stock_quantity <= reorder_level) as low_stock,
+        (select count(*)::int from public.products where sku like 'AKP-ACT-%' and visibility <> 'archived' and stock_quantity <= coalesce((select low_stock_threshold from public.store_inventory_settings where id = true), 10)) as low_stock,
         (select count(*)::int from public.return_requests r join public.orders o on o.id = r.order_id where r.request_number not like 'DEMO-RET-%' and o.order_number not like 'DEMO-ORD-%' and r.status = 'pending') as open_returns,
         (select count(*)::int from public.feedback f left join public.orders o on o.id = f.order_id where f.comment not like 'DEMO:%' and coalesce(o.order_number, '') not like 'DEMO-ORD-%' and f.moderation_status = 'flagged') as flagged_feedback
     `
