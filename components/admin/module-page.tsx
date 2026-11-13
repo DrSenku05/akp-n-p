@@ -53,7 +53,7 @@ const extras: Record<string, ModuleConfig> = {
 const slugAliases: Record<string, string> = { "return-refund": "returns-refunds", "return-and-refund": "returns-refunds", "marketing-notifications": "promotions" }
 const titleCase = (slug: string) => slug.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ")
 
-function statusColor(value: string) { const s = value.toLowerCase(); if (["active", "successful", "verified", "paid", "completed", "delivered", "ready for pickup", "normal", "available", "approved", "published", "sent"].some((x) => s.includes(x))) return "success" as const; if (["pending", "low stock", "open", "review", "processing", "preparing", "out for delivery", "on delivery"].some((x) => s.includes(x))) return "warning" as const; if (["failed", "rejected", "cancelled", "out of stock", "suspended", "inactive"].some((x) => s.includes(x))) return "danger" as const; return "default" as const }
+function statusColor(value: string) { const s = value.toLowerCase(); if (["active", "successful", "verified", "paid", "completed", "delivered", "ready for pickup", "normal", "available", "approved", "published", "sent"].some((x) => s.includes(x))) return "success" as const; if (["pending", "low stock", "open", "review", "processing", "preparing", "picked up", "out for delivery", "arrived", "attempted", "on delivery"].some((x) => s.includes(x))) return "warning" as const; if (["failed", "rejected", "cancelled", "out of stock", "suspended", "inactive"].some((x) => s.includes(x))) return "danger" as const; return "default" as const }
 
 function parseOrderItems(value: string): { name: string; quantity: string }[] {
   try {
@@ -68,6 +68,22 @@ function parseOrderItems(value: string): { name: string; quantity: string }[] {
     return legacyItem ? [{ name: legacyItem[1], quantity: legacyItem[2] }] : []
   }
   return []
+}
+
+function parseAssignedDeliveryOrders(value: string | undefined): { orderNumber: string; customer: string; deliveryStatus: string }[] {
+  if (!value) return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((order): order is { orderNumber: string; customer: string; deliveryStatus: string } =>
+      typeof order === "object" && order !== null &&
+      typeof order.orderNumber === "string" &&
+      typeof order.customer === "string" &&
+      typeof order.deliveryStatus === "string"
+    )
+  } catch {
+    return []
+  }
 }
 
 function getDisplayStats(slug: string, stats: ModuleConfig["stats"], rows: string[][], databaseBacked: boolean) {
@@ -343,10 +359,13 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           uploadedImageUrl = supabase.storage.from("product-images").getPublicUrl(uploadedImagePath).data.publicUrl
           values = { ...values, "Image URL": uploadedImageUrl }
         }
+        const selectedUnassignOrder = slug === "delivery-personnel" && action?.toLowerCase() === "unassign"
+          ? unassignableOrders.find((order) => order.orderNumber === values["Assigned Order"]?.split(" · ")[0])
+          : undefined
         const response = await fetch("/api/admin/records", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ module: slug, action, row: dialog.row ?? (slug === "inventory" ? rows.find((item) => item[0] === values.Product) : slug === "delivery-personnel" && action === "assign" ? rows.find((item) => `${item[1]} · ${item[0]}` === values["Delivery Personnel"]) : undefined), values }),
+          body: JSON.stringify({ module: slug, action, row: dialog.row ?? (slug === "inventory" ? rows.find((item) => item[0] === values.Product) : slug === "delivery-personnel" && action?.toLowerCase() === "assign" ? rows.find((item) => `${item[1]} · ${item[0]}` === values["Delivery Personnel"]) : selectedUnassignOrder ? rows.find((item) => item[6] === selectedUnassignOrder.driverId) : undefined), values }),
         })
         const result = await response.json() as { error?: string }
         if (!response.ok) {
@@ -360,7 +379,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           return
         }
         if (slug === "delivery-personnel" && action === "unassign") {
-          setNotice(`Removed ${values["Assigned Order"]?.split(" · ")[0] ?? "order"} from ${dialog.row?.[1] ?? "driver"}.`)
+          setNotice(`Removed ${values["Assigned Order"]?.split(" · ")[0] ?? "order"} from ${dialog.row?.[1] ?? rows.find((item) => item[6] === selectedUnassignOrder?.driverId)?.[1] ?? "driver"}.`)
           setDialog(null)
           router.refresh()
           return
@@ -613,6 +632,13 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     }
     openForm("Assign a delivery order", undefined, undefined, "Assign", ["Delivery Personnel", "Delivery Order"])
   }
+  const openManualUnassign = () => {
+    if (!unassignableOrders.length) {
+      setNotice("There are no deliveries waiting to be picked up that can be unassigned.")
+      return
+    }
+    openForm("Unassign a delivery", undefined, undefined, "Unassign", ["Assigned Order"])
+  }
   const autoAssignOrders = async () => {
     if (!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy) return
     const assignedOrdersColumn = config.columns.indexOf("Assigned Orders")
@@ -667,6 +693,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         {slug === "delivery-personnel" && <>
           <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={autoAssignOrders}><PackagePlus size={15}/>{autoAssignBusy ? "Auto-assigning…" : "Auto-assign"}</Button>
           <Button size="sm" variant="primary" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={openManualAssign}><Plus size={15}/>Assign</Button>
+          <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !unassignableOrders.length || autoAssignBusy} onPress={openManualUnassign}><RotateCcw size={15}/>Unassign</Button>
         </>}
         {config.action && !["reports", "promotions", "delivery-personnel"].includes(slug) && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}>{config.action.toLowerCase().includes("export") ? <Download size={15} /> : <Plus size={15} />}{config.action}</Button>}
       </div>
@@ -741,7 +768,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
                 <div className={`grid gap-3 sm:grid-cols-2 ${slug === "products" ? "lg:col-start-2" : ""}`}>
                   {Object.entries(dialog.values ?? {}).map(([field, value]) => (
                     <div key={field} className={["Description", "Image URL", "Craft / Origin", "Reason"].includes(field) ? "sm:col-span-2" : ""}>
-                      <DialogField field={field} value={value} choicesOverride={field === "Product" ? rows.map((item) => slug === "inventory" ? item[1] : item[0]).filter(Boolean) : field === "Delivery Personnel" ? availablePersonnel.map((item) => `${item[1]} · ${item[0]}`) : field === "Delivery Order" ? assignableOrders.map((order) => `${order.orderNumber} · ${order.customer}`) : field === "Assigned Order" ? unassignableOrders.filter((order) => order.driverId === dialog.row?.[6]).map((order) => `${order.orderNumber} · ${order.customer}`) : undefined} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), [field]: next } } : current)} />
+                      <DialogField field={field} value={value} choicesOverride={field === "Product" ? rows.map((item) => slug === "inventory" ? item[1] : item[0]).filter(Boolean) : field === "Delivery Personnel" ? availablePersonnel.map((item) => `${item[1]} · ${item[0]}`) : field === "Delivery Order" ? assignableOrders.map((order) => `${order.orderNumber} · ${order.customer}`) : field === "Assigned Order" ? unassignableOrders.filter((order) => !dialog.row || order.driverId === dialog.row[6]).map((order) => `${order.orderNumber} · ${order.customer}${dialog.row ? "" : ` · ${rows.find((item) => item[6] === order.driverId)?.[1] ?? "Delivery personnel"}`}`) : undefined} onChange={(next) => setDialog((current) => current ? { ...current, values: { ...(current.values ?? {}), [field]: next } } : current)} />
                     </div>
                   ))}
                 </div>
@@ -845,6 +872,7 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
       const assignedOrders = (row[ordersColumn] ?? "").split(",").map((order) => order.trim()).filter((order) => order && order !== "—")
       const actions = (row[actionsColumn] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action))
       const availability = row[availabilityColumn] || "Unknown"
+      const deliveryReceipts = parseAssignedDeliveryOrders(row[7])
       return <section key={id} className="rounded-xl border border-default-200 bg-content1/60">
         <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpandedPersonnel((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-4 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
@@ -861,7 +889,11 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
               </div>
               <section aria-label={`Assigned orders for ${row[nameColumn]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
                 <div className="flex items-center justify-between border-b border-dashed border-default-300 px-4 py-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Assigned orders</h3><span className="text-[11px] text-default-500">{assignedOrders.length}</span></div>
-                {assignedOrders.length ? <ul className="divide-y divide-dashed divide-default-200">{assignedOrders.map((order) => <li key={order} className="flex items-center gap-3 px-4 py-3 text-xs"><span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><PackagePlus size={14} aria-hidden="true" /></span><span className="font-medium">{order}</span><span className="ml-auto text-[11px] text-default-500">Assigned</span></li>)}</ul> : <p className="px-4 py-3 text-xs text-default-500">No active orders assigned.</p>}
+                {assignedOrders.length ? <ul className="divide-y divide-dashed divide-default-200">{assignedOrders.map((order) => {
+                  const receipt = deliveryReceipts.find((item) => item.orderNumber === order)
+                  const status = receipt?.deliveryStatus.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) ?? (row[7] ? "Status unavailable" : "Assigned")
+                  return <li key={order} className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs"><span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><PackagePlus size={14} aria-hidden="true" /></span><span className="font-medium">{receipt ? `${receipt.orderNumber} · ${receipt.customer}` : order}</span><span className="ml-auto text-[11px] text-default-500">Delivery status</span><Chip size="sm" variant="soft" color={statusColor(status)}>{status}</Chip></li>
+                })}</ul> : <p className="px-4 py-3 text-xs text-default-500">No active orders assigned.</p>}
               </section>
               {actions.length > 0 && <div className="flex flex-wrap justify-end gap-1 border-t border-default-100 pt-3">{actions.map((action) => <Button key={action} size="sm" variant={action.toLowerCase().includes("suspend") ? "outline" : "ghost"} className={`h-8 min-w-0 px-2 text-xs ${action.toLowerCase().includes("suspend") ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}</div>}
             </div>
