@@ -76,14 +76,18 @@ export async function POST(request: NextRequest) {
     if (!product) return fail("Product was not found.", 404)
     const rawQuantity = Number(value("Quantity", "Current Stock"))
     const type = value("Movement Type").toLowerCase()
-    if (!Number.isInteger(rawQuantity) || rawQuantity <= 0) return fail("Enter a whole-number stock quantity greater than zero.")
+    const reason = value("Reason")
+    if (!Number.isInteger(rawQuantity) || (action === "record-movement" ? rawQuantity <= 0 : rawQuantity < 0)) {
+      return fail(action === "record-movement" ? "Enter a whole-number stock quantity greater than zero." : "Stock must be a whole number zero or greater.")
+    }
+    if (!reason) return fail("Enter a reason for this inventory movement.")
     const movementType = type.includes("damage") ? "damage" : type.includes("sale") || type.includes("out") ? "sale" : type.includes("adjust") ? "adjustment" : "restock"
     const delta = action === "record-movement"
       ? movementType === "sale" || movementType === "damage" ? -rawQuantity : rawQuantity
       : rawQuantity - product.stock_quantity
     if (delta === 0) return fail("Stock is already at that quantity; no movement was recorded.")
     const actualType = action === "record-movement" ? movementType : "adjustment"
-    result = await supabase.from("inventory_movements").insert({ product_id: product.id, movement_type: actualType, quantity_delta: delta, reason: value("Reason") || "Admin inventory update", created_by: claims.sub })
+    result = await supabase.from("inventory_movements").insert({ product_id: product.id, movement_type: actualType, quantity_delta: delta, reason, created_by: claims.sub })
   } else if (module === "orders") {
     const orderNumber = row[0]?.replace(/^#/, "")
     if (!orderNumber) return fail("Order number is required.")

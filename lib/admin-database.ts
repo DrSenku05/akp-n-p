@@ -17,6 +17,13 @@ type ProductRecord = {
   image_url: string | null
 }
 
+type InventoryMovement = {
+  movement_type: string
+  quantity_delta: number
+  reason: string
+  created_at: Date | string
+}
+
 const money = (amount: string | number) => `₱${Number(amount).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`
 const dateLabel = (value: Date | string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"
 const dateTimeLabel = (value: Date | string | null) => value ? new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }) : "Never"
@@ -74,24 +81,32 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "inventory") {
-      const [products, threshold] = await Promise.all([prisma.$queryRaw<(ProductRecord & { last_delta: number | null; last_reason: string | null; last_date: Date | null })[]>`
+      const [products, threshold] = await Promise.all([prisma.$queryRaw<(ProductRecord & { movement_history: InventoryMovement[] | null })[]>`
         select p.sku, p.name, c.name as category, p.price::text as price,
           p.stock_quantity as stock, p.visibility,
           p.is_featured as featured, p.craft_origin, p.description, p.image_url,
-          movement.quantity_delta as last_delta, movement.reason as last_reason,
-          movement.created_at as last_date
+          movement.movement_history
         from public.products p
         left join public.product_categories c on c.id = p.category_id
         left join lateral (
-          select im.quantity_delta, im.reason, im.created_at
+          select jsonb_agg(
+            jsonb_build_object(
+              'movement_type', im.movement_type,
+              'quantity_delta', im.quantity_delta,
+              'reason', im.reason,
+              'created_at', im.created_at
+            ) order by im.created_at desc
+          ) as movement_history
           from public.inventory_movements im
           where im.product_id = p.id
-          order by im.created_at desc limit 1
         ) movement on true
         where p.sku like 'AKP-ACT-%'
         order by p.sku
       `, getLowStockThreshold()])
-      return { error: false, rows: products.map((p) => [p.sku, p.name, String(p.stock), p.last_delta === null ? "No movements" : `${dateLabel(p.last_date)} · ${p.last_delta > 0 ? "+" : ""}${p.last_delta} ${p.last_reason ?? "movement"}`, p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Normal", "Adjust"]) }
+      return { error: false, rows: products.map((p) => {
+        const movements = p.movement_history ?? []
+        return [p.sku, p.name, String(p.stock), `${movements.length} ${movements.length === 1 ? "activity" : "activities"}`, p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Normal", "Adjust", JSON.stringify(movements)]
+      }) }
     }
 
     if (slug === "customers") {

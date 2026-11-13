@@ -8,10 +8,28 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 
 type ModuleConfig = { title: string; subtitle: string; action?: string; stats?: [string, string, string?][]; columns: string[]; rows: string[][]; search: string; filter?: string; filterOptions?: string[]; note?: string }
+type InventoryMovement = { movement_type: string; quantity_delta: number; reason: string; created_at: string }
+
+function parseInventoryMovements(value: string | undefined): InventoryMovement[] {
+  if (!value) return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((movement): movement is InventoryMovement =>
+      typeof movement === "object" && movement !== null &&
+      typeof movement.movement_type === "string" &&
+      typeof movement.quantity_delta === "number" &&
+      typeof movement.reason === "string" &&
+      typeof movement.created_at === "string"
+    )
+  } catch {
+    return []
+  }
+}
 
 const modules: Record<string, ModuleConfig> = {
   orders: { title: "Order Management", subtitle: "Review customer orders, payment details, and pickup or delivery progress", action: "Export Orders", stats: [["Awaiting Action", "0"], ["Preparing", "0"], ["In Fulfillment", "0"], ["Completed", "0"]], search: "Search order ID or customer...", filter: "Order status", filterOptions: ["Pending", "Preparing", "Ready for Pickup", "Out for Delivery", "Completed", "Cancelled"], columns: ["Order ID", "Customer", "Order Type", "Items", "Total", "Payment Method", "Payment Status", "Order Status", "Date", "Actions"], rows: [["#ORD-0041", "Maria Santos", "Delivery", "3", "₱1,200", "GCash", "Pending", "Pending", "Aug 14", "View · Accept Order · Cancel"], ["#ORD-0040", "Jose Reyes", "Walk-in", "2", "₱840", "COD", "Pending", "Preparing", "Aug 14", "View · Ready for Pickup · Cancel"], ["#ORD-0039", "Ana Cruz", "Delivery", "5", "₱2,100", "GCash", "Paid", "Out for Delivery", "Aug 13", "View · Complete Order"]], note: "GCash references are not proof of payment. Confirm funds manually in the platform's GCash account. Walk-in orders progress to Ready for Pickup; delivery orders progress to Out for Delivery." },
-  inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Last Movement", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "Aug 12 · +20 received", "Normal", "Adjust"], ["SKU-002", "Native Rattan Basket", "8", "Aug 10 · -3 sold", "Low Stock", "Adjust"], ["SKU-003", "Handwoven Table Runner", "25", "Aug 14 · -5 sold", "Normal", "Adjust"], ["SKU-004", "Bamboo Jewelry Set", "2", "Aug 13 · -4 sold", "Low Stock", "Adjust"], ["SKU-005", "Native Buri Hat", "0", "Aug 11 · -6 sold", "Out of Stock", "Adjust"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
+  inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Movement History", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "2 activities", "Normal", "Adjust", "[{\"movement_type\":\"restock\",\"quantity_delta\":20,\"reason\":\"Supplier delivery\",\"created_at\":\"2026-08-12T09:00:00.000Z\"},{\"movement_type\":\"sale\",\"quantity_delta\":-8,\"reason\":\"Customer orders\",\"created_at\":\"2026-08-13T10:30:00.000Z\"}]"], ["SKU-002", "Native Rattan Basket", "8", "1 activity", "Low Stock", "Adjust", "[{\"movement_type\":\"sale\",\"quantity_delta\":-3,\"reason\":\"Store sale\",\"created_at\":\"2026-08-10T09:00:00.000Z\"}]"], ["SKU-003", "Handwoven Table Runner", "25", "1 activity", "Normal", "Adjust", "[{\"movement_type\":\"sale\",\"quantity_delta\":-5,\"reason\":\"Customer order\",\"created_at\":\"2026-08-14T08:30:00.000Z\"}]"], ["SKU-004", "Bamboo Jewelry Set", "2", "1 activity", "Low Stock", "Adjust", "[{\"movement_type\":\"damage\",\"quantity_delta\":-4,\"reason\":\"Damaged during inspection\",\"created_at\":\"2026-08-13T08:00:00.000Z\"}]"], ["SKU-005", "Native Buri Hat", "0", "1 activity", "Out of Stock", "Adjust", "[{\"movement_type\":\"sale\",\"quantity_delta\":-6,\"reason\":\"Customer order\",\"created_at\":\"2026-08-11T09:00:00.000Z\"}]"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
   customers: { title: "Customer Management", subtitle: "Manage customer accounts, information, and transaction records", action: "Export Customers", search: "Search by name, email, or phone...", filter: "Filter by Status", columns: ["Customer ID", "Name", "Email", "Phone", "Total Orders", "Total Spent", "Status", "Actions"], rows: [["CUS-001", "Maria Santos", "maria@email.com", "09XX-XXX-XXX", "6", "₱5,400", "Active", "View · Suspend"], ["CUS-002", "Jose Reyes", "jose@email.com", "09XX-XXX-XXX", "3", "₱2,100", "Active", "View · Suspend"], ["CUS-003", "Ana Cruz", "ana@email.com", "09XX-XXX-XXX", "10", "₱9,800", "Active", "View · Suspend"], ["CUS-004", "Pedro Lim", "pedro@email.com", "09XX-XXX-XXX", "1", "₱560", "Suspended", "View · Reactivate"]], note: "Customer details include profile information, address book, order history, and feedback records." },
   "delivery-personnel": { title: "Delivery Personnel Management", subtitle: "Manage delivery staff accounts, availability, and assignments", action: "Add Personnel", stats: [["Total Personnel", "8"], ["Available", "5"], ["On Delivery", "3"], ["Deliveries Today", "11"]], search: "Search personnel...", columns: ["Personnel ID", "Name", "Contact", "Assigned Orders", "Availability", "Actions"], rows: [["DEL-001", "Ramon Dela Cruz", "09XX-XXX-XXX", "#ORD-0041, #ORD-0039", "On Delivery", "View · Edit"], ["DEL-002", "Julio Marcos", "09XX-XXX-XXX", "#ORD-0040", "On Delivery", "View · Edit"], ["DEL-003", "Benito Aquino", "09XX-XXX-XXX", "—", "Available", "View · Edit · Assign"], ["DEL-004", "Carlos Ramos", "09XX-XXX-XXX", "—", "Off Duty", "View · Edit"]], note: "Assign pending orders to available personnel. Availability updates when an order is picked up or delivered." },
   "returns-refunds": { title: "Return and Refund Management", subtitle: "Handle eligible return and refund requests from customers", action: "Export", stats: [["Open Requests", "4"], ["Under Review", "2"], ["Approved", "1"], ["Rejected", "1"]], search: "Search by request, order, or customer...", filter: "All Status", columns: ["Request ID", "Order ID", "Customer", "Reason", "Type", "Amount", "Status", "Actions"], rows: [["RET-007", "#ORD-0033", "Rosa Tan", "Defective item", "Refund", "₱780", "Open", "Review · Approve · Reject"], ["RET-006", "#ORD-0030", "Ana Cruz", "Wrong item received", "Return + Refund", "₱1,200", "Under Review", "Review · Approve · Reject"], ["RET-005", "#ORD-0028", "Jose Reyes", "Changed mind", "Return", "₱430", "Rejected", "View"], ["RET-004", "#ORD-0025", "Maria Santos", "Item not as described", "Refund", "₱650", "Approved", "View"]], note: "Approved refunds create a payment reversal and notify the customer. Requests must be within the return window." },
@@ -346,6 +364,12 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
           router.refresh()
           return
         }
+        if (slug === "inventory") {
+          setNotice(`${dialog.action} saved for ${dialog.row?.[1] ?? dialog.row?.[0] ?? "inventory"}.`)
+          setDialog(null)
+          router.refresh()
+          return
+        }
         if (["orders", "payments", "users"].includes(slug)) {
           setNotice(`${dialog.action} saved for ${dialog.row?.[1] ?? dialog.row?.[0] ?? "record"}.`)
           setDialog(null)
@@ -378,14 +402,28 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
         if (!product || !type || !Number.isFinite(quantity) || quantity <= 0) { setNotice("Choose a product, movement type, and quantity greater than zero."); return }
         const productColumn = config.columns.indexOf("Product Name")
         const stockColumn = config.columns.indexOf("Current Stock")
-        const movementColumn = config.columns.indexOf("Last Movement")
+        const movementColumn = config.columns.indexOf("Movement History")
         const statusColumn = config.columns.indexOf("Status")
         const target = rows.findIndex((item) => item[productColumn]?.toLowerCase() === product.toLowerCase())
         if (target < 0) { setNotice("Product not found. Enter an exact product name from Inventory."); return }
         const stock = Number(rows[target][stockColumn])
-        const delta = type.toLowerCase().includes("out") || type.toLowerCase().includes("sale") || type.toLowerCase().includes("damage") ? -quantity : quantity
-        const nextStock = Math.max(0, stock + delta)
-        setRows((existing) => existing.map((item, index) => index === target ? item.map((cell, column) => column === stockColumn ? String(nextStock) : column === movementColumn ? `${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${delta > 0 ? "+" : ""}${delta} ${dialog.values?.Reason || type}` : column === statusColumn ? nextStock === 0 ? "Out of Stock" : nextStock <= inventoryThreshold ? "Low Stock" : "Normal" : cell) : item))
+        const movementType = type.toLowerCase().includes("damage") ? "damage" : type.toLowerCase().includes("sale") || type.toLowerCase().includes("out") ? "sale" : "restock"
+        const delta = movementType === "sale" || movementType === "damage" ? -quantity : quantity
+        const nextStock = stock + delta
+        if (nextStock < 0) { setNotice("This movement would make stock negative."); return }
+        const reason = dialog.values?.Reason?.trim()
+        if (!reason) { setNotice("Enter a reason for this inventory movement."); return }
+        const movement = { movement_type: movementType, quantity_delta: delta, reason, created_at: new Date().toISOString() }
+        setRows((existing) => existing.map((item, index) => {
+          if (index !== target) return item
+          const history = parseInventoryMovements(item[6])
+          const updated = [...item]
+          updated[stockColumn] = String(nextStock)
+          updated[movementColumn] = `${history.length + 1} ${history.length === 0 ? "activity" : "activities"}`
+          updated[statusColumn] = nextStock === 0 ? "Out of Stock" : nextStock <= inventoryThreshold ? "Low Stock" : "Normal"
+          updated[6] = JSON.stringify([movement, ...history])
+          return updated
+        }))
         setNotice(`Recorded stock ${delta > 0 ? "in" : "out"} for ${product}.`)
         setDialog(null)
         return
@@ -430,11 +468,18 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       } else if (dialog.rowIndex !== undefined) {
         if (dialog.action === "Adjust") {
           const stockColumn = config.columns.indexOf("Current Stock")
-          const movementColumn = config.columns.indexOf("Last Movement")
+          const movementColumn = config.columns.indexOf("Movement History")
           const statusColumn = config.columns.indexOf("Status")
           const stock = Number(current[stockColumn])
           if (!Number.isFinite(stock) || stock < 0) { setNotice("Stock quantity must be zero or greater."); return }
-          if (movementColumn >= 0) current[movementColumn] = `${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} · adjusted${dialog.values?.Reason ? `: ${dialog.values.Reason}` : ""}`
+          const oldStock = Number(dialog.row[stockColumn])
+          const delta = stock - oldStock
+          const reason = dialog.values?.Reason?.trim()
+          if (delta === 0) { setNotice("Stock is already at that quantity; no movement was recorded."); return }
+          if (!reason) { setNotice("Enter a reason for this inventory adjustment."); return }
+          const history = parseInventoryMovements(dialog.row[6])
+          current[movementColumn] = `${history.length + 1} ${history.length === 0 ? "activity" : "activities"}`
+          current[6] = JSON.stringify([{ movement_type: "adjustment", quantity_delta: delta, reason, created_at: new Date().toISOString() }, ...history])
           if (statusColumn >= 0) current[statusColumn] = stock === 0 ? "Out of Stock" : stock <= inventoryThreshold ? "Low Stock" : "Normal"
         }
         if (dialog.action === "Assign") {
@@ -635,12 +680,13 @@ function InventoryDirectory({ config, rows, onAction }: { config: ModuleConfig; 
     {rows.map((row, index) => {
       const expanded = expandedProducts.has(row[0])
       const panelId = `inventory-details-${encodeURIComponent(row[0])}`
-      const status = row[5] || "Unknown"
-      const actions = (row[6] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action))
+      const status = row[config.columns.indexOf("Status")] || "Unknown"
+      const actions = (row[config.columns.indexOf("Actions")] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action))
+      const movements = parseInventoryMovements(row[6])
       return <section key={row[0]} className="rounded-xl border border-default-200 bg-content1/60">
         <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpandedProducts((current) => { const next = new Set(current); if (next.has(row[0])) next.delete(row[0]); else next.add(row[0]); return next })} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-4 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{row[1] || "Unnamed product"}</span><span className="mt-1 block text-xs text-default-500">{row[0]}</span></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{row[1] || "Unnamed product"}</span><span className="mt-1 block text-xs text-default-500">{row[0]} · {row[config.columns.indexOf("Movement History")] || "No movements"}</span></span>
           <span className="hidden text-xs text-default-500 sm:block">Stock: <strong className="text-foreground">{row[2] ?? "—"}</strong></span>
           <Chip size="sm" variant="soft" color={statusColor(status)}>{status}</Chip>
           <ChevronDown size={17} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -650,7 +696,7 @@ function InventoryDirectory({ config, rows, onAction }: { config: ModuleConfig; 
             <div className="space-y-4 border-t border-default-200 p-3 sm:p-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {config.columns.map((heading, columnIndex) => {
-                  if (heading === "Actions") return null
+                  if (heading === "Actions" || heading === "Movement History") return null
                   const value = row[columnIndex] || "—"
                   return <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
                     <p className="text-[11px] text-default-500">{heading}</p>
@@ -658,6 +704,22 @@ function InventoryDirectory({ config, rows, onAction }: { config: ModuleConfig; 
                   </div>
                 })}
               </div>
+              <section aria-label={`Movement history for ${row[1]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
+                <h3 className="border-b border-dashed border-default-300 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Movement receipts</h3>
+                {movements.length ? <ul className="divide-y divide-dashed divide-default-200">
+                  {movements.map((movement, movementIndex) => <li key={`${movement.created_at}-${movementIndex}`} className="px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="font-semibold capitalize">{movement.movement_type.replaceAll("_", " ")}</span>
+                      <span className={`font-semibold tabular-nums ${movement.quantity_delta > 0 ? "text-success" : "text-danger"}`}>{movement.quantity_delta > 0 ? "+" : ""}{movement.quantity_delta}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-default-500">{new Date(movement.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" })}</p>
+                    <div className="mt-3 border-t border-dashed border-default-200 pt-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-default-500">Reason</p>
+                      <p className="mt-1 break-words text-xs">{movement.reason}</p>
+                    </div>
+                  </li>)}
+                </ul> : <p className="px-4 py-3 text-xs text-default-500">No movement activity recorded.</p>}
+              </section>
               <div className="flex flex-wrap justify-end gap-1 border-t border-default-100 pt-3">
                 {actions.map((action) => <Button key={action} size="sm" variant="ghost" className="h-8 min-w-0 px-2 text-xs text-accent" onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
               </div>
