@@ -576,8 +576,52 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
 
 function DataTable({ config, rows, compact = false, selectable = false, selectedIds = [], onToggle, onToggleAll, onAction }: { config: ModuleConfig; rows: string[][]; compact?: boolean; selectable?: boolean; selectedIds?: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
   if (config.title === "Order Management") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
+  if (config.title === "Inventory Management") return <InventoryDirectory config={config} rows={rows} onAction={onAction} />
   const statusValues = ["Active", "Suspended", "Pending", "Processing", "Preparing", "Ready for Pickup", "Out for Delivery", "Paid", "Shipped", "Delivered", "Completed", "Cancelled", "Normal", "Low Stock", "Out of Stock", "Verified", "Refunded", "Failed", "Open", "Approved", "Rejected", "Successful", "Inactive", "Archived", "Available", "On Delivery", "Off Duty", "Under Review", "Published", "Draft", "Flagged", "Unflagged"]
   return <div className="overflow-x-auto"><table className={`w-full ${compact ? "min-w-[540px]" : "min-w-[760px]"} text-left text-xs`}><thead className="bg-default-50 text-default-500"><tr>{selectable && <th className="w-10 px-3 py-3"><input aria-label="Select all visible records" type="checkbox" checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row[0]))} onChange={(event) => onToggleAll?.(event.target.checked)} /></th>}{config.columns.map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="border-t border-default-100 transition-colors hover:bg-default-50/70">{selectable && <td className="px-3 py-2"><input aria-label={`Select ${row[0]}`} type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} /></td>}{config.columns.map((heading, cellIndex) => { const cell = row[cellIndex] ?? ""; if (heading === "Actions") { const actions = cell.split(" · ").map((item) => item.trim()).filter(Boolean); return <td key={heading} className="px-3 py-2 align-middle"><div className="flex flex-wrap gap-x-1 gap-y-1">{actions.map((action) => { const lower = action.toLowerCase(); const Icon = lower.includes("delete") || lower.includes("remove") ? Trash2 : lower.includes("edit") || lower.includes("adjust") ? Pencil : lower.includes("view") || lower.includes("review") || lower.includes("detail") || lower.includes("receipt") || lower.includes("track") ? Eye : lower.includes("download") ? Download : lower.includes("record") ? PackagePlus : undefined; const destructive = ["delete", "remove", "reject", "suspend", "archive", "end"].some((word) => lower.includes(word)); return <Button key={action} size="sm" variant="ghost" className={`h-7 min-w-0 px-1.5 text-[11px] ${destructive ? "text-danger" : "text-[#315f43]"}`} onPress={() => onAction?.(action, row, index)}>{Icon && <Icon size={12} />}{action}</Button> })}</div></td> } if (heading === "Image") return <td key={heading} className="px-3 py-2 align-middle">{cell && cell !== "—" ? <Image src={cell} alt={`${row[config.columns.indexOf("Product Name")] || "Product"} image`} width={52} height={52} unoptimized className="size-12 rounded-lg border border-default-200 object-cover" /> : <span className="text-default-400">No image</span>}</td>; return <td key={`${cellIndex}-${cell}`} className="max-w-64 px-3 py-3 align-middle text-default-700">{statusValues.includes(cell) ? <Chip size="sm" variant="soft" color={statusColor(cell)}>{cell}</Chip> : <span className={cellIndex === 0 ? "font-semibold" : ""}>{cell}</span>}</td> })}</tr>)}</tbody></table>{rows.length === 0 && <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No records found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>}<div className="flex items-center justify-between border-t border-default-100 pt-3 text-[11px] text-default-500"><span>Showing {rows.length} records</span><div className="flex gap-2"><Button size="sm" variant="outline" isDisabled>Previous</Button><Button size="sm" variant="outline" isDisabled>Next</Button></div></div></div>
+}
+
+function InventoryDirectory({ config, rows, onAction }: { config: ModuleConfig; rows: string[][]; onAction?: (action: string, row: string[], index: number) => void }) {
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set())
+  if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No inventory items found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
+
+  return <div className="space-y-3">
+    {rows.map((row, index) => {
+      const expanded = expandedProducts.has(row[0])
+      const panelId = `inventory-details-${encodeURIComponent(row[0])}`
+      const status = row[5] || "Unknown"
+      const actions = (row[6] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action))
+      return <section key={row[0]} className="rounded-xl border border-default-200 bg-content1/60">
+        <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpandedProducts((current) => { const next = new Set(current); if (next.has(row[0])) next.delete(row[0]); else next.add(row[0]); return next })} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-4 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{row[1] || "Unnamed product"}</span><span className="mt-1 block text-xs text-default-500">{row[0]}</span></span>
+          <span className="hidden text-xs text-default-500 sm:block">Stock: <strong className="text-foreground">{row[2] ?? "—"}</strong></span>
+          <Chip size="sm" variant="soft" color={statusColor(status)}>{status}</Chip>
+          <ChevronDown size={17} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
+        <div id={panelId} aria-hidden={!expanded} inert={!expanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+          <div className="min-h-0 overflow-hidden">
+            <div className="space-y-4 border-t border-default-200 p-3 sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {config.columns.map((heading, columnIndex) => {
+                  if (heading === "Actions") return null
+                  const value = row[columnIndex] || "—"
+                  return <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
+                    <p className="text-[11px] text-default-500">{heading}</p>
+                    {heading === "Status" ? <div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(value)}>{value}</Chip></div> : <p className="mt-1 break-words text-xs font-medium">{value}</p>}
+                  </div>
+                })}
+              </div>
+              <div className="flex flex-wrap justify-end gap-1 border-t border-default-100 pt-3">
+                {actions.map((action) => <Button key={action} size="sm" variant="ghost" className="h-8 min-w-0 px-2 text-xs text-accent" onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    })}
+    <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} inventory {rows.length === 1 ? "item" : "items"}</div>
+  </div>
 }
 
 function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAction }: { config: ModuleConfig; rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
