@@ -113,7 +113,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     if (slug === "orders") {
       const orders = await prisma.$queryRaw<{ order_number: string; customer_id: string | null; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; latitude: number | null; longitude: number | null; created_at: Date }[]>`
         select o.order_number, o.customer_id::text as customer_id, c.name as customer, coalesce(items.item_count, 0)::int as item_count,
-          items.summary as items, o.total_amount::text as total,
+          items.items as items, o.total_amount::text as total,
           coalesce(nullif(o.payment_method, ''), p.method) as method,
           coalesce(p.status, o.payment_status) as payment,
           p.reference, o.fulfillment_method as fulfillment, o.status,
@@ -128,7 +128,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         left join public.customer_addresses a on a.id = o.delivery_address_id
         left join lateral (
           select count(*)::int as item_count,
-            string_agg(concat(oi.product_name, ' × ', oi.quantity), ', ' order by oi.created_at) as summary
+            coalesce(json_agg(json_build_object('name', oi.product_name, 'quantity', oi.quantity) order by oi.created_at)::text, '[]') as items
           from public.order_items oi where oi.order_id = o.id
         ) items on true
         left join lateral (
@@ -143,7 +143,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         const fulfillment = o.fulfillment?.toLowerCase() ?? "delivery"
         const method = o.method ? paymentMethodLabel(o.method) : "—"
         const pin = o.latitude !== null && o.longitude !== null ? `${o.latitude},${o.longitude}` : ""
-        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "No items listed", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number]
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "[]", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number]
       }) }
     }
 

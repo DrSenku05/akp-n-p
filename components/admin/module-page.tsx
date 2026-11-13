@@ -37,6 +37,21 @@ const titleCase = (slug: string) => slug.split("-").map((part) => part.charAt(0)
 
 function statusColor(value: string) { const s = value.toLowerCase(); if (["active", "successful", "verified", "paid", "completed", "delivered", "ready for pickup", "normal", "available", "approved", "published", "sent"].some((x) => s.includes(x))) return "success" as const; if (["pending", "low stock", "open", "review", "processing", "preparing", "out for delivery", "on delivery"].some((x) => s.includes(x))) return "warning" as const; if (["failed", "rejected", "cancelled", "out of stock", "suspended", "inactive"].some((x) => s.includes(x))) return "danger" as const; return "default" as const }
 
+function parseOrderItems(value: string): { name: string; quantity: string }[] {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (Array.isArray(parsed)) return parsed.flatMap((item): { name: string; quantity: string }[] => {
+      if (typeof item !== "object" || item === null || !("name" in item) || !("quantity" in item)) return []
+      if (typeof item.name !== "string" || (typeof item.quantity !== "number" && typeof item.quantity !== "string")) return []
+      return [{ name: item.name, quantity: String(item.quantity) }]
+    })
+  } catch {
+    const legacyItem = /^(.*)\s×\s(\d+)$/.exec(value)
+    return legacyItem ? [{ name: legacyItem[1], quantity: legacyItem[2] }] : []
+  }
+  return []
+}
+
 function getDisplayStats(slug: string, stats: ModuleConfig["stats"], rows: string[][], databaseBacked: boolean) {
   if (!stats || !databaseBacked) return stats
   const countStatus = (index: number, value: string) => rows.filter((row) => row[index]?.toLowerCase() === value).length
@@ -594,6 +609,7 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
         {group.orders.map(({ row, index }) => {
           const orderExpanded = expandedOrders.has(row[0])
           const orderPanelId = `order-details-${encodeURIComponent(row[0])}`
+          const orderedItems = parseOrderItems(row[11] ?? "")
           const [latitude, longitude] = (row[14] ?? "").split(",").map(Number)
           const hasMapPin = Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
           const mapParams = new URLSearchParams({ q: `${latitude},${longitude}`, z: "16", output: "embed" })
@@ -614,7 +630,7 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
           <div className="space-y-4 border-t border-default-100 p-3 sm:p-4">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {config.columns.map((heading, columnIndex) => {
-                if (["Customer", "Order ID", "Actions"].includes(heading)) return null
+                if (["Customer", "Order ID", "Actions", "Items"].includes(heading)) return null
                 const value = row[columnIndex] || "—"
                 return <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
                   <p className="text-[11px] text-default-500">{heading}</p>
@@ -623,13 +639,23 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
               })}
               {[
                 ["Delivery address", row[10] || "Pickup at store / no address provided"],
-                ["Ordered products", row[11] || "No item details available"],
                 ["GCash reference", row[12] || "Not applicable"],
               ].map(([heading, value]) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
                 <p className="text-[11px] text-default-500">{heading}</p>
                 <p className="mt-1 break-words text-xs font-medium">{value}</p>
               </div>)}
             </div>
+            <section aria-label="Ordered products" className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
+              <h3 className="border-b border-dashed border-default-300 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Ordered products</h3>
+              <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 border-b border-default-100 bg-default-50/70 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-default-500">
+                <span>Product</span><span className="text-right">Qty</span>
+              </div>
+              {orderedItems.length ? <ul className="divide-y divide-dashed divide-default-200">
+                {orderedItems.map((item, itemIndex) => <li key={`${item.name}-${itemIndex}`} className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 px-4 py-3 text-xs">
+                  <span className="break-words font-medium">{item.name}</span><span className="text-right tabular-nums text-default-600">{item.quantity}</span>
+                </li>)}
+              </ul> : <p className="px-4 py-3 text-xs text-default-500">No item details available.</p>}
+            </section>
             {hasMapPin && <section aria-label="Delivery pinpoint map" className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="flex items-center gap-2 text-xs font-semibold"><MapPin size={14} className="text-accent" />Delivery location</h3>
