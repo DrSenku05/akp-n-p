@@ -873,6 +873,7 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
       const actions = (row[actionsColumn] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action))
       const availability = row[availabilityColumn] || "Unknown"
       const deliveryReceipts = parseAssignedDeliveryOrders(row[7])
+      const deliveryHistory = parseAssignedDeliveryOrders(row[8])
       return <section key={id} className="rounded-xl border border-default-200 bg-content1/60">
         <button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpandedPersonnel((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-4 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
@@ -887,14 +888,23 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
                 <div className="rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">Personnel ID</p><p className="mt-1 break-words text-xs font-medium">{row[idColumn] || "—"}</p></div>
                 <div className="rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">Availability</p><div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(availability)}>{availability}</Chip></div></div>
               </div>
-              <section aria-label={`Assigned orders for ${row[nameColumn]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
-                <div className="flex items-center justify-between border-b border-dashed border-default-300 px-4 py-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Assigned orders</h3><span className="text-[11px] text-default-500">{assignedOrders.length}</span></div>
-                {assignedOrders.length ? <ul className="divide-y divide-dashed divide-default-200">{assignedOrders.map((order) => {
-                  const receipt = deliveryReceipts.find((item) => item.orderNumber === order)
-                  const status = receipt?.deliveryStatus.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) ?? (row[7] ? "Status unavailable" : "Assigned")
-                  return <li key={order} className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs"><span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><PackagePlus size={14} aria-hidden="true" /></span><span className="font-medium">{receipt ? `${receipt.orderNumber} · ${receipt.customer}` : order}</span><span className="ml-auto text-[11px] text-default-500">Delivery status</span><Chip size="sm" variant="soft" color={statusColor(status)}>{status}</Chip></li>
-                })}</ul> : <p className="px-4 py-3 text-xs text-default-500">No active orders assigned.</p>}
-              </section>
+              <div className="grid gap-3 md:grid-cols-2">
+                <section aria-label={`Assigned orders for ${row[nameColumn]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
+                  <div className="flex items-center justify-between border-b border-dashed border-default-300 px-4 py-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Assigned orders</h3><span className="text-[11px] text-default-500">{assignedOrders.length}</span></div>
+                  {assignedOrders.length ? <ul className="divide-y divide-dashed divide-default-200">{assignedOrders.map((order) => {
+                    const receipt = deliveryReceipts.find((item) => item.orderNumber === order)
+                    const status = receipt?.deliveryStatus.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) ?? (row[7] ? "Status unavailable" : "Assigned")
+                    return <li key={order} className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs"><span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><PackagePlus size={14} aria-hidden="true" /></span><span className="font-medium">{receipt ? `${receipt.orderNumber} · ${receipt.customer}` : order}</span><span className="ml-auto text-[11px] text-default-500">Delivery status</span><Chip size="sm" variant="soft" color={statusColor(status)}>{status}</Chip></li>
+                  })}</ul> : <p className="px-4 py-3 text-xs text-default-500">No active orders assigned.</p>}
+                </section>
+                <section aria-label={`Delivery history for ${row[nameColumn]}`} className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
+                  <div className="flex items-center justify-between border-b border-dashed border-default-300 px-4 py-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Delivery history</h3><span className="text-[11px] text-default-500">{deliveryHistory.length}</span></div>
+                  {deliveryHistory.length ? <ul className="divide-y divide-dashed divide-default-200">{deliveryHistory.map((receipt) => {
+                    const status = receipt.deliveryStatus.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+                    return <li key={receipt.orderNumber} className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs"><span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent"><PackagePlus size={14} aria-hidden="true" /></span><span className="font-medium">{receipt.orderNumber} · {receipt.customer}</span><span className="ml-auto text-[11px] text-default-500">Delivery status</span><Chip size="sm" variant="soft" color={statusColor(status)}>{status}</Chip></li>
+                  })}</ul> : <p className="px-4 py-3 text-xs text-default-500">No delivery history available.</p>}
+                </section>
+              </div>
               {actions.length > 0 && <div className="flex flex-wrap justify-end gap-1 border-t border-default-100 pt-3">{actions.map((action) => <Button key={action} size="sm" variant={action.toLowerCase().includes("suspend") ? "outline" : "ghost"} className={`h-8 min-w-0 px-2 text-xs ${action.toLowerCase().includes("suspend") ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}</div>}
             </div>
           </div>

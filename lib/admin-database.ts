@@ -170,7 +170,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "delivery-personnel") {
-      const [personnel, assignableOrders, assignedOrders] = await Promise.all([
+      const [personnel, assignableOrders, assignedOrders, deliveryHistory] = await Promise.all([
         prisma.$queryRaw<{ id: string; name: string; phone: string | null; availability: string; assigned_orders: string | null; suspendable: boolean }[]>`
           select d.id::text as id, d.name, d.phone, d.availability,
             string_agg(o.order_number, ', ' order by o.order_number) as assigned_orders,
@@ -202,11 +202,20 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
             and o.order_number not like 'DEMO-ORD-%'
           order by o.created_at desc
         `,
+        prisma.$queryRaw<{ driver_id: string; order_number: string; customer: string | null; delivery_status: string }[]>`
+          select o.delivery_personnel_id::text as driver_id, o.order_number, c.name as customer, o.delivery_status
+          from public.orders o
+          left join public.customers c on c.id = o.customer_id
+          where o.delivery_personnel_id is not null
+            and o.fulfillment_method = 'delivery'
+            and o.order_number not like 'DEMO-ORD-%'
+          order by o.created_at desc
+        `,
       ])
       const unassignableOrders = assignedOrders.filter((order) => order.delivery_status === "assigned")
       return {
         error: false,
-        rows: personnel.map((d) => [`DEL-${d.id.slice(0, 8).toUpperCase()}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), `View${unassignableOrders.some((order) => order.driver_id === d.id) ? " · Unassign" : ""}${d.suspendable ? " · Suspend" : ""}${d.availability === "suspended" ? " · Reactivate" : ""}`, d.id, JSON.stringify(assignedOrders.filter((order) => order.driver_id === d.id).map((order) => ({ orderNumber: order.order_number, customer: order.customer ?? "Customer", deliveryStatus: order.delivery_status })))]),
+        rows: personnel.map((d) => [`DEL-${d.id.slice(0, 8).toUpperCase()}`, d.name, d.phone ?? "—", d.assigned_orders ?? "—", title(d.availability), `View${unassignableOrders.some((order) => order.driver_id === d.id) ? " · Unassign" : ""}${d.suspendable ? " · Suspend" : ""}${d.availability === "suspended" ? " · Reactivate" : ""}`, d.id, JSON.stringify(assignedOrders.filter((order) => order.driver_id === d.id).map((order) => ({ orderNumber: order.order_number, customer: order.customer ?? "Customer", deliveryStatus: order.delivery_status }))), JSON.stringify(deliveryHistory.filter((order) => order.driver_id === d.id).map((order) => ({ orderNumber: order.order_number, customer: order.customer ?? "Customer", deliveryStatus: order.delivery_status })))]),
         assignableOrders: assignableOrders.map((order) => ({ orderNumber: order.order_number, customer: order.customer ?? "Customer" })),
         unassignableOrders: unassignableOrders.map((order) => ({ driverId: order.driver_id, orderNumber: order.order_number, customer: order.customer ?? "Customer" })),
       }
