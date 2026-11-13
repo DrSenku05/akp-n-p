@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Bell, ChevronDown, CircleAlert, Download, Filter, Folder, ImagePlus, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus, Smartphone, Upload } from "lucide-react"
+import { Archive, Bell, ChevronDown, CircleAlert, Download, Filter, Folder, ImagePlus, Leaf, MapPin, Plus, RotateCcw, ShieldCheck, Trash2, Eye, Pencil, PackagePlus, Smartphone, Upload } from "lucide-react"
 import { Button, Card, Chip, Input, Modal } from "@heroui/react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -594,6 +594,11 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
         {group.orders.map(({ row, index }) => {
           const orderExpanded = expandedOrders.has(row[0])
           const orderPanelId = `order-details-${encodeURIComponent(row[0])}`
+          const [latitude, longitude] = (row[14] ?? "").split(",").map(Number)
+          const hasMapPin = Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+          const mapParams = new URLSearchParams({ q: `${latitude},${longitude}`, z: "16", output: "embed" })
+          const mapUrl = `https://maps.google.com/maps?${mapParams.toString()}`
+          const mapLink = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`
           return <section key={row[0]} className="group/order rounded-lg border border-default-200 bg-background/70">
           <div className="flex items-center gap-3 px-3 sm:px-4">
             {selectable && <label aria-label={`Select order ${row[0]}`} className="flex size-8 shrink-0 cursor-pointer items-center justify-center"><input type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} /></label>}
@@ -625,6 +630,13 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
                 <p className="mt-1 break-words text-xs font-medium">{value}</p>
               </div>)}
             </div>
+            {hasMapPin && <section aria-label="Delivery pinpoint map" className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="flex items-center gap-2 text-xs font-semibold"><MapPin size={14} className="text-accent" />Delivery location</h3>
+                <a href={mapLink} target="_blank" rel="noreferrer" className="text-xs font-medium text-accent hover:underline">Open map</a>
+              </div>
+              <iframe title={`Delivery location for order ${row[0]}`} src={mapUrl} className="h-56 w-full rounded-lg border border-default-200" loading="lazy" referrerPolicy="no-referrer" />
+            </section>}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default-100 pt-3">
               <div className="flex flex-wrap gap-1">
                 {(row[9] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action)).map((action) => <Button key={action} size="sm" variant="ghost" className={`h-8 min-w-0 px-2 text-xs ${isDestructive(action) ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
