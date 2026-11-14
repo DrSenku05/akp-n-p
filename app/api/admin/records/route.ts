@@ -26,47 +26,67 @@ export async function POST(request: NextRequest) {
 
   if (module === "products" || module === "heritage-showcase") {
     const sku = module === "products" ? row[0] : ""
-    const productId = module === "heritage-showcase" ? value("Product ID") : ""
+    const showcaseSku = row[6] || value("Product SKU").split(" · ")[0]
     const categoryName = value("Category")
-    const { data: category } = categoryName ? await supabase.from("product_categories").select("id").eq("name", categoryName).maybeSingle() : { data: null }
+    const { data: category, error: categoryError } = categoryName ? await supabase.from("product_categories").select("id").eq("name", categoryName).maybeSingle() : { data: null, error: null }
+    if (categoryError) return fail(categoryError.message)
+    if (categoryName && !category) return fail("Product category was not found.", 404)
     const visibilityInput = value("Visibility", "Status").toLowerCase()
-    const fields = {
-      name: value("Product Name", "Product") || (module === "heritage-showcase" ? row[0] : ""),
-      description: value("Description") || null,
-      category_id: category?.id ?? null,
-      price: money(value("Price")),
-      craft_origin: value("Craft / Origin") || null,
-      is_featured: ["yes", "true"].includes(value("Featured").toLowerCase()),
-      visibility: visibilityInput ? visibilityInput === "active" ? "published" : visibilityInput : undefined,
-      image_url: value("Image URL") || null,
-    }
     if (module === "heritage-showcase") {
-      result = await supabase.from("products").update({
-        craft_origin: value("Craft / Origin") || null,
-        category_id: category?.id ?? null,
-        is_featured: ["yes", "true"].includes(value("Featured").toLowerCase()),
-        visibility: value("Visibility").toLowerCase(),
-      }).eq("name", row[0]).select("id")
-    } else if (module === "products" && action.includes("archive")) {
-      result = await supabase.from("products").update({ visibility: "archived" }).eq("sku", sku).select("id")
-    } else if (!fields.name || !Number.isFinite(fields.price) || fields.price < 0) return fail("Product name and a valid non-negative price are required.")
-    else if (action === "create") {
-      const skuInput = value("SKU", "Product ID")
-      if (!skuInput) return fail("SKU is required to create a product.")
-      const stock = Number(value("Stock") || 0)
-      if (!Number.isInteger(stock) || stock < 0) return fail("Stock must be a whole number zero or greater.")
-      result = await supabase.from("products").insert({ sku: skuInput, ...fields, stock_quantity: stock, visibility: fields.visibility || "draft" })
+      if (!showcaseSku) return fail("Product SKU is required.")
+      if (action === "publish") {
+        result = await supabase.from("products").update({ visibility: "published" }).eq("sku", showcaseSku).select("id")
+      } else if (action === "feature" || action === "add-to-showcase") {
+        result = await supabase.from("products").update({ is_featured: true }).eq("sku", showcaseSku).select("id")
+      } else if (action === "remove") {
+        result = await supabase.from("products").update({ is_featured: false }).eq("sku", showcaseSku).select("id")
+      } else if (action === "edit") {
+        const patch: Record<string, string | boolean | null> = {}
+        if (values.Product !== undefined) patch.name = value("Product")
+        if (values["Craft / Origin"] !== undefined) patch.craft_origin = value("Craft / Origin") || null
+        if (values.Category !== undefined) patch.category_id = category?.id ?? null
+        if (values.Visibility !== undefined) {
+          if (!["published", "draft", "archived"].includes(visibilityInput)) return fail("Choose a valid product visibility.")
+          patch.visibility = visibilityInput
+        }
+        if (values.Featured !== undefined) patch.is_featured = ["yes", "true"].includes(value("Featured").toLowerCase())
+        if (!Object.keys(patch).length) return fail("No showcase changes were provided.")
+        result = await supabase.from("products").update(patch).eq("sku", showcaseSku).select("id")
+      } else return fail("Unsupported showcase action.")
     } else {
-      const productPatch: Record<string, string | number | boolean | null> = { name: fields.name, price: fields.price }
-      if (categoryName) productPatch.category_id = category?.id ?? null
-      if (values.Description !== undefined) productPatch.description = value("Description") || null
-      if (values["Craft / Origin"] !== undefined) productPatch.craft_origin = value("Craft / Origin") || null
-      if (values["Image URL"] !== undefined) productPatch.image_url = value("Image URL") || null
-      if (values.Featured !== undefined) productPatch.is_featured = ["yes", "true"].includes(value("Featured").toLowerCase())
-      if (visibilityInput) productPatch.visibility = visibilityInput === "active" ? "published" : visibilityInput
-      let query = supabase.from("products").update(productPatch)
-      query = module === "products" ? query.eq("sku", sku) : query.eq("name", row[0])
-      result = await query.select("id")
+        const fields = {
+          name: value("Product Name", "Product") || row[0] || "",
+          description: value("Description") || null,
+          category_id: category?.id ?? null,
+          price: money(value("Price")),
+          craft_origin: value("Craft / Origin") || null,
+          is_featured: ["yes", "true"].includes(value("Featured").toLowerCase()),
+          visibility: visibilityInput ? visibilityInput === "active" ? "published" : visibilityInput : undefined,
+          image_url: value("Image URL") || null,
+        }
+        if (action.includes("reactivate")) {
+          result = await supabase.from("products").update({ visibility: "published" }).eq("sku", sku).select("id")
+        } else if (action.includes("archive")) {
+          result = await supabase.from("products").update({ visibility: "archived" }).eq("sku", sku).select("id")
+        } else if (!fields.name || !Number.isFinite(fields.price) || fields.price < 0) return fail("Product name and a valid non-negative price are required.")
+        else if (action === "create") {
+          const skuInput = value("SKU", "Product ID")
+          if (!skuInput) return fail("SKU is required to create a product.")
+          const stock = Number(value("Stock") || 0)
+          if (!Number.isInteger(stock) || stock < 0) return fail("Stock must be a whole number zero or greater.")
+          result = await supabase.from("products").insert({ sku: skuInput, ...fields, stock_quantity: stock, visibility: fields.visibility || "draft" })
+        } else {
+          const productPatch: Record<string, string | number | boolean | null> = { name: fields.name, price: fields.price }
+          if (categoryName) productPatch.category_id = category?.id ?? null
+          if (values.Description !== undefined) productPatch.description = value("Description") || null
+          if (values["Craft / Origin"] !== undefined) productPatch.craft_origin = value("Craft / Origin") || null
+          if (values["Image URL"] !== undefined) productPatch.image_url = value("Image URL") || null
+          if (values.Featured !== undefined) productPatch.is_featured = ["yes", "true"].includes(value("Featured").toLowerCase())
+          if (visibilityInput) productPatch.visibility = visibilityInput === "active" ? "published" : visibilityInput
+          let query = supabase.from("products").update(productPatch)
+          query = query.eq("sku", sku)
+          result = await query.select("id")
+        }
     }
   } else if (module === "inventory") {
     const productLookup = row[0]
@@ -126,7 +146,9 @@ export async function POST(request: NextRequest) {
       if (!["pending", "processing"].includes(current)) return fail("Only pending or preparing orders can be cancelled.", 409)
       status = "cancelled"
     } else return fail("Unsupported order action.")
-    result = await supabase.from("orders").update({ status }).eq("id", order.id).select("id")
+    result = await supabase.from("orders").update({ status }).eq("id", order.id).eq("status", current).select("id")
+    if (result.error) return fail(result.error.message)
+    if (Array.isArray(result.data) && result.data.length === 0) return fail("Order status changed while this action was being processed. Refresh and try again.", 409)
   } else if (module === "customers") {
     const email = row[2]
     const customerId = row[8]
@@ -240,9 +262,9 @@ export async function POST(request: NextRequest) {
     if (lookupError) return fail(lookupError.message)
     if (!payment) return fail("Payment record was not found.", 404)
     if (payment.status.toLowerCase() !== "pending") return fail("Only pending payments can be changed.", 409)
-    const method = payment.method.toLowerCase()
-    const isCod = method.includes("cod") || method.includes("cash")
-    const isGcash = method.includes("gcash") || method.includes("wallet")
+    const method = payment.method.trim().toLowerCase().replaceAll("_", " ")
+    const isCod = ["cod", "cash on delivery"].includes(method)
+    const isGcash = ["gcash", "wallet", "e-wallet"].includes(method)
     let status = ""
     if (action.includes("reject payment")) {
       if (!isGcash) return fail("Only GCash payments can be rejected here.")
@@ -255,6 +277,8 @@ export async function POST(request: NextRequest) {
       status = "verified"
     } else return fail("Unsupported payment action.")
     result = await supabase.from("payments").update({ status, verified_by: claims.sub, verified_at: new Date().toISOString() }).eq("id", payment.id).eq("status", "pending").select("id")
+    if (result.error) return fail(result.error.message)
+    if (Array.isArray(result.data) && result.data.length === 0) return fail("Payment status changed while this action was being processed. Refresh and try again.", 409)
   } else if (module === "feedback") {
     const status = action.includes("remove") ? "removed" : action.includes("flag") && !action.includes("unflag") ? "flagged" : "visible"
     if (!row[8]) return fail("Feedback identifier is missing. Refresh and try again.")

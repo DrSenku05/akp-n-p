@@ -1,9 +1,10 @@
 import "server-only"
 
+import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/prisma/prisma"
 
 type PreviewResult = { rows: string[][]; announcements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; unassignableOrders?: { driverId: string; orderNumber: string; customer: string }[]; error: boolean } | null
-const databaseModules = new Set(["customers", "orders", "delivery-personnel", "returns-refunds", "feedback", "payments", "promotions", "notifications", "audit-logs", "users"])
+const databaseModules = new Set(["customers", "orders", "delivery-personnel", "returns-refunds", "feedback", "payments", "promotions", "notifications", "audit-logs", "users", "backup-restore", "reports", "settings"])
 type ProductRecord = {
   sku: string
   name: string
@@ -62,6 +63,17 @@ async function getDemoProducts() {
   `
 }
 
+async function getAdminProducts() {
+  return prisma.$queryRaw<ProductRecord[]>`
+    select p.sku, p.name, c.name as category, p.price::text as price,
+      p.stock_quantity as stock, p.visibility,
+      p.is_featured as featured, p.craft_origin, p.description, p.image_url
+    from public.products p
+    left join public.product_categories c on c.id = p.category_id
+    order by p.name, p.sku
+  `
+}
+
 async function getLowStockThreshold() {
   const [settings] = await prisma.$queryRaw<{ threshold: number }[]>`
     select low_stock_threshold as threshold
@@ -76,8 +88,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
 
   try {
     if (slug === "products") {
-      const [products, threshold] = await Promise.all([getDemoProducts(), getLowStockThreshold()])
-      return { error: false, rows: products.map((p) => [p.sku, p.image_url ?? "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Active", "View · Edit · Archive", p.description ?? "", p.visibility, p.featured ? "Yes" : "No", p.craft_origin ?? "", p.image_url ?? ""]) }
+      const [products, threshold] = await Promise.all([getAdminProducts(), getLowStockThreshold()])
+      return { error: false, rows: products.map((p) => [p.sku, p.image_url ?? "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Active", p.visibility === "archived" ? "View · Edit · Reactivate" : "View · Edit · Archive", p.description ?? "", p.visibility, p.featured ? "Yes" : "No", p.craft_origin ?? "", p.image_url ?? ""]) }
     }
 
     if (slug === "inventory") {
@@ -271,7 +283,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
 
     if (slug === "heritage-showcase") {
       const products = await getDemoProducts()
-      return { error: false, rows: products.filter((p) => p.visibility !== "archived").map((p) => [p.name, p.craft_origin ?? "Origin not provided", p.category ?? "Uncategorized", title(p.visibility), p.featured ? "Yes" : "No", p.visibility === "draft" ? "Edit · Publish" : "Edit · Remove"]) }
+      return { error: false, rows: products.filter((p) => p.visibility !== "archived").map((p) => [p.name, p.craft_origin ?? "Origin not provided", p.category ?? "Uncategorized", title(p.visibility), p.featured ? "Yes" : "No", p.visibility === "draft" ? "Edit · Publish" : p.featured ? "Edit · Remove" : "Edit · Feature", p.sku]) }
     }
 
     if (slug === "promotions") {
@@ -299,15 +311,21 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "audit-logs") {
+      const supabase = await createClient()
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+      const userId = claimsData?.claims?.sub
+      if (claimsError || !userId) return { error: true, rows: [] }
+      const { data: admin, error: adminError } = await supabase.from("admin_users").select("role,is_active").eq("user_id", userId).maybeSingle()
+      if (adminError || !admin?.is_active || !["owner", "staff"].includes(admin.role)) return { error: true, rows: [] }
       const logs = await prisma.$queryRaw<{ id: bigint; actor_role: string | null; module: string; action: string; created_at: Date; metadata: { row?: Record<string, unknown> }; actor_email: string }[]>`
         select l.id, l.actor_role, l.module, l.action, l.created_at, l.metadata,
           coalesce(u.email, 'Admin') as actor_email
         from public.audit_logs l
         left join auth.users u on u.id = l.actor_id
-        where l.actor_id is not null
+        where (${admin.role === "owner"} or l.actor_id = ${userId}::uuid)
         order by l.created_at desc limit 100
       `
-      return { error: false, rows: logs.map((log) => [`LOG-${log.id}`, log.actor_email, log.actor_role ? title(log.actor_role) : "—", title(log.module), title(log.action), "—", new Date(log.created_at).toLocaleString("en-PH")]) }
+      return { error: false, rows: logs.map((log) => [`LOG-${log.id}`, log.actor_email === "Admin" ? "System / app activity" : log.actor_email, log.actor_role ? title(log.actor_role) : "System", title(log.module), title(log.action), "—", new Date(log.created_at).toLocaleString("en-PH")]) }
     }
 
     if (slug === "users") {
@@ -348,7 +366,22 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       return { error: false, rows: accounts.map((account) => [account.account_id, account.display_name, account.email ?? "—", account.account_type, account.status, dateTimeLabel(account.last_sign_in_at), account.suspendable ? (account.status === "Suspended" ? "View · Reactivate" : "View · Suspend") : "View"]) }
     }
 
-    if (slug === "backup-restore") return { error: false, rows: [] }
+    if (slug === "backup-restore") {
+      const backups = await prisma.$queryRaw<{ id: string; backup_type: string; size_bytes: bigint | null; status: string; created_at: Date }[]>`
+        select id::text as id, backup_type, size_bytes, status, created_at
+        from public.backup_records
+        order by created_at desc
+      `
+      return { error: false, rows: backups.map((backup) => [
+        `BCK-${backup.id.slice(0, 8).toUpperCase()}`,
+        title(backup.backup_type),
+        backup.size_bytes === null ? "—" : `${(Number(backup.size_bytes) / (1024 * 1024)).toFixed(2)} MB`,
+        title(backup.status),
+        dateTimeLabel(backup.created_at),
+        "View Details",
+      ]) }
+    }
+    if (slug === "reports" || slug === "settings") return { error: false, rows: [] }
     return null
   } catch (error) {
     console.error("Admin database preview query failed", error)
