@@ -15,11 +15,14 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState("")
   const [profile, setProfile] = useState({ name: "Admin", role: "Administrator" })
+  const [storeName, setStoreName] = useState("AKP Native Products Trading")
   useEffect(() => {
     let active = true
     const loadProfile = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      const { data: settings } = await supabase.from("store_settings").select("store_name").eq("id", true).maybeSingle()
+      if (active && typeof settings?.store_name === "string" && settings.store_name.trim()) setStoreName(settings.store_name)
       if (!user) return
       const { data } = await supabase.from("admin_users").select("display_name, role").eq("user_id", user.id).maybeSingle()
       if (active && data) setProfile({ name: data.display_name, role: data.role === "owner" ? "Owner" : "Staff" })
@@ -61,7 +64,7 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
         className="flex size-11 items-center justify-center rounded-md border border-amber-300/55 text-[11px] font-bold tracking-tight text-white shadow-sm shadow-black/30 ring-1 ring-black/20"
         style={{ backgroundImage: "linear-gradient(rgba(26, 24, 20, 0.48), rgba(26, 24, 20, 0.48)), url('/images/banig-badian.jpg')", backgroundPosition: "center", backgroundSize: "cover" }}
       >AKP</span>
-      <span className="hidden text-sm font-bold tracking-wide sm:block">AKP Native Products</span>
+      <span className="hidden text-sm font-bold tracking-wide sm:block">{storeName}</span>
       <span className="hidden border-s border-white/15 pl-4 text-[10px] font-medium uppercase tracking-[0.18em] text-stone-300/65 md:block">Administration</span>
     </Link>
     <div className="ml-auto min-w-0 flex-1 sm:max-w-sm">

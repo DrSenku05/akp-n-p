@@ -29,6 +29,7 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [resendSeconds, setResendSeconds] = useState(0)
   const [checkingRecoverySession, setCheckingRecoverySession] = useState(step === "reset-password")
+  const [storeName, setStoreName] = useState("AKP Native Products Trading")
   const go = (path: string) => router.push(path)
 
   const title = step === "login" ? "Staff / Owner Login" : step === "forgot-password" ? "Forgot Password" : step === "verify-code" ? "Enter Verification Code" : step === "reset-password" ? "Reset Password" : "Password Updated"
@@ -51,6 +52,15 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
     })
     return () => { alive = false }
   }, [router, step])
+
+  useEffect(() => {
+    let active = true
+    void createClient().from("store_settings").select("store_name").eq("id", true).maybeSingle()
+      .then(({ data }) => {
+        if (active && typeof data?.store_name === "string" && data.store_name.trim()) setStoreName(data.store_name)
+      })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (resendSeconds <= 0) return
@@ -139,7 +149,7 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
 
   return <main className="flex min-h-dvh items-center justify-center bg-background px-4 py-10 text-foreground">
     <section className="w-full max-w-[520px] rounded-xl border border-default-200 bg-content1 p-6 shadow-[0_20px_60px_rgba(44,40,30,0.12)] sm:p-9">
-        <div className="mb-7 flex items-center gap-3 border-b border-default-200 pb-5"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/40 text-[10px] font-bold tracking-tight text-white shadow-sm" style={{ backgroundImage: "linear-gradient(rgba(26, 24, 20, 0.44), rgba(26, 24, 20, 0.44)), url('/images/banig-badian.jpg')", backgroundPosition: "center", backgroundSize: "cover" }}>AKP</span><div><p className="text-sm font-bold tracking-wide">AKP Native Products</p><p className="mt-0.5 text-[11px] text-default-500">Gawang Pilipino · Administration System</p></div></div>
+        <div className="mb-7 flex items-center gap-3 border-b border-default-200 pb-5"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/40 text-[10px] font-bold tracking-tight text-white shadow-sm" style={{ backgroundImage: "linear-gradient(rgba(26, 24, 20, 0.44), rgba(26, 24, 20, 0.44)), url('/images/banig-badian.jpg')", backgroundPosition: "center", backgroundSize: "cover" }}>AKP</span><div><p className="text-sm font-bold tracking-wide">{storeName}</p><p className="mt-0.5 text-[11px] text-default-500">Gawang Pilipino · Administration System</p></div></div>
         {step === "password-updated" ? <div className="flex min-h-[400px] flex-col items-center justify-center text-center"><span className="flex size-14 items-center justify-center rounded-full bg-success/10 text-success"><Check size={26} /></span><h1 className="mt-5 text-xl font-bold">{title}</h1><p className="mt-2 max-w-sm text-sm leading-6 text-default-500">{description}</p><Button className="mt-7 w-full max-w-xs" variant="primary" onPress={() => go("/login")}>Back to Login</Button></div> : <>
           {step !== "login" && <button className="mb-6 inline-flex items-center gap-2 text-xs font-medium text-default-500 hover:text-foreground" onClick={() => go(step === "forgot-password" ? "/login" : step === "verify-code" ? "/forgot-password" : "/verify-code")}><ArrowLeft size={14} />{step === "verify-code" ? "Change email" : step === "reset-password" ? "Verification" : "Back to Login"}</button>}
           <h1 className="text-xl font-bold tracking-tight">{title}</h1><p className="mt-2 text-sm leading-6 text-default-500">{description}</p>

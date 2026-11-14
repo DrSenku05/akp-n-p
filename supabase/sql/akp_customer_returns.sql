@@ -1,5 +1,40 @@
--- Customer return requests. Run after akp_admin_schema.sql and akp_customer_orders.sql.
+-- Customer return requests and shared store settings.
+-- Run after akp_admin_schema.sql and akp_customer_orders.sql.
 begin;
+
+create table if not exists public.store_settings (
+  id boolean primary key default true check (id = true),
+  store_name text not null default 'AKP Native Products Trading'
+    check (char_length(btrim(store_name)) between 2 and 120),
+  currency_code text not null default 'PHP' check (currency_code = 'PHP'),
+  return_window_days integer not null default 7 check (return_window_days between 1 and 365),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists touch_updated_at on public.store_settings;
+create trigger touch_updated_at
+before update on public.store_settings
+for each row execute function app_private.touch_updated_at();
+
+alter table public.store_settings enable row level security;
+revoke all on table public.store_settings from anon, authenticated;
+grant select on public.store_settings to anon, authenticated;
+grant update on public.store_settings to authenticated;
+
+drop policy if exists "Anyone can read store settings" on public.store_settings;
+create policy "Anyone can read store settings"
+on public.store_settings for select to anon, authenticated
+using (true);
+
+drop policy if exists "Owners can update store settings" on public.store_settings;
+create policy "Owners can update store settings"
+on public.store_settings for update to authenticated
+using ((select app_private.current_admin_role()) = 'owner')
+with check ((select app_private.current_admin_role()) = 'owner');
+
+insert into public.store_settings (id, store_name, currency_code, return_window_days)
+values (true, 'AKP Native Products Trading', 'PHP', 7)
+on conflict (id) do nothing;
 
 alter table public.return_requests
   add column if not exists product_ids text[] not null default '{}';
@@ -27,6 +62,8 @@ declare
   v_uid uuid := (select auth.uid());
   v_customer_id uuid;
   v_order_status text;
+  v_delivered_at timestamptz;
+  v_return_window_days integer;
   v_product_ids text[];
   v_request_id uuid;
   v_request_number text;
@@ -52,8 +89,8 @@ begin
     into v_product_ids
   from pg_catalog.unnest(p_product_ids) as requested(product_id);
 
-  select o.customer_id, o.status
-    into v_customer_id, v_order_status
+  select o.customer_id, o.status, o.delivered_at
+    into v_customer_id, v_order_status, v_delivered_at
   from public.orders o
   join public.customers c on c.id = o.customer_id
   where o.id = p_order_id
@@ -96,6 +133,18 @@ begin
       and rr.product_ids && v_product_ids
   ) then
     raise exception 'One or more selected items already have an active return request.' using errcode = 'P0002';
+  end if;
+
+  select settings.return_window_days
+    into v_return_window_days
+  from public.store_settings settings
+  where settings.id = true;
+  if v_return_window_days is null then
+    raise exception 'Store return settings are unavailable.' using errcode = 'P0001';
+  end if;
+  if v_delivered_at is null
+    or pg_catalog.now() > v_delivered_at + pg_catalog.make_interval(days => v_return_window_days) then
+    raise exception 'The return window for this order has expired.' using errcode = 'P0002';
   end if;
 
   v_request_number := 'RET-' || pg_catalog.to_char(pg_catalog.now() at time zone 'UTC', 'YYMMDD')
