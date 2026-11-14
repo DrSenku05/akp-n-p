@@ -1,0 +1,27 @@
+Runtime libraries bundled so PostgreSQL client utilities work on Vercel
+without relying on optional system packages.
+
+Source: https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/Packages/
+
+Packages:
+- cyrus-sasl-lib-2.1.27-21.el9.x86_64
+- gmp-6.2.0-13.el9.x86_64
+- gnutls-3.8.10-9.el9.x86_64
+- keyutils-libs-1.6.3-1.el9.x86_64
+- krb5-libs-1.21.1-10.el9.x86_64
+- libcom_err-1.46.5-8.el9.x86_64
+- libffi-3.4.2-8.el9.x86_64
+- libidn2-2.3.0-7.el9.x86_64
+- libtasn1-4.16.0-10.el9.x86_64
+- libunistring-0.9.10-15.el9.x86_64
+- libxcrypt-4.4.18-3.el9.x86_64
+- libzstd-1.5.5-1.el9.x86_64
+- lz4-libs-1.9.3-5.el9.x86_64
+- ncurses-libs-6.2-12.20210508.el9.x86_64
+- nettle-3.10.1-1.el9.x86_64
+- openldap-2.6.13-1.el9.x86_64
+- openssl-libs-3.5.9-1.el9.x86_64
+- readline-8.1-4.el9.x86_64
+- zlib-1.2.11-41.el9.x86_64
+
+The associated upstream license files are in licenses/.

@@ -23,3 +23,8 @@ INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
 FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE PROVIDED HEREUNDER IS ON AN
 "AS IS" BASIS, AND THE POSTGRESQL GLOBAL DEVELOPMENT GROUP HAS NO OBLIGATIONS
 TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+The shared libraries in lib/ include runtime dependencies from the CentOS
+Stream 9 x86_64 BaseOS packages listed in DEPENDENCIES. Their upstream license
+texts are included in licenses/. Those components remain under their respective
+licenses and copyrights.
