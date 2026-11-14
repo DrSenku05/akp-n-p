@@ -208,7 +208,7 @@ create table if not exists public.backup_records (
   storage_key text,
   size_bytes bigint check (size_bytes is null or size_bytes >= 0),
   status text not null default 'queued' check (status in ('queued', 'running', 'completed', 'failed', 'restoring')),
-  created_by uuid references public.admin_users(user_id) on delete set null,
+  created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   completed_at timestamptz,
   failure_message text
