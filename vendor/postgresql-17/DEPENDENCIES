@@ -10,8 +10,11 @@ Packages:
 - keyutils-libs-1.6.3-1.el9.x86_64
 - krb5-libs-1.21.1-10.el9.x86_64
 - libcom_err-1.46.5-8.el9.x86_64
+- libevent-2.1.13-1.el9.x86_64
 - libffi-3.4.2-8.el9.x86_64
 - libidn2-2.3.0-7.el9.x86_64
+- libselinux-3.6-5.el9.x86_64
+- libsepol-3.6-3.el9.x86_64
 - libtasn1-4.16.0-10.el9.x86_64
 - libunistring-0.9.10-15.el9.x86_64
 - libxcrypt-4.4.18-3.el9.x86_64
@@ -21,6 +24,7 @@ Packages:
 - nettle-3.10.1-1.el9.x86_64
 - openldap-2.6.13-1.el9.x86_64
 - openssl-libs-3.5.9-1.el9.x86_64
+- pcre2-10.40-7.el9.x86_64
 - readline-8.1-4.el9.x86_64
 - zlib-1.2.11-41.el9.x86_64
 
