@@ -2,18 +2,13 @@ import { NextResponse, type NextRequest } from "next/server"
 import {
   acquireBackupLock,
   assertPostgresToolsAvailable,
-  BACKUP_TABLES,
   BackupError,
   createBackupClient,
-  createBackupId,
-  generateSqlBackup,
   getActiveAdmin,
-  getBackupDigest,
-  MAX_BASE64_BYTES,
-  MAX_SQL_BYTES,
   releaseBackupLock,
   requireSameOrigin,
   requireOwner,
+  saveDatabaseBackup,
 } from "@/lib/admin-database-backups"
 
 export const runtime = "nodejs"
@@ -78,46 +73,8 @@ export async function POST(request: NextRequest) {
     await client.connect()
     await acquireBackupLock(client)
     lockHeld = true
-    const sql = await generateSqlBackup(process.env.DIRECT_URL!)
-    const backupData = sql.toString("base64")
-    if (Buffer.byteLength(backupData, "utf8") > MAX_BASE64_BYTES || sql.byteLength > MAX_SQL_BYTES) {
-      throw new BackupError("The SQL dump exceeds the database backup archive limit.", 413)
-    }
-
-    const id = createBackupId()
-    const createdAt = new Date()
-    const stamp = createdAt.toISOString().replaceAll(/[-:.]/g, "")
-    const fileName = `akp-database-backup-${stamp}.sql`
-    const digest = getBackupDigest(sql)
-    await client.query("begin")
-    try {
-      const { rows } = await client.query(
-        `insert into public.database_backups
-          (id, backup_name, backup_data, file_name, file_size, sha256, format_version, schema_scope, description, metadata, created_by)
-          values ($1, $2, $3, $4, $5, $6, 1, array['public']::text[], $7,
-            jsonb_build_object('encoding', 'base64', 'dumpFormat', 'plain-sql', 'tableScope', $9::text[], 'postgresqlVersion', current_setting('server_version')),
-           $8)
-         returning id, backup_name, file_name, file_size::text, sha256, format_version, schema_scope, description, created_at`,
-        [id, backupName, backupData, fileName, sql.byteLength, digest, description || null, userId, [...BACKUP_TABLES]],
-      )
-      const { rows: savedRows } = await client.query<{ backup_data: string; file_size: string; sha256: string }>(
-        "select backup_data, file_size::text, sha256 from public.database_backups where id = $1",
-        [id],
-      )
-      const saved = savedRows[0]
-      if (!saved
-        || saved.backup_data !== backupData
-        || Number(saved.file_size) !== sql.byteLength
-        || saved.sha256 !== digest
-        || getBackupDigest(Buffer.from(saved.backup_data, "base64")) !== digest) {
-        throw new BackupError("The saved SQL backup failed integrity verification and was not retained.", 500)
-      }
-      await client.query("commit")
-      return NextResponse.json({ backup: rows[0] }, { status: 201, headers: { "Cache-Control": "no-store" } })
-    } catch (error) {
-      await client.query("rollback").catch(() => undefined)
-      throw error
-    }
+    const backup = await saveDatabaseBackup(client, { backupName, description, userId, source: "manual" })
+    return NextResponse.json({ backup }, { status: 201, headers: { "Cache-Control": "no-store" } })
   } catch (error) {
     return fail(error)
   } finally {

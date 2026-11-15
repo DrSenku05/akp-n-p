@@ -233,6 +233,53 @@ export async function releaseBackupLock(client: Client) {
   await client.query("select pg_advisory_unlock($1, $2)", [LOCK_CLASS_ID, LOCK_OBJECT_ID])
 }
 
+export async function saveDatabaseBackup(client: Client, options: { backupName: string; description: string; userId: string | null; source: "manual" | "automatic" }) {
+  const connectionString = process.env.DIRECT_URL
+  if (!connectionString) throw new BackupError("Database backup operations need DIRECT_URL configured as a server-only Vercel environment variable.", 503)
+  const sql = await generateSqlBackup(connectionString)
+  const backupData = sql.toString("base64")
+  if (Buffer.byteLength(backupData, "utf8") > MAX_BASE64_BYTES || sql.byteLength > MAX_SQL_BYTES) {
+    throw new BackupError("The SQL dump exceeds the 32 MB archive limit. Use a smaller application database backup.", 413)
+  }
+
+  const id = createBackupId()
+  const createdAt = new Date()
+  const stamp = createdAt.toISOString().replaceAll(/[-:.]/g, "")
+  const fileName = `akp-database-backup-${stamp}.sql`
+  const digest = getBackupDigest(sql)
+  await client.query("begin")
+  try {
+    const { rows } = await client.query(
+      `insert into public.database_backups
+        (id, backup_name, backup_data, file_name, file_size, sha256, format_version, schema_scope, description, metadata, created_by)
+       values ($1, $2, $3, $4, $5, $6, 1, array['public']::text[], $7,
+        jsonb_build_object('encoding', 'base64', 'dumpFormat', 'plain-sql', 'tableScope', $9::text[], 'postgresqlVersion', current_setting('server_version'), 'source', $10), $8)
+       returning id, backup_name, file_name, file_size::text, sha256, format_version, schema_scope, description, created_at`,
+      [id, options.backupName, backupData, fileName, sql.byteLength, digest, options.description || null, options.userId, [...BACKUP_TABLES], options.source],
+    )
+    const { rows: savedRows } = await client.query<{ backup_data: string; file_size: string; sha256: string }>(
+      "select backup_data, file_size::text, sha256 from public.database_backups where id = $1",
+      [id],
+    )
+    const saved = savedRows[0]
+    if (!saved || saved.backup_data !== backupData || Number(saved.file_size) !== sql.byteLength || saved.sha256 !== digest || getBackupDigest(Buffer.from(saved.backup_data, "base64")) !== digest) {
+      throw new BackupError("The saved SQL backup failed integrity verification and was not retained.", 500)
+    }
+    await client.query(
+      `delete from public.database_backups
+       where id in (select id from public.database_backups order by created_at desc, id desc offset 5)`,
+    )
+    if (options.source === "automatic") {
+      await client.query("update public.database_backup_automation set last_run_at = now(), last_error = null where id = true")
+    }
+    await client.query("commit")
+    return rows[0] as BackupMetadata
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined)
+    throw error
+  }
+}
+
 function databaseToolEnvironment(connectionString: string) {
   const url = new URL(connectionString)
   if (!["postgres:", "postgresql:"].includes(url.protocol)) {
