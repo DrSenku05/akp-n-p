@@ -225,6 +225,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
   const [bulkAction, setBulkAction] = useState("")
   const [loaded, setLoaded] = useState(false)
   const [dialog, setDialog] = useState<DialogState | null>(null)
+  const [invalidNumericFields, setInvalidNumericFields] = useState<string[]>([])
   const [productImage, setProductImage] = useState<File | null>(null)
   const [productImagePreview, setProductImagePreview] = useState("")
   const previewObjectUrl = useRef("")
