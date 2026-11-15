@@ -3,7 +3,7 @@ import "server-only"
 import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/prisma/prisma"
 
-type PreviewResult = { rows: string[][]; announcements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; unassignableOrders?: { driverId: string; orderNumber: string; customer: string }[]; error: boolean } | null
+type PreviewResult = { rows: string[][]; categories?: string[]; announcements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; unassignableOrders?: { driverId: string; orderNumber: string; customer: string }[]; error: boolean } | null
 const databaseModules = new Set(["customers", "orders", "delivery-personnel", "returns-refunds", "feedback", "payments", "promotions", "notifications", "audit-logs", "users", "backup-restore", "reports", "settings"])
 type ProductRecord = {
   sku: string
@@ -74,6 +74,12 @@ async function getAdminProducts() {
   `
 }
 
+async function getProductCategories() {
+  return prisma.$queryRaw<{ name: string }[]>`
+    select name from public.product_categories order by name
+  `
+}
+
 async function getLowStockThreshold() {
   const [settings] = await prisma.$queryRaw<{ threshold: number }[]>`
     select low_stock_threshold as threshold
@@ -88,8 +94,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
 
   try {
     if (slug === "products") {
-      const [products, threshold] = await Promise.all([getAdminProducts(), getLowStockThreshold()])
-      return { error: false, rows: products.map((p) => [p.sku, p.image_url ?? "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Active", p.visibility === "archived" ? "View · Edit · Reactivate" : "View · Edit · Archive", p.description ?? "", p.visibility, p.featured ? "Yes" : "No", p.craft_origin ?? "", p.image_url ?? ""]) }
+      const [products, threshold, categories] = await Promise.all([getAdminProducts(), getLowStockThreshold(), getProductCategories()])
+      return { error: false, categories: categories.map((category) => category.name), rows: products.map((p) => [p.sku, p.image_url ?? "—", p.name, p.category ?? "Uncategorized", money(p.price), String(p.stock), p.visibility === "archived" ? "Archived" : p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Active", p.visibility === "archived" ? "View · Edit · Reactivate" : "View · Edit · Archive", p.description ?? "", p.visibility, p.featured ? "Yes" : "No", p.craft_origin ?? "", p.image_url ?? ""]) }
     }
 
     if (slug === "inventory") {

@@ -5,5 +5,5 @@ export const dynamic = "force-dynamic"
 
 export default async function ProductsPage() {
   const preview = await getAdminDatabasePreview("products")
-  return <ModulePage slug="products" databaseRows={preview?.rows} databaseError={preview?.error} />
+  return <ModulePage slug="products" databaseRows={preview?.rows} databaseCategories={preview?.categories} databaseError={preview?.error} />
 }
