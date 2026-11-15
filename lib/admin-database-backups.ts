@@ -82,8 +82,23 @@ function preserveFunctionDependencies(sql: string) {
     .replace(/^CREATE PROCEDURE /gm, "CREATE OR REPLACE PROCEDURE ")
 }
 
+function deferAdminRoleFunction(sql: string) {
+  const definitionPattern = /^CREATE OR REPLACE FUNCTION "app_private"\."current_admin_role"\(\)[\s\S]*?^\$\$;\r?$/m
+  const definition = definitionPattern.exec(sql)?.[0]
+  const dataSection = /^-- Data for Name:/m.exec(sql)
+  if (!definition || !dataSection) {
+    throw new BackupError("The SQL backup is missing the administrator-role function or table data section.", 422)
+  }
+  const withoutDefinition = sql.replace(definitionPattern, "")
+  const remainingDataSection = /^-- Data for Name:/m.exec(withoutDefinition)
+  if (!remainingDataSection) {
+    throw new BackupError("The SQL backup is missing its table data section.", 422)
+  }
+  return `${withoutDefinition.slice(0, remainingDataSection.index)}${definition}\n\n${withoutDefinition.slice(remainingDataSection.index)}`
+}
+
 function prepareSqlRestore(sql: string) {
-  return batchInsertStatements(preserveFunctionDependencies(sql))
+  return batchInsertStatements(deferAdminRoleFunction(preserveFunctionDependencies(sql)))
     .replace(/^ALTER DEFAULT PRIVILEGES\b.*;\r?$/gm, "")
     .replace(/^\\(?:restrict|unrestrict)\s+\S+\s*$/gm, "")
 }
