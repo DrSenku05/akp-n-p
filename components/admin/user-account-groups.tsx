@@ -23,10 +23,12 @@ export default function UserAccountGroups({ rows, busy, onAction }: { rows: stri
   useEffect(() => {
     let mounted = true
     const supabase = createClient()
-    void Promise.all([supabase.auth.getUser(), supabase.from("admin_users").select("role,is_active").maybeSingle()]).then(([auth, admin]) => {
+    void supabase.auth.getUser().then(async (auth) => {
       if (!mounted) return
       setSelfId(auth.data.user?.id ?? "")
-      setCanManage(admin.data?.role === "owner" && admin.data.is_active)
+      if (!auth.data.user?.id) return
+      const { data: admin } = await supabase.from("admin_users").select("role,is_active").eq("user_id", auth.data.user.id).maybeSingle()
+      if (mounted) setCanManage(admin?.role === "owner" && admin.is_active)
     })
     return () => { mounted = false }
   }, [])
