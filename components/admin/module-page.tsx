@@ -1142,7 +1142,7 @@ function RecordDirectory({ config, rows, selectable, selectedIds, onToggle, onTo
       const details = config.columns.map((heading, columnIndex) => ({ heading, value: row[columnIndex] ?? "—", columnIndex })).filter(({ heading }) => heading !== "Actions")
       const summary = details.filter(({ heading, value, columnIndex }) => columnIndex !== titleColumn && columnIndex !== statusColumn && heading !== "Image" && value !== "—").slice(0, 2)
       const isGcashPayment = config.title === "Payment Management" && row[4]?.toLowerCase().includes("gcash") === true
-      const actions = actionColumn < 0 ? [] : (row[actionColumn] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^(view|review)$/i.test(action) && !(config.title === "Payment Management" && /^view receipt$/i.test(action)))
+      const actions = actionColumn < 0 ? [] : (row[actionColumn] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^(view|review)$/i.test(action) && !(config.title === "Payment Management" && /^(view details|view receipt)$/i.test(action)))
       const hasPaymentReceipt = isGcashPayment && Boolean(row[10])
       const dateColumn = config.columns.findIndex((column) => /date|time|sent/i.test(column))
       return <section key={`${key}-${index}`} className="rounded-xl border border-default-200 bg-content1/60">
