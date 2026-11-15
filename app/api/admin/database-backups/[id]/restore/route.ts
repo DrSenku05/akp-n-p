@@ -38,7 +38,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!sql.toString("utf8").includes("-- PostgreSQL database dump")) {
       throw new BackupError("The selected file is not a supported PostgreSQL SQL backup.", 422)
     }
-    await executeSqlRestore(client, process.env.DIRECT_URL!, sql)
+    await executeSqlRestore(client, sql)
     const afterRestoreFingerprint = await getArchiveFingerprint(client)
     if (afterRestoreFingerprint !== archiveFingerprint) {
       throw new BackupError("Restore finished, but the protected backup archive changed unexpectedly. Stop further restores and inspect the database.", 500)

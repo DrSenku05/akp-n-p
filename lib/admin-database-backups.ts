@@ -2,8 +2,7 @@ import "server-only"
 
 import { createHash, randomUUID } from "node:crypto"
 import { spawn } from "node:child_process"
-import { access, mkdtemp, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { access } from "node:fs/promises"
 import { join } from "node:path"
 import { Client } from "pg"
 import { createClient } from "@/lib/supabase/server"
@@ -81,6 +80,12 @@ function preserveFunctionDependencies(sql: string) {
     .replace(/^DROP (FUNCTION|PROCEDURE) IF EXISTS .+;\r?$/gm, "")
     .replace(/^CREATE FUNCTION /gm, "CREATE OR REPLACE FUNCTION ")
     .replace(/^CREATE PROCEDURE /gm, "CREATE OR REPLACE PROCEDURE ")
+}
+
+function prepareSqlRestore(sql: string) {
+  return batchInsertStatements(preserveFunctionDependencies(sql))
+    .replace(/^ALTER DEFAULT PRIVILEGES\b.*;\r?$/gm, "")
+    .replace(/^\\(?:restrict|unrestrict)\s+\S+\s*$/gm, "")
 }
 
 function batchInsertStatements(sql: string) {
@@ -164,14 +169,14 @@ function databaseToolEnvironment(connectionString: string) {
   }
 }
 
-function toolPath(name: "pg_dump" | "psql") {
+function toolPath(name: "pg_dump") {
   return join(process.cwd(), "vendor/postgresql-17/bin", name)
 }
 
 type ToolResult = { stdout: Buffer; stderr: string }
 
 function runTool(
-  name: "pg_dump" | "psql",
+  name: "pg_dump",
   args: string[],
   connectionString: string,
   maxOutputBytes: number,
@@ -221,9 +226,7 @@ function runTool(
         reject(new BackupError(`PostgreSQL ${name} exceeded its execution time limit.`, 504))
       } else if (code !== 0) {
         const detail = Buffer.concat(stderr).toString("utf8").trim()
-        const safeDetail = name === "psql"
-          ? detail.split(/\r?\n/).find((line) => line && !/^\s*(?:DETAIL|CONTEXT|STATEMENT|QUERY|LINE \d+):/i.test(line))?.slice(-300)
-          : detail.replace(/[\r\n]+/g, " ").slice(-1000)
+        const safeDetail = detail.replace(/[\r\n]+/g, " ").slice(-1000)
         reject(new BackupError(safeDetail ? `PostgreSQL ${name} failed: ${safeDetail}` : `PostgreSQL ${name} failed.`, 500))
       } else {
         resolve({ stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString("utf8") })
@@ -251,7 +254,7 @@ export async function generateSqlBackup(connectionString: string) {
     throw new BackupError("PostgreSQL did not return a valid plain SQL dump.", 500)
   }
 
-  const safeSql = preserveFunctionDependencies(
+  const safeSql = prepareSqlRestore(
     rawSql
       .replace(/^DROP SCHEMA IF EXISTS (?:"(public|app_private)"|(public|app_private));\r?$/gm, "")
       .replace(
@@ -383,40 +386,25 @@ async function getExternalPolicyStatements(client: Client, sql: Buffer) {
   }
 }
 
-export async function executeSqlRestore(client: Client, connectionString: string, sql: Buffer) {
-  const directory = await mkdtemp(join(tmpdir(), "akp-database-restore-"))
-  const sqlPath = join(directory, "restore.sql")
+export async function executeSqlRestore(client: Client, sql: Buffer) {
+  const policies = await getExternalPolicyStatements(client, sql)
+  const restoreSql = prepareSqlRestore(sql.toString("utf8"))
+  await client.query("begin")
   try {
-    const policies = await getExternalPolicyStatements(client, sql)
-    const dependencySafeSql = Buffer.from(
-      batchInsertStatements(preserveFunctionDependencies(sql.toString("utf8"))),
-      "utf8",
-    )
-    const restoreSql = Buffer.concat([
-      new Uint8Array(Buffer.from(`${policies.before}\n`, "utf8")),
-      new Uint8Array(dependencySafeSql),
-      new Uint8Array(Buffer.from(`\n${policies.after}\n`, "utf8")),
-    ])
-    await writeFile(sqlPath, new Uint8Array(restoreSql), { mode: 0o600, flag: "wx" })
-    await runTool("psql", [
-      "--no-psqlrc",
-      "--set=ON_ERROR_STOP=1",
-      "--single-transaction",
-      "--file",
-      sqlPath,
-    ], connectionString, 2 * 1024 * 1024, 240_000)
-  } finally {
-    await rm(directory, { recursive: true, force: true })
+    await client.query(`set local statement_timeout = '240s';\n${policies.before}\n${restoreSql}\n${policies.after}`)
+    await client.query("commit")
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined)
+    const detail = error instanceof Error ? error.message.replace(/[\r\n]+/g, " ").slice(0, 300) : ""
+    throw new BackupError(detail ? `PostgreSQL restore failed: ${detail}` : "PostgreSQL restore failed.", 500)
   }
 }
 
 export async function assertPostgresToolsAvailable() {
-  for (const name of ["pg_dump", "psql"] as const) {
-    try {
-      await access(toolPath(name))
-    } catch {
-      throw new BackupError(`The bundled PostgreSQL ${name} utility is not present in this deployment.`, 503)
-    }
+  try {
+    await access(toolPath("pg_dump"))
+  } catch {
+    throw new BackupError("The bundled PostgreSQL pg_dump utility is not present in this deployment.", 503)
   }
 }
 
