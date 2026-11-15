@@ -406,7 +406,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     previewObjectUrl.current = ""
     setProductImage(null)
     setProductImagePreview(slug === "products" ? row?.[12] || "" : "")
-    const fields = customFields ?? config.columns.filter((column) => column !== "Actions" && column !== "Status" && !(slug === "products" && column === "Image"))
+    const fields = customFields ?? config.columns.filter((column) => column !== "Actions" && column !== "Status" && !(slug === "products" && ["Image", "Product ID"].includes(column)))
     if (slug === "products" && action === "create") fields.push("New Category")
     const productValues: Record<string, string> = {
       "Product Name": row?.[2] ?? "", Description: row?.[8] ?? "",
