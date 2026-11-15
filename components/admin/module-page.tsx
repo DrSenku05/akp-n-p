@@ -971,8 +971,14 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">{storeDisplayName} · {secondary}</p><h1 className="text-2xl font-bold tracking-tight">{config.title}</h1><p className="mt-1 text-sm text-default-500">{config.subtitle}</p></div>
       <div className="flex flex-wrap gap-2">
-        {slug === "inventory" && <Button size="sm" variant="outline" onPress={() => exportRows("csv")}><Download size={15}/>Export</Button>}
-        {config.action?.toLowerCase().includes("export") && slug !== "reports" && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}><Download size={15} />{config.action}</Button>}
+        {slug === "products" && <Button size="sm" variant="outline" onPress={() => location.assign("/heritage-showcase")}>Heritage Showcase</Button>}
+        {slug === "promotions" && <><Button size="sm" variant="outline" onPress={() => triggerTopAction("Announcement")}><Plus size={15}/>Announcement</Button><Button size="sm" variant="primary" onPress={() => triggerTopAction("New Promotion")}><Plus size={15}/>New Promotion</Button></>}
+        {slug === "delivery-personnel" && <>
+          <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={autoAssignOrders}><PackagePlus size={15}/>{autoAssignBusy ? "Auto-assigning…" : "Auto-assign"}</Button>
+          <Button size="sm" variant="primary" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={openManualAssign}><Plus size={15}/>Assign</Button>
+          <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !unassignableOrders.length || autoAssignBusy} onPress={openManualUnassign}><RotateCcw size={15}/>Unassign</Button>
+        </>}
+        {config.action && !config.action.toLowerCase().includes("export") && !["reports", "promotions", "delivery-personnel"].includes(slug) && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}><Plus size={15} />{config.action}</Button>}
       </div>
     </div>
     {notice && <div role="status" className="flex items-center justify-between rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{notice}<Button size="sm" variant="ghost" onPress={() => setNotice("")}>Dismiss</Button></div>}
