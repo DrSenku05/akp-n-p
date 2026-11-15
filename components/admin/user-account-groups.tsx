@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Button, Chip, Modal } from "@heroui/react"
-import { Pencil } from "lucide-react"
+import { ChevronDown, Pencil, UserRound } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -90,22 +90,28 @@ export default function UserAccountGroups({ rows, busy, onAction }: { rows: stri
             const isSelf = Boolean(selfId && row[7] === selfId)
             const actions = (banned ? ["Unban", "Delete"] : suspended ? ["Reactivate", "Ban", "Delete"] : ["Suspend", "Ban", "Delete"])
               .filter((action) => row[7] || !["Ban", "Unban"].includes(action))
-            return <li key={row[0]} className="space-y-3 p-4">
-              <div className="flex min-w-0 items-start justify-between gap-3">
-                <div className="min-w-0"><p className="truncate text-sm font-semibold">{row[1] || "Unnamed account"}</p><p className="mt-1 break-all text-xs text-default-500">{row[2] || "—"}</p></div>
-                <Chip size="sm" variant="soft" color={banned || suspended ? "danger" : status.toLowerCase().includes("online") ? "success" : "default"}>{status}</Chip>
-              </div>
-              <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
-                <div className="min-w-0"><dt className="text-default-500">Account ID</dt><dd className="mt-0.5 break-all font-mono">{row[0]?.split(":").slice(1).join(":") || "—"}</dd></div>
-                <div><dt className="text-default-500">Phone</dt><dd className="mt-0.5">{row[3] || "—"}</dd></div>
-                <div className="sm:col-span-2"><dt className="text-default-500">Last sign in</dt><dd className="mt-0.5">{row[5] || "Never"}</dd></div>
-              </dl>
-              <div className="flex flex-wrap gap-2 border-t border-default-100 pt-3">
-                {canManage && !isSelf && row[7] && <Button size="sm" variant="outline" isDisabled={busy || editBusy} onPress={() => { setEditError(""); setLoginDraft({ email: row[2] === "—" ? "" : row[2], password: "" }); setEditRow(row) }}><Pencil size={14}/>Edit login</Button>}
-                {canManage && actions.map((action) => <Button key={action} size="sm" variant={action === "Delete" || action === "Ban" ? "danger" : action === "Reactivate" || action === "Unban" ? "primary" : "outline"} isDisabled={busy || isSelf} onPress={() => onAction(action, row)}>{action}</Button>)}
-                {isSelf && <span className="self-center text-[11px] text-default-500">Your account is protected.</span>}
-                {!canManage && !isSelf && <span className="self-center text-[11px] text-default-500">Owner access required.</span>}
-              </div>
+            return <li key={row[0]}>
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-3 transition hover:bg-default-50 focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-warning/10 text-warning"><UserRound size={15}/></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{row[1] || "Unnamed account"}</span><span className="mt-0.5 block truncate text-[11px] text-default-500">{row[2] || "—"}</span></span>
+                  <Chip size="sm" variant="soft" color={banned || suspended ? "danger" : status.toLowerCase().includes("online") ? "success" : "default"}>{status}</Chip>
+                  <ChevronDown size={15} className="shrink-0 text-default-400 transition-transform group-open:rotate-180"/>
+                </summary>
+                <div className="space-y-3 border-t border-default-100 bg-default-50/40 px-4 py-3">
+                  <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
+                    <div className="min-w-0"><dt className="text-default-500">Account ID</dt><dd className="mt-0.5 break-all font-mono">{row[0]?.split(":").slice(1).join(":") || "—"}</dd></div>
+                    <div><dt className="text-default-500">Phone</dt><dd className="mt-0.5">{row[3] || "—"}</dd></div>
+                    <div className="sm:col-span-2"><dt className="text-default-500">Last sign in</dt><dd className="mt-0.5">{row[5] || "Never"}</dd></div>
+                  </dl>
+                  <div className="flex flex-wrap gap-2 border-t border-default-200 pt-3">
+                    {canManage && !isSelf && row[7] && <Button size="sm" variant="outline" isDisabled={busy || editBusy} onPress={() => { setEditError(""); setLoginDraft({ email: row[2] === "—" ? "" : row[2], password: "" }); setEditRow(row) }}><Pencil size={14}/>Edit login</Button>}
+                    {canManage && actions.map((action) => <Button key={action} size="sm" variant={action === "Delete" || action === "Ban" ? "danger" : action === "Reactivate" || action === "Unban" ? "primary" : "outline"} isDisabled={busy || isSelf} onPress={() => onAction(action, row)}>{action}</Button>)}
+                    {isSelf && <span className="self-center text-[11px] text-default-500">Your account is protected.</span>}
+                    {!canManage && !isSelf && <span className="self-center text-[11px] text-default-500">Owner access required.</span>}
+                  </div>
+                </div>
+              </details>
             </li>
           })}
         </ul>}
