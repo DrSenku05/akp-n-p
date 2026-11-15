@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
   if (module === "products" || module === "heritage-showcase") {
     const sku = module === "products" ? row[0] : ""
-    const showcaseSku = row[6] || value("Product SKU").split(" · ")[0]
+    const showcaseSku = (module === "heritage-showcase" ? row[5] : row[6]) || value("Product SKU").split(" · ")[0]
     const selectedCategory = value("Category")
     const newCategoryName = value("New Category")
     const isNewCategory = selectedCategory === "Add new category"
@@ -53,20 +53,24 @@ export async function POST(request: NextRequest) {
       if (!showcaseSku) return fail("Product SKU is required.")
       if (action === "publish") {
         result = await supabase.from("products").update({ visibility: "published" }).eq("sku", showcaseSku).select("id")
-      } else if (action === "feature" || action === "add-to-showcase") {
+      } else if (action === "archive") {
+        result = await supabase.from("products").update({ visibility: "archived" }).eq("sku", showcaseSku).select("id")
+      } else if (action === "add-to-showcase") {
+        result = await supabase.from("products").update({
+          is_featured: true,
+          visibility: "draft",
+          ...(values["Heritage Description"] !== undefined ? { craft_origin: value("Heritage Description") || null } : {}),
+        }).eq("sku", showcaseSku).select("id")
+      } else if (action === "feature") {
         result = await supabase.from("products").update({ is_featured: true }).eq("sku", showcaseSku).select("id")
       } else if (action === "remove") {
         result = await supabase.from("products").update({ is_featured: false }).eq("sku", showcaseSku).select("id")
       } else if (action === "edit") {
-        const patch: Record<string, string | boolean | null> = {}
-        if (values.Product !== undefined) patch.name = value("Product")
-        if (values["Craft / Origin"] !== undefined) patch.craft_origin = value("Craft / Origin") || null
-        if (values.Category !== undefined) patch.category_id = category?.id ?? null
-        if (values.Visibility !== undefined) {
-          if (!["published", "draft", "archived"].includes(visibilityInput)) return fail("Choose a valid product visibility.")
-          patch.visibility = visibilityInput
+        const patch: Record<string, string | boolean | null> = {
+          visibility: "draft",
         }
-        if (values.Featured !== undefined) patch.is_featured = ["yes", "true"].includes(value("Featured").toLowerCase())
+        if (values["Heritage Description"] !== undefined) patch.craft_origin = value("Heritage Description") || null
+        if (values["Craft / Origin"] !== undefined) patch.craft_origin = value("Craft / Origin") || null
         if (!Object.keys(patch).length) return fail("No showcase changes were provided.")
         result = await supabase.from("products").update(patch).eq("sku", showcaseSku).select("id")
       } else return fail("Unsupported showcase action.")

@@ -51,18 +51,6 @@ const paymentMethodLabel = (method: string) => {
 }
 const paymentStatusLabel = (status: string) => ["verified", "paid"].includes(status.toLowerCase()) ? "Paid" : title(status)
 
-async function getDemoProducts() {
-  return prisma.$queryRaw<ProductRecord[]>`
-    select p.sku, p.name, c.name as category, p.price::text as price,
-      p.stock_quantity as stock, p.visibility,
-      p.is_featured as featured, p.craft_origin, p.description, p.image_url
-    from public.products p
-    left join public.product_categories c on c.id = p.category_id
-    where p.sku like 'AKP-ACT-%'
-    order by p.sku
-  `
-}
-
 async function getAdminProducts() {
   return prisma.$queryRaw<ProductRecord[]>`
     select p.sku, p.name, c.name as category, p.price::text as price,
@@ -288,8 +276,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "heritage-showcase") {
-      const products = await getDemoProducts()
-      return { error: false, rows: products.filter((p) => p.visibility !== "archived").map((p) => [p.name, p.craft_origin ?? "Origin not provided", p.category ?? "Uncategorized", title(p.visibility), p.featured ? "Yes" : "No", p.visibility === "draft" ? "Edit · Publish" : p.featured ? "Edit · Remove" : "Edit · Feature", p.sku]) }
+      const products = await getAdminProducts()
+      return { error: false, rows: products.map((p) => [p.name, p.craft_origin ?? "Origin not provided", title(p.visibility), p.featured ? "Yes" : "No", p.visibility === "published" ? `Edit · Archive · ${p.featured ? "Remove" : "Feature"}` : p.visibility === "archived" ? `Edit · Publish · ${p.featured ? "Remove" : "Feature"}` : `Edit · Publish · Archive · ${p.featured ? "Remove" : "Feature"}`, p.sku]) }
     }
 
     if (slug === "promotions") {
