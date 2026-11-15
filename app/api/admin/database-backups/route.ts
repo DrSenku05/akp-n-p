@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import {
   acquireBackupLock,
   assertPostgresToolsAvailable,
+  BACKUP_TABLES,
   BackupError,
   createBackupClient,
   createBackupId,
@@ -93,11 +94,11 @@ export async function POST(request: NextRequest) {
       const { rows } = await client.query(
         `insert into public.database_backups
           (id, backup_name, backup_data, file_name, file_size, sha256, format_version, schema_scope, description, metadata, created_by)
-         values ($1, $2, $3, $4, $5, $6, 1, array['public', 'app_private']::text[], $7,
-           jsonb_build_object('encoding', 'base64', 'dumpFormat', 'plain-sql', 'postgresqlVersion', current_setting('server_version')),
+          values ($1, $2, $3, $4, $5, $6, 1, array['public']::text[], $7,
+            jsonb_build_object('encoding', 'base64', 'dumpFormat', 'plain-sql', 'tableScope', $9::text[], 'postgresqlVersion', current_setting('server_version')),
            $8)
          returning id, backup_name, file_name, file_size::text, sha256, format_version, schema_scope, description, created_at`,
-        [id, backupName, backupData, fileName, sql.byteLength, digest, description || null, userId],
+        [id, backupName, backupData, fileName, sql.byteLength, digest, description || null, userId, [...BACKUP_TABLES]],
       )
       const { rows: savedRows } = await client.query<{ backup_data: string; file_size: string; sha256: string }>(
         "select backup_data, file_size::text, sha256 from public.database_backups where id = $1",

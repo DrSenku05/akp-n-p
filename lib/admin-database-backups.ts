@@ -10,13 +10,44 @@ import { createClient } from "@/lib/supabase/server"
 export const MAX_SQL_BYTES = 32 * 1024 * 1024
 export const MAX_BASE64_BYTES = 44_739_244
 export const BACKUP_SCHEMAS = ["public", "app_private"] as const
+export const BACKUP_TABLES = [
+  "announcements",
+  "feedback",
+  "inventory_movements",
+  "order_items",
+  "orders",
+  "payments",
+  "product_categories",
+  "products",
+  "promotions",
+  "return_requests",
+  "store_inventory_settings",
+  "store_payment_settings",
+  "store_settings",
+] as const
 export const BACKUP_FORMAT_VERSION = 1
 
 const LOCK_CLASS_ID = 0x414b50
 const LOCK_OBJECT_ID = 0x424b50
 const BACKUP_MARKER = "-- AKP_DATABASE_BACKUP_FORMAT=1"
-const BACKUP_SCOPE_MARKER = "-- AKP_DATABASE_BACKUP_SCHEMAS=public,app_private"
+const LEGACY_BACKUP_SCOPE_MARKER = "-- AKP_DATABASE_BACKUP_SCHEMAS=public,app_private"
+const BACKUP_TABLE_SCOPE_MARKER = `-- AKP_DATABASE_BACKUP_TABLES=${BACKUP_TABLES.join(",")}`
 const INSERT_BATCH_SIZE = 100
+const BUSINESS_DATA_DELETE_ORDER = [
+  "feedback",
+  "inventory_movements",
+  "order_items",
+  "payments",
+  "return_requests",
+  "orders",
+  "products",
+  "product_categories",
+  "announcements",
+  "promotions",
+  "store_inventory_settings",
+  "store_payment_settings",
+  "store_settings",
+] as const
 
 export type AdminRole = "owner" | "staff" | null
 export type BackupMetadata = {
@@ -75,30 +106,55 @@ export function requireSameOrigin(request: Request) {
   }
 }
 
-function preserveFunctionDependencies(sql: string) {
-  return sql
-    .replace(/^DROP (FUNCTION|PROCEDURE) IF EXISTS .+;\r?$/gm, "")
-    .replace(/^CREATE FUNCTION /gm, "CREATE OR REPLACE FUNCTION ")
-    .replace(/^CREATE PROCEDURE /gm, "CREATE OR REPLACE PROCEDURE ")
-}
+function restrictRestoreToBusinessTables(sql: string) {
+  const sectionPattern = /^-- (?:Name: |Data for Name: )/m
+  const firstSection = sectionPattern.exec(sql)
+  if (!firstSection) throw new BackupError("The SQL backup has no recognizable PostgreSQL object sections.", 422)
 
-function deferAdminRoleFunction(sql: string) {
-  const definitionPattern = /^CREATE OR REPLACE FUNCTION "app_private"\."current_admin_role"\(\)[\s\S]*?^\$\$;\r?$/m
-  const definition = definitionPattern.exec(sql)?.[0]
-  const dataSection = /^-- Data for Name:/m.exec(sql)
-  if (!definition || !dataSection) {
-    throw new BackupError("The SQL backup is missing the administrator-role function or table data section.", 422)
+  const includedTables = new Set<string>(BACKUP_TABLES)
+  const sections = sql.slice(firstSection.index).split(/(?=^-- (?:Name: |Data for Name: ))/m)
+  const declaredTables = new Set<string>()
+  const sequenceOwners = new Map<string, string>()
+  const tableDataSections = new Map<string, string>()
+  const sequenceDataSections: string[] = []
+
+  for (const section of sections) {
+    const header = section.match(/^-- (?:Data for )?Name: ([^;]+); Type: ([^;]+); Schema: public(?:;|$)/m)
+    if (!header) continue
+    const [, name, type] = header
+
+    if (type === "TABLE") declaredTables.add(name)
+    if (type === "SEQUENCE OWNED BY") {
+      const owner = section.match(/OWNED BY (?:"public"|public)\.(?:"((?:""|[^"])*)"|([A-Za-z_][\w$]*))\./)
+      if (owner) sequenceOwners.set(name, (owner[1] ?? owner[2]).replaceAll('""', '"'))
+    }
+
+    const dataHeader = section.match(/^-- Data for Name: ([^;]+); Type: TABLE DATA; Schema: public; Owner:/m)
+    if (dataHeader && includedTables.has(dataHeader[1])) {
+      tableDataSections.set(dataHeader[1], section)
+    }
+
+    const sequenceOwner = sequenceOwners.get(name)
+      ?? BACKUP_TABLES.find((table) => name.startsWith(`${table}_`))
+    if (type === "SEQUENCE SET" && sequenceOwner && includedTables.has(sequenceOwner)) {
+      sequenceDataSections.push(section)
+    }
   }
-  const withoutDefinition = sql.replace(definitionPattern, "")
-  const remainingDataSection = /^-- Data for Name:/m.exec(withoutDefinition)
-  if (!remainingDataSection) {
-    throw new BackupError("The SQL backup is missing its table data section.", 422)
+
+  if (!sql.includes(`${BACKUP_TABLE_SCOPE_MARKER}\n`)) {
+    const missingTables = BACKUP_TABLES.filter((table) => !declaredTables.has(table))
+    if (missingTables.length) {
+      throw new BackupError(`This older backup is missing required business tables: ${missingTables.join(", ")}.`, 422)
+    }
   }
-  return `${withoutDefinition.slice(0, remainingDataSection.index)}${definition}\n\n${withoutDefinition.slice(remainingDataSection.index)}`
+
+  const deleteStatements = BUSINESS_DATA_DELETE_ORDER
+    .map((table) => `DELETE FROM "public"."${table}";`)
+  return `${deleteStatements.join("\n")}\n${[...tableDataSections.values(), ...sequenceDataSections].join("")}`
 }
 
 function prepareSqlRestore(sql: string) {
-  return batchInsertStatements(deferAdminRoleFunction(preserveFunctionDependencies(sql)))
+  return batchInsertStatements(restrictRestoreToBusinessTables(sql))
     .replace(/^ALTER DEFAULT PRIVILEGES\b.*;\r?$/gm, "")
     .replace(/^\\(?:restrict|unrestrict)\s+\S+\s*$/gm, "")
 }
@@ -251,35 +307,29 @@ function runTool(
 }
 
 export async function generateSqlBackup(connectionString: string) {
+  const tableArgs = BACKUP_TABLES.flatMap((table) => [`--table=public.${table}`])
   const dump = await runTool("pg_dump", [
     "--format=plain",
-    "--clean",
-    "--if-exists",
+    "--data-only",
     "--no-owner",
     `--rows-per-insert=${INSERT_BATCH_SIZE}`,
     "--quote-all-identifiers",
-    "--schema=public",
-    "--schema=app_private",
-    "--exclude-table=public.database_backups",
-    "--exclude-table=public.backup_records",
+    ...tableArgs,
   ], connectionString, MAX_SQL_BYTES, 240_000)
 
   const rawSql = dump.stdout.toString("utf8")
   if (!rawSql.startsWith("--\n-- PostgreSQL database dump")) {
     throw new BackupError("PostgreSQL did not return a valid plain SQL dump.", 500)
   }
+  if (/no matching (?:relations|tables) were found/i.test(dump.stderr)) {
+    throw new BackupError("PostgreSQL could not find every required business table for the backup.", 500)
+  }
 
   const safeSql = prepareSqlRestore(
-    rawSql
-      .replace(/^DROP SCHEMA IF EXISTS (?:"(public|app_private)"|(public|app_private));\r?$/gm, "")
-      .replace(
-        /^CREATE SCHEMA (?:"(public|app_private)"|(public|app_private));\r?$/gm,
-        (_statement, quotedName: string | undefined, plainName: string | undefined) =>
-          `CREATE SCHEMA IF NOT EXISTS ${quotedName ?? plainName};`,
-      ),
+    `${BACKUP_TABLE_SCOPE_MARKER}\n${rawSql}`,
   )
   const sql = Buffer.from(
-    `${BACKUP_MARKER}\n${BACKUP_SCOPE_MARKER}\n-- Supabase-managed schemas and Storage object files are excluded.\n${safeSql}`,
+    `${BACKUP_MARKER}\n${BACKUP_TABLE_SCOPE_MARKER}\n-- Account, staff, customer, driver, audit, Supabase-managed, and archive data are excluded.\n${safeSql}`,
     "utf8",
   )
   if (sql.byteLength > MAX_SQL_BYTES) {
@@ -314,7 +364,7 @@ export async function readAndVerifyBackup(id: string) {
     const backup = rows[0]
     if (!backup) throw new BackupError("The selected backup was not found.", 404)
     if (backup.format_version !== BACKUP_FORMAT_VERSION
-      || backup.schema_scope.join(",") !== BACKUP_SCHEMAS.join(",")
+      || ![BACKUP_SCHEMAS.join(","), "public"].includes(backup.schema_scope.join(","))
       || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.sql$/.test(backup.file_name)
       || !/^[A-Za-z0-9+/]*={0,2}$/.test(backup.backup_data)
       || backup.backup_data.length > MAX_BASE64_BYTES) {
@@ -325,7 +375,9 @@ export async function readAndVerifyBackup(id: string) {
     if (sql.toString("base64") !== backup.backup_data
       || sql.byteLength !== Number(backup.file_size)
       || getBackupDigest(sql) !== backup.sha256
-      || !sql.toString("utf8").startsWith(`${BACKUP_MARKER}\n${BACKUP_SCOPE_MARKER}\n`)) {
+      || !sql.toString("utf8").startsWith(BACKUP_MARKER)
+      || !sql.toString("utf8").includes(`${LEGACY_BACKUP_SCOPE_MARKER}\n`)
+        && !sql.toString("utf8").includes(`${BACKUP_TABLE_SCOPE_MARKER}\n`)) {
       throw new BackupError("Backup integrity verification failed; the SQL file was not used.", 422)
     }
     return { backup, sql }

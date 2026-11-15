@@ -1,5 +1,5 @@
 -- Owner-managed SQL backup archive.
--- Backups cover application schemas only; Supabase-managed schemas and Storage objects are excluded.
+-- Backups contain business-table data only; account tables and Supabase-managed data are excluded.
 begin;
 
 create table if not exists public.database_backups (
@@ -10,7 +10,7 @@ create table if not exists public.database_backups (
   file_size bigint not null check (file_size between 1 and 33554432),
   sha256 text not null check (sha256 ~ '^[0-9a-f]{64}$'),
   format_version smallint not null default 1 check (format_version = 1),
-  schema_scope text[] not null default array['public', 'app_private']::text[],
+  schema_scope text[] not null default array['public']::text[],
   description text,
   metadata jsonb not null default '{}'::jsonb,
   created_by uuid references auth.users(id) on delete set null,
