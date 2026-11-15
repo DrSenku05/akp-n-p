@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   const action = (body.action ?? "").toLowerCase()
   const row = body.row ?? []
   const values = body.values ?? {}
-  const value = (...keys: string[]) => keys.map((key) => values[key]?.trim()).find((item) => item !== undefined) ?? ""
+  const value = (...keys: string[]) => keys.map((key) => typeof values[key] === "string" ? values[key].trim() : undefined).find((item) => item !== undefined) ?? ""
   let result: { error: { message: string } | null; data?: unknown } | null = null
 
   if (module === "products" || module === "heritage-showcase") {
@@ -242,6 +242,32 @@ export async function POST(request: NextRequest) {
     } else return fail("Only editing existing delivery personnel is supported here.")
   } else if (module === "users") {
     if (admin.role !== "owner") return fail("Only an owner can manage accounts.", 403)
+    if (action === "create") {
+      const role = value("role").toLowerCase()
+      const name = value("name")
+      const email = value("email").toLowerCase()
+      const phone = value("phone")
+      const password = typeof values.password === "string" ? values.password : ""
+      if (!(role === "owner" || role === "staff" || role === "driver")) return fail("Choose Owner/Admin, Staff, or Delivery Driver.")
+      if (!name || name.length > 120) return fail("Enter a name up to 120 characters.")
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return fail("Enter a valid email address.")
+      if (phone.length > 32) return fail("Phone numbers must be 32 characters or fewer.")
+      if (password.length < 8 || password.length > 128) return fail("Enter an initial password between 8 and 128 characters.")
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!supabaseUrl || !serviceKey) return fail("Account creation needs SUPABASE_SECRET_KEY configured in the Vercel project environment.", 503)
+      const authAdmin = createSupabaseClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } }).auth.admin
+      const { data: created, error: createError } = await authAdmin.createUser({ email, password, phone: phone || undefined, email_confirm: true, user_metadata: { full_name: name, name } })
+      if (createError || !created.user) return fail(createError?.message ?? "Supabase did not create the account.", 400)
+      const profile = role === "driver"
+        ? await supabase.from("delivery_personnel").insert({ auth_user_id: created.user.id, name, email, phone: phone || null, availability: "available" })
+        : await supabase.from("admin_users").insert({ user_id: created.user.id, display_name: name, role, is_active: true })
+      if (profile.error) {
+        const { error: cleanupError } = await authAdmin.deleteUser(created.user.id)
+        return fail(cleanupError ? `Could not save the role profile (${profile.error.message}); remove the unused Auth account ${email} in Supabase Auth.` : profile.error.message, 409)
+      }
+      return NextResponse.json({ ok: true })
+    }
     const [accountType, accountId] = (row[0] ?? "").split(":")
     if (!accountId || !/^[0-9a-f-]{36}$/i.test(accountId)) return fail("Account identifier is invalid.")
     const actionName = action.trim()
