@@ -48,6 +48,21 @@ const BUSINESS_DATA_DELETE_ORDER = [
   "store_payment_settings",
   "store_settings",
 ] as const
+const BUSINESS_DATA_RESTORE_ORDER = [
+  "announcements",
+  "product_categories",
+  "products",
+  "promotions",
+  "store_inventory_settings",
+  "store_payment_settings",
+  "store_settings",
+  "orders",
+  "feedback",
+  "inventory_movements",
+  "order_items",
+  "payments",
+  "return_requests",
+] as const
 
 export type AdminRole = "owner" | "staff" | null
 export type BackupMetadata = {
@@ -150,7 +165,10 @@ function restrictRestoreToBusinessTables(sql: string) {
 
   const deleteStatements = BUSINESS_DATA_DELETE_ORDER
     .map((table) => `DELETE FROM "public"."${table}";`)
-  return `${deleteStatements.join("\n")}\n${[...tableDataSections.values(), ...sequenceDataSections].join("")}`
+  const orderedDataSections = BUSINESS_DATA_RESTORE_ORDER
+    .map((table) => tableDataSections.get(table))
+    .filter((section): section is string => section !== undefined)
+  return `${deleteStatements.join("\n")}\n${[...orderedDataSections, ...sequenceDataSections].join("")}`
 }
 
 function prepareSqlRestore(sql: string) {
@@ -458,7 +476,14 @@ export async function executeSqlRestore(client: Client, sql: Buffer) {
   const restoreSql = prepareSqlRestore(sql.toString("utf8"))
   await client.query("begin")
   try {
-    await client.query(`set local statement_timeout = '240s';\n${policies.before}\n${restoreSql}\n${policies.after}`)
+    await client.query(`set local statement_timeout = '240s';
+      ${policies.before}
+      alter table public.inventory_movements disable trigger inventory_movements_are_immutable;
+      alter table public.inventory_movements disable trigger inventory_movement_apply_stock;
+      ${restoreSql}
+      alter table public.inventory_movements enable trigger inventory_movement_apply_stock;
+      alter table public.inventory_movements enable trigger inventory_movements_are_immutable;
+      ${policies.after}`)
     await client.query("commit")
   } catch (error) {
     await client.query("rollback").catch(() => undefined)
