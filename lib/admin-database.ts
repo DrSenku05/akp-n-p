@@ -309,8 +309,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "promotions") {
-      const promotions = await prisma.$queryRaw<{ id: string; name: string; product_name: string | null; discount_type: string; discount_value: string; ends_at: Date; status: string }[]>`
-        select promotion.id, promotion.name, product.name as product_name,
+      const promotions = await prisma.$queryRaw<{ id: string; name: string; description: string | null; product_name: string | null; discount_type: string; discount_value: string; ends_at: Date; status: string }[]>`
+        select promotion.id, promotion.name, promotion.description, product.name as product_name,
           promotion.discount_type, promotion.discount_value::text as discount_value,
           promotion.ends_at, promotion.status
         from public.promotions promotion
@@ -330,8 +330,9 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           p.discount_type === "percentage" ? `${p.discount_value}% off` : `${money(p.discount_value)} off`,
           dateLabel(p.ends_at),
           title(p.status === "active" && p.ends_at <= new Date() ? "ended" : p.status),
-          p.status === "active" && p.ends_at > new Date() ? "End" : "View",
+          p.status === "active" && p.ends_at > new Date() ? "View · End" : "View",
           p.id,
+          p.description ?? "No description provided",
         ]),
         announcements: announcements.map((a) => [a.title, title(a.audience), dateLabel(a.sent_at), "View"]),
       }

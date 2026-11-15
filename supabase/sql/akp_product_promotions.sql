@@ -31,8 +31,10 @@ create policy customers_read_sent_announcements on public.announcements
   for select to anon, authenticated
   using (status = 'sent' and audience in ('all', 'customers'));
 
-create or replace function public.create_product_promotion(
+drop function if exists public.create_product_promotion(text, text, numeric, timestamptz);
+create function public.create_product_promotion(
   p_name text,
+  p_description text,
   p_product_sku text,
   p_discount_percent numeric,
   p_ends_at timestamptz
@@ -53,6 +55,9 @@ begin
   end if;
   if nullif(trim(p_name), '') is null or length(trim(p_name)) > 120 then
     raise exception 'Enter a promotion name of up to 120 characters.' using errcode = '22023';
+  end if;
+  if nullif(trim(p_description), '') is null or length(trim(p_description)) > 1000 then
+    raise exception 'Enter a promotion description of up to 1,000 characters.' using errcode = '22023';
   end if;
   if p_discount_percent is null or p_discount_percent <= 0 or p_discount_percent >= 100 then
     raise exception 'Discount must be greater than 0%% and less than 100%%.' using errcode = '22023';
@@ -83,15 +88,15 @@ begin
   if v_discounted_price <= 0 then
     raise exception 'This discount would make the product price zero.' using errcode = '22023';
   end if;
-  v_message := format('%s is %s%% off until %s.',
+  v_message := concat_ws(E'\n\n', trim(p_description), format('%s is %s%% off until %s.',
     v_product.name, trim(to_char(p_discount_percent, 'FM990.99')),
-    to_char(p_ends_at at time zone 'Asia/Manila', 'Mon DD, YYYY'));
+    to_char(p_ends_at at time zone 'Asia/Manila', 'Mon DD, YYYY')));
 
   insert into public.promotions (
     name, description, product_id, discount_type, discount_value,
     starts_at, ends_at, status, created_by
   ) values (
-    trim(p_name), v_message, v_product.id, 'percentage', p_discount_percent,
+    trim(p_name), trim(p_description), v_product.id, 'percentage', p_discount_percent,
     now(), p_ends_at, 'active', v_uid
   ) returning id into v_promotion_id;
 
@@ -102,7 +107,7 @@ begin
 end
 $$;
 
-revoke all on function public.create_product_promotion(text, text, numeric, timestamptz) from public, anon;
-grant execute on function public.create_product_promotion(text, text, numeric, timestamptz) to authenticated;
+revoke all on function public.create_product_promotion(text, text, text, numeric, timestamptz) from public, anon;
+grant execute on function public.create_product_promotion(text, text, text, numeric, timestamptz) to authenticated;
 
 commit;

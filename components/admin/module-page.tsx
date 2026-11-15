@@ -484,6 +484,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
         if (row[4]?.toLowerCase().includes("gcash")) extraFields.push(["GCash transaction reference", row[5] || "Not provided"], ["Receipt screenshot", row[10] ? "Attached · previewed in the expanded payment details" : "Not attached"])
         extraFields.push(["Verification rule", row[4]?.toLowerCase().includes("gcash") ? "Compare the exact amount and reference against the incoming transaction in the platform's GCash account. A reference or screenshot alone is not confirmation." : "Mark paid only after cash has physically been collected."])
       }
+      if (slug === "promotions") extraFields.push(["Description", row[7] || "No description provided"])
       if (slug === "products") extraFields.push(["Description", row[8] || "No description provided"], ["Visibility", row[9] || "—"], ["Featured", row[10] || "No"], ["Craft / Origin", row[11] || "Not provided"], ["Image URL", row[12] || "No image uploaded"])
       setDialog({ title: `${action}: ${row[0]}`, kind: "view", row, fields: table === "announcements" ? ["Title", "Target", "Sent"] : config.columns.filter((column) => column !== "Actions" && !(slug === "payments" && !row[4]?.toLowerCase().includes("gcash") && column === "GCash Reference")), extraFields })
       return
@@ -792,7 +793,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
   const triggerTopAction = (action: string) => {
     if (action.toLowerCase().includes("export")) { exportRows(); return }
     if (["Announcement", "New Announcement", "Send Notification"].includes(action)) { openForm(action, undefined, undefined, action, ["Title", "Target", "Message"]); return }
-    if (slug === "promotions" && action === "New Promotion") { openForm(action, undefined, undefined, "create", ["Promo Name", "Promotion Product", "Discount (%)", "Valid Until"]); return }
+    if (slug === "promotions" && action === "New Promotion") { openForm(action, undefined, undefined, "create", ["Promo Name", "Promotion Description", "Promotion Product", "Discount (%)", "Valid Until"]); return }
     if (slug === "heritage-showcase" && action === "Add to Showcase") { openForm(action, undefined, undefined, action, ["Product SKU", "Craft / Origin", "Heritage Description"]); return }
     if (action === "Record Movement") { openForm(action, undefined, undefined, action, ["Product", "Movement Type", "Quantity", "Correction Direction", "Reason"]); return }
     openForm(action, undefined, undefined, action)

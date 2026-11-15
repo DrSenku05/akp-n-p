@@ -321,16 +321,18 @@ export async function POST(request: NextRequest) {
   } else if (module === "promotions") {
     if (action === "create") {
       const promoName = value("Promo Name")
+      const description = value("Promotion Description")
       const productSku = value("Promotion Product").split(" · ")[0]
       const discountInput = value("Discount (%)")
       const discount = Number(discountInput)
       const endDate = value("Valid Until")
-      if (!promoName || promoName.length > 120 || !productSku || !/^\d{1,2}(?:\.\d{1,2})?$/.test(discountInput) || !Number.isFinite(discount) || discount <= 0 || discount >= 100) return fail("Enter a name, published product, and percentage from 0.01 to 99.99.")
+      if (!promoName || promoName.length > 120 || !description.trim() || description.length > 1000 || !productSku || !/^\d{1,2}(?:\.\d{1,2})?$/.test(discountInput) || !Number.isFinite(discount) || discount <= 0 || discount >= 100) return fail("Enter a name, description (up to 1,000 characters), published product, and percentage from 0.01 to 99.99.")
       if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return fail("Choose a valid promotion end date.")
       const ends = new Date(`${endDate}T23:59:59+08:00`)
       if (!Number.isFinite(ends.getTime()) || ends.toISOString().slice(0, 10) !== endDate || ends <= new Date()) return fail("Choose a valid future end date.")
       const { error } = await supabase.rpc("create_product_promotion", {
         p_name: promoName,
+        p_description: description,
         p_product_sku: productSku,
         p_discount_percent: discount,
         p_ends_at: ends.toISOString(),
