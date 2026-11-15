@@ -75,6 +75,13 @@ export function requireSameOrigin(request: Request) {
   }
 }
 
+function preserveFunctionDependencies(sql: string) {
+  return sql
+    .replace(/^DROP (FUNCTION|PROCEDURE) IF EXISTS .+;\r?$/gm, "")
+    .replace(/^CREATE FUNCTION /gm, "CREATE OR REPLACE FUNCTION ")
+    .replace(/^CREATE PROCEDURE /gm, "CREATE OR REPLACE PROCEDURE ")
+}
+
 export function createBackupClient() {
   const connectionString = process.env.DIRECT_URL
   if (!connectionString) {
@@ -212,18 +219,15 @@ export async function generateSqlBackup(connectionString: string) {
     throw new BackupError("PostgreSQL did not return a valid plain SQL dump.", 500)
   }
 
-  const safeSql = rawSql
-    .replace(/^DROP SCHEMA IF EXISTS (?:"(public|app_private)"|(public|app_private));\r?$/gm, "")
-    .replace(
-      /^CREATE SCHEMA (?:"(public|app_private)"|(public|app_private));\r?$/gm,
-      (_statement, quotedName: string | undefined, plainName: string | undefined) =>
-        `CREATE SCHEMA IF NOT EXISTS ${quotedName ?? plainName};`,
-    )
-    .replace(/^DROP FUNCTION IF EXISTS (?:"app_private"|app_private)\.(?:"current_admin_role"|current_admin_role)\(\);\r?$/gm, "")
-    .replace(
-      /^CREATE FUNCTION ("app_private"|app_private)\.("current_admin_role"|current_admin_role)\(/gm,
-      "CREATE OR REPLACE FUNCTION $1.$2(",
-    )
+  const safeSql = preserveFunctionDependencies(
+    rawSql
+      .replace(/^DROP SCHEMA IF EXISTS (?:"(public|app_private)"|(public|app_private));\r?$/gm, "")
+      .replace(
+        /^CREATE SCHEMA (?:"(public|app_private)"|(public|app_private));\r?$/gm,
+        (_statement, quotedName: string | undefined, plainName: string | undefined) =>
+          `CREATE SCHEMA IF NOT EXISTS ${quotedName ?? plainName};`,
+      ),
+  )
   const sql = Buffer.from(
     `${BACKUP_MARKER}\n${BACKUP_SCOPE_MARKER}\n-- Supabase-managed schemas and Storage object files are excluded.\n${safeSql}`,
     "utf8",
@@ -352,9 +356,10 @@ export async function executeSqlRestore(client: Client, connectionString: string
   const sqlPath = join(directory, "restore.sql")
   try {
     const policies = await getExternalPolicyStatements(client, sql)
+    const dependencySafeSql = Buffer.from(preserveFunctionDependencies(sql.toString("utf8")), "utf8")
     const restoreSql = Buffer.concat([
       new Uint8Array(Buffer.from(`${policies.before}\n`, "utf8")),
-      new Uint8Array(sql),
+      new Uint8Array(dependencySafeSql),
       new Uint8Array(Buffer.from(`\n${policies.after}\n`, "utf8")),
     ])
     await writeFile(sqlPath, new Uint8Array(restoreSql), { mode: 0o600, flag: "wx" })
