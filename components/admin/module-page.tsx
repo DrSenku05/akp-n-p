@@ -451,9 +451,12 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       if (slug === "customers") extraFields.push(["Saved addresses", row[9] || "No saved addresses"], ["Order history", "See linked transactions in Order Management."], ["Feedback", "See verified reviews in Customer Feedback."])
       if (slug === "returns-refunds" && decisionNotes[row[0]]) extraFields.push(["Decision notes", decisionNotes[row[0]]])
       if (slug === "orders") extraFields.push(["Delivery address", row[10] || "Pickup at store / no address provided"], ["Ordered products", row[11] || "No item details available"], ["GCash reference", row[12] || "Not applicable"])
-      if (slug === "payments") extraFields.push(["GCash transaction reference", row[5] || "Not provided"], ["Receipt screenshot", row[10] ? "Attached · use View Receipt to open the private image" : "Not attached"], ["Verification rule", row[4] === "Online payment (GCash)" ? "Compare the exact amount and reference against the incoming transaction in the platform's GCash account. A reference or screenshot alone is not confirmation." : "Mark paid only after cash has physically been collected."])
+      if (slug === "payments") {
+        if (row[4]?.toLowerCase().includes("gcash")) extraFields.push(["GCash transaction reference", row[5] || "Not provided"], ["Receipt screenshot", row[10] ? "Attached · previewed in the expanded payment details" : "Not attached"])
+        extraFields.push(["Verification rule", row[4]?.toLowerCase().includes("gcash") ? "Compare the exact amount and reference against the incoming transaction in the platform's GCash account. A reference or screenshot alone is not confirmation." : "Mark paid only after cash has physically been collected."])
+      }
       if (slug === "products") extraFields.push(["Description", row[8] || "No description provided"], ["Visibility", row[9] || "—"], ["Featured", row[10] || "No"], ["Craft / Origin", row[11] || "Not provided"], ["Image URL", row[12] || "No image uploaded"])
-      setDialog({ title: `${action}: ${row[0]}`, kind: "view", row, fields: table === "announcements" ? ["Title", "Target", "Sent"] : config.columns.filter((column) => column !== "Actions"), extraFields })
+      setDialog({ title: `${action}: ${row[0]}`, kind: "view", row, fields: table === "announcements" ? ["Title", "Target", "Sent"] : config.columns.filter((column) => column !== "Actions" && !(slug === "payments" && !row[4]?.toLowerCase().includes("gcash") && column === "GCash Reference")), extraFields })
       return
     }
     if (lower === "download") {
@@ -1138,8 +1141,9 @@ function RecordDirectory({ config, rows, selectable, selectedIds, onToggle, onTo
       const status = statusColumn >= 0 ? row[statusColumn] : ""
       const details = config.columns.map((heading, columnIndex) => ({ heading, value: row[columnIndex] ?? "—", columnIndex })).filter(({ heading }) => heading !== "Actions")
       const summary = details.filter(({ heading, value, columnIndex }) => columnIndex !== titleColumn && columnIndex !== statusColumn && heading !== "Image" && value !== "—").slice(0, 2)
-      const actions = actionColumn < 0 ? [] : (row[actionColumn] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^(view|review)$/i.test(action))
-      const hasPaymentReceipt = config.title === "Payment Management" && Boolean(row[10])
+      const isGcashPayment = config.title === "Payment Management" && row[4]?.toLowerCase().includes("gcash") === true
+      const actions = actionColumn < 0 ? [] : (row[actionColumn] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^(view|review)$/i.test(action) && !(config.title === "Payment Management" && /^view receipt$/i.test(action)))
+      const hasPaymentReceipt = isGcashPayment && Boolean(row[10])
       const dateColumn = config.columns.findIndex((column) => /date|time|sent/i.test(column))
       return <section key={`${key}-${index}`} className="rounded-xl border border-default-200 bg-content1/60">
         <div className="flex items-center gap-2 px-2 sm:px-3">
@@ -1154,7 +1158,15 @@ function RecordDirectory({ config, rows, selectable, selectedIds, onToggle, onTo
         </div>
         <div id={panelId} aria-hidden={!expanded} inert={!expanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
           <div className="min-h-0 overflow-hidden"><div className="space-y-4 border-t border-default-200 p-3 sm:p-4">
-            {config.title === "Customer Feedback Management" ? <>
+            {config.title === "Payment Management" ? <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {details.filter(({ heading }) => heading !== "GCash Reference").map(({ heading, value }) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">{heading}</p><p className="mt-1 whitespace-pre-wrap break-words text-xs font-medium">{value}</p></div>)}
+              </div>
+              {isGcashPayment && <section aria-label="GCash payment proof" className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
+                <div className="border-b border-dashed border-default-300 px-4 py-3"><p className="text-xs font-semibold">GCash reference</p><p className="mt-1 break-all text-sm">{row[5] && row[5] !== "—" ? row[5] : "Not provided"}</p></div>
+                {hasPaymentReceipt ? <div className="space-y-2 p-3"><p className="text-xs font-semibold">Customer payment receipt</p><Image src={`/api/admin/payment-proof?path=${encodeURIComponent(row[10])}`} alt={`Customer receipt for order ${row[1]}`} width={1200} height={900} unoptimized className="max-h-[36rem] w-auto max-w-full rounded-lg border border-default-200 object-contain"/><a href={`/api/admin/payment-proof?path=${encodeURIComponent(row[10])}`} target="_blank" rel="noreferrer" className="inline-flex text-xs font-medium text-accent hover:underline">Open full receipt</a></div> : <p className="px-4 py-4 text-xs text-default-500">No receipt image was attached by the customer.</p>}
+              </section>}
+            </> : config.title === "Customer Feedback Management" ? <>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {details.filter(({ heading }) => !["Rating", "Comment"].includes(heading)).map(({ heading, value }) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">{heading}</p><p className="mt-1 whitespace-pre-wrap break-words text-xs font-medium">{value}</p></div>)}
               </div>
@@ -1169,7 +1181,6 @@ function RecordDirectory({ config, rows, selectable, selectedIds, onToggle, onTo
             </> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {details.map(({ heading, value }) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">{heading}</p>{heading === "Image" && /^(https?:\/\/|\/)/i.test(value) ? <Image src={value} alt={`${row[titleColumn] || "Record"} image`} width={240} height={160} unoptimized className="mt-2 max-h-40 w-auto max-w-full rounded-md border border-default-200 object-cover" /> : heading === "Image" ? <p className="mt-1 text-xs text-default-500">No image uploaded</p> : /^(status|payment status|order status|availability|visibility)$/i.test(heading) ? <div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(value)}>{value}</Chip></div> : <p className="mt-1 whitespace-pre-wrap break-words text-xs font-medium">{value}</p>}</div>)}
             </div>}
-            {hasPaymentReceipt && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default-200 p-3"><div><p className="text-xs font-semibold">Customer payment evidence</p><p className="mt-1 text-[11px] text-default-500">A screenshot was attached. Verify the transfer in GCash before confirming.</p></div><Button size="sm" variant="outline" onPress={() => onAction?.("View Receipt", row, index)}><Eye size={14} />View receipt</Button></div>}
             {actions.length > 0 && <div className="flex flex-wrap justify-end gap-1 border-t border-default-100 pt-3">{actions.filter((action) => !(hasPaymentReceipt && /^view receipt$/i.test(action))).map((action) => <Button key={action} size="sm" variant={action.toLowerCase().includes("reject") || action.toLowerCase().includes("remove") || action.toLowerCase().includes("delete") ? "ghost" : "outline"} className={action.toLowerCase().includes("reject") || action.toLowerCase().includes("remove") || action.toLowerCase().includes("delete") ? "text-danger" : ""} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}</div>}
           </div></div>
         </div>
