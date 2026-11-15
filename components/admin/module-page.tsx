@@ -407,6 +407,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
     setProductImage(null)
     setProductImagePreview(slug === "products" ? row?.[12] || "" : "")
     const fields = customFields ?? config.columns.filter((column) => column !== "Actions" && column !== "Status" && !(slug === "products" && column === "Image"))
+    if (slug === "products" && action === "create") fields.push("New Category")
     const productValues: Record<string, string> = {
       "Product Name": row?.[2] ?? "", Description: row?.[8] ?? "",
       Category: row?.[3] ?? "", Price: (row?.[4] ?? "").replace(/^₱/, ""),
@@ -1479,4 +1480,3 @@ function defaultRowAction(slug: string) {
   if (slug === "promotions") return "Edit · End"
   return "View · Edit"
 }
-    if (slug === "products" && action === "create") fields.push("New Category")
