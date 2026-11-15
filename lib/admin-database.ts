@@ -339,11 +339,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "notifications") {
-      const announcements = await prisma.$queryRaw<{ id: string; title: string; message: string; audience: string; status: string; sent_at: Date | null }[]>`
-        select id, title, message, audience, status, sent_at
-        from public.announcements where title not like 'DEMO:%' order by created_at desc
-      `
-      return { error: false, rows: announcements.map((a) => [a.title, title(a.audience), a.message, dateLabel(a.sent_at), title(a.status), "View", a.id, a.audience]) }
+      return { error: false, rows: [] }
     }
 
     if (slug === "audit-logs") {

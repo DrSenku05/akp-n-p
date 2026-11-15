@@ -1,11 +1,12 @@
 "use client"
-import { Bell, LoaderCircle, Menu, Search } from "lucide-react"
+import { LoaderCircle, Menu, Search } from "lucide-react"
 import { Button } from "@heroui/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { ThemeSwitch } from "../theme-switch"
 import { createClient } from "@/lib/supabase/client"
+import { AdminNotificationBell } from "@/components/admin/admin-notifications"
 const searchablePages: [string, string][] = [["order", "/orders"], ["inventory", "/inventory"], ["stock", "/inventory"], ["delivery", "/delivery-personnel"], ["return", "/returns-refunds"], ["refund", "/returns-refunds"], ["customer", "/customers"], ["feedback", "/feedback"], ["payment", "/payments"], ["product", "/products"], ["heritage", "/heritage-showcase"], ["promotion", "/promotions"], ["notification", "/notifications"], ["report", "/reports"], ["audit", "/audit-logs"], ["backup", "/backup-restore"], ["user", "/users"], ["setting", "/settings"]]
 
 export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () => void; inert?: boolean }) {
@@ -75,7 +76,7 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
       {message && <p role="status" className="absolute right-40 top-full mt-1 rounded-lg border border-default-200 bg-content1 px-3 py-2 text-xs text-foreground shadow-lg">{message}</p>}
     </div>
     <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-      <Link href="/notifications" aria-label="Notifications" className="flex size-9 items-center justify-center rounded-lg text-stone-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-300"><Bell size={17} strokeWidth={1.8} /></Link>
+      <AdminNotificationBell />
       <ThemeSwitch className="text-stone-100" />
       <div className="hidden items-center gap-2.5 border-l border-white/15 pl-3 sm:flex">
         <span className="flex size-8 items-center justify-center rounded-full border border-white/15 bg-white/[0.07] text-xs font-semibold text-amber-100">{profile.name.slice(0, 1).toUpperCase()}</span>

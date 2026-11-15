@@ -39,9 +39,9 @@ const sections = [
     { label: "Products", href: "/products", icon: Package },
     { label: "Heritage Showcase", href: "/heritage-showcase", icon: Archive },
     { label: "Promotions", href: "/promotions", icon: Shapes },
-    { label: "Announcements", href: "/notifications", icon: Bell },
   ] },
   { label: "System", href: "/reports", icon: Settings2, links: [
+    { label: "Notifications", href: "/notifications", icon: Bell },
     { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "Audit Logs", href: "/audit-logs", icon: ClipboardList },
     { label: "Backup & Restore", href: "/backup-restore", icon: Archive },
