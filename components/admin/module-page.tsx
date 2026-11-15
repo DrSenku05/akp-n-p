@@ -210,7 +210,6 @@ function reportSql(data: ReportData) {
   return `-- AKP generated report export: normalized report metadata and fact values\n-- Run in PostgreSQL. Export tables are temporary and scoped to this database session.\nBEGIN;\nCREATE TEMP TABLE akp_report_metadata (report_id text PRIMARY KEY, title text NOT NULL, period_from date NOT NULL, period_to date NOT NULL, time_zone text NOT NULL, scope text NOT NULL) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_dimension_definitions (dimension_key text PRIMARY KEY, label text NOT NULL) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_measure_definitions (measure_key text PRIMARY KEY, label text NOT NULL, value_format text NOT NULL) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_records (record_no integer PRIMARY KEY) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_dimension_values (record_no integer NOT NULL REFERENCES akp_report_records(record_no), dimension_key text NOT NULL REFERENCES akp_report_dimension_definitions(dimension_key), value text NOT NULL, PRIMARY KEY (record_no, dimension_key)) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_measure_values (record_no integer NOT NULL REFERENCES akp_report_records(record_no), measure_key text NOT NULL REFERENCES akp_report_measure_definitions(measure_key), value numeric, PRIMARY KEY (record_no, measure_key)) ON COMMIT PRESERVE ROWS;\n${metadata}${inserts("akp_report_dimension_definitions", "dimension_key, label", dimensionDefs)}${inserts("akp_report_measure_definitions", "measure_key, label, value_format", measureDefs)}${inserts("akp_report_records", "record_no", data.records.map((_, index) => `(${index + 1})`))}${inserts("akp_report_dimension_values", "record_no, dimension_key, value", rows.flatMap((row) => row.dimensionValues))}${inserts("akp_report_measure_values", "record_no, measure_key, value", rows.flatMap((row) => row.measureValues))}COMMIT;\n`
 }
 
-
 export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnouncements, assignableOrders = [], unassignableOrders = [], databaseError = false }: { slug: string; databaseRows?: string[][]; databaseAnnouncements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; unassignableOrders?: { driverId: string; orderNumber: string; customer: string }[]; databaseError?: boolean }) {
   const router = useRouter()
   const slug = slugAliases[rawSlug] ?? rawSlug
@@ -591,6 +590,10 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseAnnoun
       }
     }
     if (dialog.kind === "form") {
+      if (invalidNumericFields.length) {
+        setNotice(`Correct the highlighted numeric field${invalidNumericFields.length === 1 ? "" : "s"} before saving.`)
+        return
+      }
       const fields = [...Object.keys(dialog.values ?? {}), ...(uploadedImageUrl ? ["Image URL"] : [])]
       if (["Announcement", "New Announcement", "Send Notification"].includes(dialog.action ?? "")) {
         const values = dialog.values ?? {}
@@ -1412,7 +1415,14 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
   </div>
 }
 
-function DialogField({ field, value, onChange, choicesOverride }: { field: string; value: string; onChange: (value: string) => void; choicesOverride?: string[] }) {
+function numericFieldKind(field: string): "integer" | "decimal" | null {
+  const name = field.toLowerCase()
+  if (["quantity", "stock", "reorder", "phone", "contact", "account number"].some((term) => name.includes(term))) return "integer"
+  if (["price", "amount", "discount", "latitude", "longitude"].some((term) => name.includes(term))) return "decimal"
+  return null
+}
+
+function DialogField({ field, value, onChange, choicesOverride, invalid, onValidityChange }: { field: string; value: string; onChange: (value: string) => void; choicesOverride?: string[]; invalid?: boolean; onValidityChange?: (invalid: boolean) => void }) {
   const options: Record<string, string[]> = {
     "Movement Type": ["Stock in (restock)", "Stock out (sale)", "Damage"],
     Category: ["Native Materials", "Bags", "Baskets", "Home Decor", "Accessories", "Headwear", "Add new category"],
@@ -1424,9 +1434,12 @@ function DialogField({ field, value, onChange, choicesOverride }: { field: strin
     "Assigned Orders": ["#ORD-0041"],
   }
   const choices = choicesOverride ?? options[field]
+  const numberKind = numericFieldKind(field)
   const multiline = ["message", "reason", "address", "description", "comment", "note"].some((term) => field.toLowerCase().includes(term))
-  const numeric = ["quantity", "stock", "reorder"].some((term) => field.toLowerCase().includes(term))
-  return <label className="block space-y-1 text-xs font-medium">{field}{choices ? <select aria-label={field} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose {field.toLowerCase()}</option>{choices.map((choice) => <option key={choice}>{choice}</option>)}</select> : multiline ? <textarea aria-label={field} className="min-h-20 w-full rounded-md border border-default-200 bg-background p-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)} /> : <input aria-label={field} type={numeric ? "number" : "text"} min={numeric ? "0" : undefined} step={numeric ? "any" : undefined} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)} />}</label>
+  const currencyAmount = field.toLowerCase().includes("amount")
+  const numeric = ["quantity", "stock", "reorder"].some((term) => field.toLowerCase().includes(term)) || currencyAmount
+  const numericPattern = numberKind === "integer" ? /^\d*$/ : /^\d*(?:\.\d*)?$/
+  return <label className="block space-y-1 text-xs font-medium">{field}{choices ? <select aria-label={field} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose {field.toLowerCase()}</option>{choices.map((choice) => <option key={choice}>{choice}</option>)}</select> : multiline ? <textarea aria-label={field} className="min-h-20 w-full rounded-md border border-default-200 bg-background p-3 text-sm font-normal" value={value} onChange={(event) => onChange(event.target.value)} /> : <input aria-label={field} type="text" inputMode={numberKind ? numberKind === "decimal" ? "decimal" : "numeric" : undefined} min={numeric ? currencyAmount ? "0.01" : "0" : undefined} step={numeric ? currencyAmount ? "0.01" : "any" : undefined} aria-invalid={invalid || undefined} className={`h-10 w-full rounded-md border bg-background px-3 text-sm font-normal ${invalid ? "border-danger text-danger focus:border-danger" : "border-default-200"}`} value={value} onChange={(event) => { const next = event.target.value; if (numberKind) onValidityChange?.(next.length > 0 && !numericPattern.test(next)); onChange(next) }} />}{invalid && <span className="block text-[11px] font-normal text-danger">Enter numbers only.</span>}</label>
 }
 
 function isDestructive(action?: string) {
