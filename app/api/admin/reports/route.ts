@@ -96,13 +96,8 @@ export async function GET(request: NextRequest) {
       measures = [{ key: "verifiedTransactions", label: "Verified Transactions", format: "count" }, { key: "revenuePHP", label: "Revenue (PHP)", format: "currency" }]
       records = data.map((item) => ({ dimensions: { date: item.day }, measures: { verifiedTransactions: item.transactions, revenuePHP: item.total } }))
     } else if (report === "inventory") {
-      const data = await prisma.$queryRaw<{ product_id: string; sku: string; product: string; stock: number; reorder_level: number; status: string; movements: number }[]>`
-        select p.id::text as product_id, p.sku, p.name, p.stock_quantity as stock, p.reorder_level,
-          case
-            when p.stock_quantity = 0 then 'Out of Stock'
-            when p.stock_quantity <= coalesce((select low_stock_threshold from public.store_inventory_settings where id = true), 10) then 'Low Stock'
-            else 'Normal'
-          end as status,
+      const data = await prisma.$queryRaw<{ product_id: string; sku: string; product: string; stock: number; movements: number }[]>`
+        select p.id::text as product_id, p.sku, p.name, p.stock_quantity as stock,
           count(im.id)::int as movements
         from public.products p
         left join public.inventory_movements im on im.product_id = p.id
@@ -112,10 +107,10 @@ export async function GET(request: NextRequest) {
         group by p.id
         order by p.name, p.sku
       `
-      dimensions = [{ key: "productId", label: "Product", attributes: [{ key: "sku", label: "SKU" }] }, { key: "stockStatus", label: "Stock Status" }]
+      dimensions = [{ key: "productId", label: "Product", attributes: [{ key: "sku", label: "SKU" }] }]
       dimensionMembers = { productId: data.map((item) => ({ id: item.product_id, label: item.product, attributes: { sku: item.sku } })) }
-      measures = [{ key: "currentStock", label: "Current Stock", format: "number" }, { key: "reorderLevel", label: "Reorder Level", format: "number" }, { key: "movementsInPeriod", label: "Movements in Period", format: "count" }]
-      records = data.map((item) => ({ dimensions: { productId: item.product_id, stockStatus: item.status }, measures: { currentStock: item.stock, reorderLevel: item.reorder_level, movementsInPeriod: item.movements } }))
+      measures = [{ key: "currentStock", label: "Current Stock", format: "number" }, { key: "movementsInPeriod", label: "Movements in Period", format: "count" }]
+      records = data.map((item) => ({ dimensions: { productId: item.product_id }, measures: { currentStock: item.stock, movementsInPeriod: item.movements } }))
     } else if (report === "orders") {
       const data = await prisma.$queryRaw<{ status: string; fulfillment: string; orders: number; total: string }[]>`
         select o.status, o.fulfillment_method as fulfillment,
