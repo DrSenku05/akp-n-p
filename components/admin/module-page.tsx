@@ -1219,7 +1219,7 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
       </button>
       <div id={customerPanelId} aria-hidden={!customerExpanded} inert={!customerExpanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${customerExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
         <div className="min-h-0 overflow-hidden">
-        <div className="space-y-2 border-t border-default-200 p-3 sm:p-4">
+        <div className="max-h-80 space-y-2 overflow-y-auto overscroll-contain border-t border-default-200 p-3 pr-2 sm:p-4 sm:pr-3">
         {group.orders.map(({ row, index }) => {
           const orderExpanded = expandedOrders.has(row[0])
           const orderPanelId = `order-details-${encodeURIComponent(row[0])}`
