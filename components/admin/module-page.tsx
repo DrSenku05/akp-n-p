@@ -1090,8 +1090,37 @@ function DataTable({ config, rows, compact = false, selectable = false, selected
   if (config.title === "Order Management") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
   if (config.title === "Inventory Management") return <InventoryDirectory config={config} rows={rows} onAction={onAction} />
   if (config.title === "Delivery Personnel Management") return <PersonnelDirectory config={config} rows={rows} onAction={onAction} />
+  if (config.title === "Customer Management") return <CustomerDirectory rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onToggleAll={onToggleAll} onAction={onAction} />
   return <RecordDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onToggleAll={onToggleAll} onAction={onAction} />
 }
+
+function CustomerDirectory({ rows, selectable, selectedIds, onToggle, onToggleAll, onAction }: { rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
+  if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No customers found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
+  return <div className="space-y-3">
+    {selectable && <label className="flex items-center gap-2 px-1 text-xs text-default-500"><input aria-label="Select all visible customers" type="checkbox" checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row[0]))} onChange={(event) => onToggleAll?.(event.target.checked)} className="size-4 accent-[#315f43]" />Select all visible customers</label>}
+    <div className="overflow-x-auto rounded-lg border border-default-200">
+      <table className="w-full min-w-[920px] table-auto text-left text-xs">
+        <thead className="bg-default-50 text-default-500"><tr>{selectable && <th className="w-10 px-3 py-3"/>}{["Customer", "Phone", "Email", "Total Orders", "Total Spent", "Status", "Action"].map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead>
+        <tbody>{rows.map((row, index) => {
+          const suspended = row[6]?.toLowerCase() === "suspended"
+          const action = suspended ? "Reactivate" : "Suspend"
+          return <tr key={row[8] || row[0] || index} className="border-t border-default-100 hover:bg-default-50/50">
+            {selectable && <td className="px-3 py-3"><input aria-label={`Select ${row[1]}`} type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} className="size-4 accent-[#315f43]" /></td>}
+            <td className="whitespace-nowrap px-3 py-3 font-semibold">{row[1] || "—"}</td>
+            <td className="whitespace-nowrap px-3 py-3">{row[3] || "—"}</td>
+            <td className="px-3 py-3">{row[2] || "—"}</td>
+            <td className="whitespace-nowrap px-3 py-3 tabular-nums">{row[4] || "0"}</td>
+            <td className="whitespace-nowrap px-3 py-3 tabular-nums">{row[5] || "₱0.00"}</td>
+            <td className="px-3 py-3"><Chip size="sm" variant="soft" color={statusColor(row[6] || "")}>{row[6] || "Unknown"}</Chip></td>
+            <td className="px-3 py-2"><Button size="sm" variant="outline" className={suspended ? "" : "text-danger"} onPress={() => onAction?.(action, row, index)}>{action}</Button></td>
+          </tr>
+        })}</tbody>
+      </table>
+    </div>
+    <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} {rows.length === 1 ? "customer" : "customers"}</div>
+  </div>
+}
+
 
 function RecordDirectory({ config, rows, selectable, selectedIds, onToggle, onToggleAll, onAction }: { config: ModuleConfig; rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
