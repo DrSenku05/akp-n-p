@@ -347,41 +347,77 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "users") {
-      const accounts = await prisma.$queryRaw<{ account_id: string; display_name: string; email: string | null; account_type: string; status: string; last_sign_in_at: Date | null; rank: number; suspendable: boolean }[]>`
+      const accounts = await prisma.$queryRaw<{ account_id: string; display_name: string; email: string | null; phone: string | null; account_type: string; status: string; last_sign_in_at: Date | null; auth_user_id: string | null; rank: number }[]>`
         select 'admin:' || au.user_id::text as account_id, au.display_name,
-          u.email, case when au.role = 'owner' then 'Owner/Admin' else 'Staff' end as account_type,
-          case when au.is_active then 'Active' else 'Suspended' end as status,
-          u.last_sign_in_at, case when au.role = 'owner' then 1 else 2 end as rank,
-          (au.role = 'staff') as suspendable
+          u.email, u.phone, case when au.role = 'owner' then 'Owner/Admin' else 'Staff' end as account_type,
+          case
+            when u.raw_app_meta_data ->> 'akp_account_status' = 'banned' then 'Banned'
+            when not au.is_active or u.raw_app_meta_data ->> 'akp_account_status' = 'suspended' then 'Offline · Suspended'
+            when p.last_seen_at > now() - interval '90 seconds' then 'Online · Active'
+            else 'Offline · Active'
+          end as status,
+          u.last_sign_in_at, au.user_id::text as auth_user_id,
+          case when au.role = 'owner' then 1 else 2 end as rank
         from public.admin_users au
         left join auth.users u on u.id = au.user_id
+        left join public.user_presence p on p.user_id = au.user_id
         union all
-        select 'driver:' || d.id::text, d.name, coalesce(u.email, d.email), 'Delivery Driver',
-          case when d.availability = 'suspended' then 'Suspended' else initcap(replace(d.availability, '_', ' ')) end,
-          u.last_sign_in_at, 3,
-          (d.availability <> 'on_delivery')
+        select 'driver:' || d.id::text, d.name, coalesce(u.email, d.email), d.phone, 'Delivery Driver',
+          case
+            when u.raw_app_meta_data ->> 'akp_account_status' = 'banned' then 'Banned'
+            when d.availability = 'suspended' or u.raw_app_meta_data ->> 'akp_account_status' = 'suspended' then 'Offline · Suspended'
+            when p.last_seen_at > now() - interval '90 seconds' then 'Online · ' || initcap(replace(d.availability, '_', ' '))
+            else 'Offline · ' || initcap(replace(d.availability, '_', ' '))
+          end,
+          u.last_sign_in_at, u.id::text, 3
         from public.delivery_personnel d
-        left join auth.users u on u.id = d.auth_user_id
+        left join lateral (
+          select candidate.* from auth.users candidate
+          where candidate.id = d.auth_user_id or lower(candidate.email) = lower(d.email)
+          order by (candidate.id = d.auth_user_id) desc nulls last
+          limit 1
+        ) u on true
+        left join public.user_presence p on p.user_id = u.id
         where d.name not like 'Demo Rider - %'
         union all
-        select 'customer:' || c.id::text, c.name, c.email, 'Customer', initcap(c.status),
-          u.last_sign_in_at, 4, true
+        select 'customer:' || c.id::text, c.name, c.email, c.phone, 'Customer',
+          case
+            when u.raw_app_meta_data ->> 'akp_account_status' = 'banned' then 'Banned'
+            when c.status = 'suspended' or u.raw_app_meta_data ->> 'akp_account_status' = 'suspended' then 'Offline · Suspended'
+            when p.last_seen_at > now() - interval '90 seconds' then 'Online · Active'
+            else 'Offline · Active'
+          end,
+          u.last_sign_in_at, u.id::text, 4
         from public.customers c
-        left join auth.users u on lower(u.email) = lower(c.email)
+        left join lateral (
+          select candidate.* from auth.users candidate
+          where candidate.id = c.auth_user_id or lower(candidate.email) = lower(c.email)
+          order by (candidate.id = c.auth_user_id) desc nulls last
+          limit 1
+        ) u on true
+        left join public.user_presence p on p.user_id = u.id
         where coalesce(c.email, '') not like '%.demo@example.com'
           and c.name not like 'Demo Customer - %'
         union all
         select 'customer-auth:' || u.id::text,
           coalesce(u.raw_user_meta_data ->> 'full_name', u.raw_user_meta_data ->> 'name', u.email, 'Customer'),
-          u.email, 'Customer', 'No customer profile', u.last_sign_in_at, 4, false
+          u.email, u.phone, 'Customer',
+          case
+            when u.raw_app_meta_data ->> 'akp_account_status' = 'banned' then 'Banned'
+            when u.raw_app_meta_data ->> 'akp_account_status' = 'suspended' then 'Offline · Suspended'
+            when p.last_seen_at > now() - interval '90 seconds' then 'Online · Active'
+            else 'Offline · Active'
+          end,
+          u.last_sign_in_at, u.id::text, 4
         from auth.users u
+        left join public.user_presence p on p.user_id = u.id
         where coalesce(u.email, '') not like '%.demo@example.com'
           and not exists (select 1 from public.admin_users au where au.user_id = u.id)
-          and not exists (select 1 from public.delivery_personnel d where d.auth_user_id = u.id)
-          and not exists (select 1 from public.customers c where lower(c.email) = lower(u.email))
+          and not exists (select 1 from public.delivery_personnel d where d.auth_user_id = u.id or (d.auth_user_id is null and lower(d.email) = lower(u.email)))
+          and not exists (select 1 from public.customers c where c.auth_user_id = u.id or (c.auth_user_id is null and lower(c.email) = lower(u.email)))
         order by rank, display_name
       `
-      return { error: false, rows: accounts.map((account) => [account.account_id, account.display_name, account.email ?? "—", account.account_type, account.status, dateTimeLabel(account.last_sign_in_at), account.suspendable ? (account.status === "Suspended" ? "View · Reactivate" : "View · Suspend") : "View"]) }
+      return { error: false, rows: accounts.map((account) => [account.account_id, account.display_name, account.email ?? "—", account.phone ?? "—", account.status, dateTimeLabel(account.last_sign_in_at), account.account_type, account.auth_user_id ?? "", account.status === "Banned" ? "Unban · Delete" : account.status.toLowerCase().includes("suspended") ? "Reactivate · Ban · Delete" : "Suspend · Ban · Delete"]) }
     }
 
     if (slug === "backup-restore") {

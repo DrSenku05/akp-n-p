@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { randomUUID } from "node:crypto"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 export const dynamic = "force-dynamic"
 
@@ -240,38 +241,123 @@ export async function POST(request: NextRequest) {
       result = await supabase.from("delivery_personnel").update({ name: value("Name") || row[1], phone: value("Contact", "Phone") || null, availability: value("Availability").toLowerCase().replaceAll(" ", "_") || "available" }).eq("id", row[6] || row[0]).select("id")
     } else return fail("Only editing existing delivery personnel is supported here.")
   } else if (module === "users") {
-    if (admin.role !== "owner") return fail("Only an owner can change account status.", 403)
+    if (admin.role !== "owner") return fail("Only an owner can manage accounts.", 403)
     const [accountType, accountId] = (row[0] ?? "").split(":")
     if (!accountId || !/^[0-9a-f-]{36}$/i.test(accountId)) return fail("Account identifier is invalid.")
-    const suspend = action.includes("suspend")
-    const reactivate = action.includes("reactivate")
-    if (!suspend && !reactivate) return fail("Unsupported account action.")
+    const actionName = action.trim()
+    if (!["suspend", "reactivate", "ban", "unban", "delete"].includes(actionName)) return fail("Unsupported account action.")
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !serviceKey) return fail("Account controls need SUPABASE_SECRET_KEY configured in the Vercel project environment.", 503)
+    const authAdmin = createSupabaseClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } }).auth.admin
+    const deleting = actionName === "delete"
+    const banning = actionName === "ban"
+    const suspending = actionName === "suspend"
+    const reactivating = actionName === "reactivate"
+    const unbanning = actionName === "unban"
+    let authUserId = accountType === "admin" || accountType === "customer-auth" ? accountId : ""
+    let profileId = accountId
+    let currentState = "active"
+    let targetAdminRole = ""
+    let fallbackAuthUserId = ""
+    let expectedAuthEmail = ""
+    let currentAuthMetadata: Record<string, unknown> = {}
     if (accountType === "admin") {
       const { data: target, error } = await supabase.from("admin_users").select("role,is_active").eq("user_id", accountId).maybeSingle()
       if (error) return fail(error.message)
       if (!target) return fail("Admin account was not found.", 404)
-      if (target.role === "owner") return fail("Owner accounts cannot be suspended from this screen.", 403)
-      if (suspend && accountId === claims.sub) return fail("You cannot suspend your own account.", 403)
-      result = await supabase.from("admin_users").update({ is_active: reactivate }).eq("user_id", accountId).select("user_id")
+      targetAdminRole = target.role
+      currentState = target.is_active ? "active" : "suspended"
     } else if (accountType === "driver") {
-      const { data: driver, error } = await supabase.from("delivery_personnel").select("availability").eq("id", accountId).maybeSingle()
+      const { data: driver, error } = await supabase.from("delivery_personnel").select("id,auth_user_id,email,availability").eq("id", accountId).maybeSingle()
       if (error) return fail(error.message)
       if (!driver) return fail("Delivery driver was not found.", 404)
-      if (suspend) {
-        const { count, error: assignmentError } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("delivery_personnel_id", accountId).in("status", ["processing", "shipped"])
-        if (assignmentError) return fail(assignmentError.message)
-        if (driver.availability === "on_delivery" || (count ?? 0) > 0) return fail("Reassign or complete this driver's active deliveries before suspending the account.", 409)
+      authUserId = driver.auth_user_id ?? ""
+      if (!authUserId && /^[0-9a-f-]{36}$/i.test(row[7] ?? "")) {
+        fallbackAuthUserId = row[7]
+        expectedAuthEmail = driver.email?.trim().toLowerCase() ?? ""
       }
-      let availability = suspend ? "suspended" : "available"
-      if (reactivate) {
-        const { count, error: assignmentError } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("delivery_personnel_id", accountId).in("status", ["processing", "shipped"])
-        if (assignmentError) return fail(assignmentError.message)
-        if ((count ?? 0) > 0) availability = "on_delivery"
-      }
-      result = await supabase.from("delivery_personnel").update({ availability }).eq("id", accountId).select("id")
+      currentState = driver.availability === "suspended" ? "suspended" : "active"
     } else if (accountType === "customer") {
-      result = await supabase.from("customers").update({ status: suspend ? "suspended" : "active" }).eq("id", accountId).select("id")
+      const { data: customer, error } = await supabase.from("customers").select("id,auth_user_id,email,status").eq("id", accountId).maybeSingle()
+      if (error) return fail(error.message)
+      if (!customer) return fail("Customer profile was not found.", 404)
+      authUserId = customer.auth_user_id ?? ""
+      if (!authUserId && /^[0-9a-f-]{36}$/i.test(row[7] ?? "")) {
+        fallbackAuthUserId = row[7]
+        expectedAuthEmail = customer.email?.trim().toLowerCase() ?? ""
+      }
+      currentState = customer.status
+    } else if (accountType === "customer-auth") {
+      authUserId = accountId
     } else return fail("Unsupported account type.")
+    if (!authUserId && fallbackAuthUserId) {
+      if (!expectedAuthEmail) return fail("Cannot safely match this profile to its Auth account.", 409)
+      authUserId = fallbackAuthUserId
+    }
+    if (authUserId && authUserId === claims.sub) return fail("You cannot change or delete your own account.", 403)
+    if (authUserId) {
+      const { data: target, error } = await authAdmin.getUserById(authUserId)
+      if (error || !target.user) return fail(error?.message ?? "Auth account was not found.", 404)
+      if (expectedAuthEmail && target.user.email?.trim().toLowerCase() !== expectedAuthEmail) return fail("The Auth account no longer matches this customer profile. Refresh and try again.", 409)
+      currentAuthMetadata = target.user.app_metadata ?? {}
+      const storedStatus = currentAuthMetadata.akp_account_status
+      currentState = storedStatus === "banned" ? "banned" : storedStatus === "suspended" ? "suspended" : currentState
+    }
+    if (currentState === "banned" && (suspending || reactivating)) return fail("This account is banned. Use Unban to restore access.", 409)
+    if (currentState !== "banned" && unbanning) return fail("This account is not banned.", 409)
+    if (currentState !== "suspended" && reactivating) return fail("This account is not suspended.", 409)
+    if (currentState === "suspended" && suspending) return fail("This account is already suspended.", 409)
+    if (accountType === "admin" && targetAdminRole === "owner" && (deleting || suspending || banning)) {
+      const { count, error } = await supabase.from("admin_users").select("user_id", { count: "exact", head: true }).eq("role", "owner").eq("is_active", true)
+      if (error) return fail(error.message)
+      const { data: owner, error: ownerError } = await supabase.from("admin_users").select("is_active").eq("user_id", accountId).maybeSingle()
+      if (ownerError) return fail(ownerError.message)
+      if (owner?.is_active && (count ?? 0) <= 1) return fail("The last active owner cannot be disabled or deleted.", 409)
+    }
+    const activeDriverOrder = async () => {
+      const { data, error } = await supabase.from("orders").select("id").eq("delivery_personnel_id", profileId).not("status", "eq", "cancelled").not("delivery_status", "in", "(delivered,failed)").limit(1)
+      if (error) throw new Error(error.message)
+      return Boolean(data?.length)
+    }
+    if (accountType === "driver" && (deleting || suspending || banning)) {
+      let hasActiveOrder = false
+      try { hasActiveOrder = await activeDriverOrder() } catch (error) { return fail(error instanceof Error ? error.message : "Could not check this driver's active deliveries.") }
+      if (hasActiveOrder) return fail("Reassign or complete this driver's active deliveries before suspending, banning, or deleting the account.", 409)
+    }
+
+    if (deleting) {
+      if (authUserId) {
+        const { error } = await authAdmin.deleteUser(authUserId)
+        if (error) return fail(`Could not delete Auth account: ${error.message}`, 409)
+      }
+      if (accountType === "driver") result = await supabase.from("delivery_personnel").delete().eq("id", profileId).select("id")
+      else if (accountType === "customer") result = await supabase.from("customers").delete().eq("id", profileId).select("id")
+      return result?.error ? fail(result.error.message) : NextResponse.json({ ok: true })
+    }
+
+    if (banning && !authUserId) return fail("A permanent email ban requires a linked Supabase Auth account.", 409)
+    if (authUserId) {
+      const metadata = { ...currentAuthMetadata, akp_account_status: banning ? "banned" : suspending ? "suspended" : "active" }
+      const { error } = await authAdmin.updateUserById(authUserId, {
+        ban_duration: suspending || banning ? "876000h" : "none",
+        app_metadata: metadata,
+      })
+      if (error) return fail(error.message)
+    }
+    if (accountType === "admin") {
+      result = await supabase.from("admin_users").update({ is_active: reactivating || unbanning }).eq("user_id", accountId).select("user_id")
+    } else if (accountType === "driver") {
+      let availability = suspending || banning ? "suspended" : "available"
+      if (reactivating || unbanning) {
+        let hasActiveOrder = false
+        try { hasActiveOrder = await activeDriverOrder() } catch (error) { return fail(error instanceof Error ? error.message : "Could not check this driver's active deliveries.") }
+        if (hasActiveOrder) availability = "on_delivery"
+      }
+      result = await supabase.from("delivery_personnel").update({ availability }).eq("id", profileId).select("id")
+    } else if (accountType === "customer") {
+      result = await supabase.from("customers").update({ status: suspending || banning ? "suspended" : "active" }).eq("id", profileId).select("id")
+    }
   } else if (module === "returns-refunds") {
     if (action === "record refund") {
       const refundAmount = money(value("Refund Amount"))
