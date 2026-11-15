@@ -343,21 +343,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "audit-logs") {
-      const supabase = await createClient()
-      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
-      const userId = claimsData?.claims?.sub
-      if (claimsError || !userId) return { error: true, rows: [] }
-      const { data: admin, error: adminError } = await supabase.from("admin_users").select("role,is_active").eq("user_id", userId).maybeSingle()
-      if (adminError || !admin?.is_active || !["owner", "staff"].includes(admin.role)) return { error: true, rows: [] }
-      const logs = await prisma.$queryRaw<{ id: bigint; actor_role: string | null; module: string; action: string; created_at: Date; metadata: { row?: Record<string, unknown> }; actor_email: string }[]>`
-        select l.id, l.actor_role, l.module, l.action, l.created_at, l.metadata,
-          coalesce(u.email, 'Admin') as actor_email
-        from public.audit_logs l
-        left join auth.users u on u.id = l.actor_id
-        where (${admin.role === "owner"} or l.actor_id = ${userId}::uuid)
-        order by l.created_at desc limit 100
-      `
-      return { error: false, rows: logs.map((log) => [`LOG-${log.id}`, log.actor_email === "Admin" ? "System / app activity" : log.actor_email, log.actor_role ? title(log.actor_role) : "System", title(log.module), title(log.action), "—", new Date(log.created_at).toLocaleString("en-PH")]) }
+      return { error: false, rows: [] }
     }
 
     if (slug === "users") {

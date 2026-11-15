@@ -406,14 +406,22 @@ set search_path = ''
 as $$
 declare
   changed_row jsonb;
+  old_row jsonb;
+  new_row jsonb;
   target_id uuid;
   audit_actor_id uuid := (select auth.uid());
   audit_actor_role text := (select app_private.current_admin_role());
 begin
   if tg_op = 'DELETE' then
-    changed_row := to_jsonb(old);
+    old_row := to_jsonb(old);
+    changed_row := old_row;
+  elsif tg_op = 'UPDATE' then
+    old_row := to_jsonb(old);
+    new_row := to_jsonb(new);
+    changed_row := new_row;
   else
-    changed_row := to_jsonb(new);
+    new_row := to_jsonb(new);
+    changed_row := new_row;
   end if;
 
   if changed_row ? 'id' then
@@ -435,7 +443,7 @@ begin
     tg_table_name,
     lower(tg_op),
     target_id,
-    jsonb_build_object('row', changed_row)
+    jsonb_build_object('row', changed_row, 'old_row', old_row, 'new_row', new_row)
   );
 
   if tg_op = 'DELETE' then return old; end if;
