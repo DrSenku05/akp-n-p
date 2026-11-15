@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { randomUUID } from "node:crypto"
 import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
@@ -27,8 +28,21 @@ export async function POST(request: NextRequest) {
   if (module === "products" || module === "heritage-showcase") {
     const sku = module === "products" ? row[0] : ""
     const showcaseSku = row[6] || value("Product SKU").split(" · ")[0]
-    const categoryName = value("Category")
-    const { data: category, error: categoryError } = categoryName ? await supabase.from("product_categories").select("id").eq("name", categoryName).maybeSingle() : { data: null, error: null }
+    let categoryName = value("Category")
+    const newCategoryName = value("New Category")
+    if (newCategoryName) categoryName = newCategoryName
+    let category = null as { id: string } | null
+    let categoryError: { message: string } | null = null
+    if (categoryName) {
+      const existing = await supabase.from("product_categories").select("id").eq("name", categoryName).maybeSingle()
+      category = existing.data
+      categoryError = existing.error
+      if (!category && !categoryError && newCategoryName) {
+        const created = await supabase.from("product_categories").insert({ name: newCategoryName }).select("id").single()
+        category = created.data
+        categoryError = created.error
+      }
+    }
     if (categoryError) return fail(categoryError.message)
     if (categoryName && !category) return fail("Product category was not found.", 404)
     const visibilityInput = value("Visibility", "Status").toLowerCase()
@@ -70,11 +84,10 @@ export async function POST(request: NextRequest) {
           result = await supabase.from("products").update({ visibility: "archived" }).eq("sku", sku).select("id")
         } else if (!fields.name || !Number.isFinite(fields.price) || fields.price < 0) return fail("Product name and a valid non-negative price are required.")
         else if (action === "create") {
-          const skuInput = value("SKU", "Product ID")
-          if (!skuInput) return fail("SKU is required to create a product.")
+          const generatedSku = `AKP-PRD-${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`
           const stock = Number(value("Stock") || 0)
           if (!Number.isInteger(stock) || stock < 0) return fail("Stock must be a whole number zero or greater.")
-          result = await supabase.from("products").insert({ sku: skuInput, ...fields, stock_quantity: stock, visibility: fields.visibility || "draft" })
+          result = await supabase.from("products").insert({ sku: generatedSku, ...fields, stock_quantity: stock, visibility: fields.visibility || "draft" })
         } else {
           const productPatch: Record<string, string | number | boolean | null> = { name: fields.name, price: fields.price }
           if (categoryName) productPatch.category_id = category?.id ?? null

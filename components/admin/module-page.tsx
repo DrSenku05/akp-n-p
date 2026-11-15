@@ -1415,7 +1415,7 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
 function DialogField({ field, value, onChange, choicesOverride }: { field: string; value: string; onChange: (value: string) => void; choicesOverride?: string[] }) {
   const options: Record<string, string[]> = {
     "Movement Type": ["Stock in (restock)", "Stock out (sale)", "Damage"],
-    Category: ["Native Materials", "Bags", "Baskets", "Home Decor", "Accessories", "Headwear"],
+    Category: ["Native Materials", "Bags", "Baskets", "Home Decor", "Accessories", "Headwear", "Add new category"],
     Target: ["All Customers", "All Users"],
     Role: ["Owner", "Staff"],
     Visibility: ["Published", "Draft", "Archived"],
@@ -1465,3 +1465,4 @@ function defaultRowAction(slug: string) {
   if (slug === "promotions") return "Edit · End"
   return "View · Edit"
 }
+    if (slug === "products" && action === "create") fields.push("New Category")
