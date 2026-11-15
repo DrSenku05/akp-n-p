@@ -23,8 +23,12 @@ create policy customers_read_active_product_promotions on public.promotions
     and ends_at > now()
   );
 
+alter table public.announcements
+  add column if not exists kind text not null default 'announcement'
+  check (kind in ('announcement', 'promotion'));
+
 revoke all on public.announcements from anon;
-grant select (id, title, message, audience, status, sent_at, created_at)
+grant select (id, title, message, audience, status, sent_at, created_at, kind)
   on public.announcements to anon;
 drop policy if exists customers_read_sent_announcements on public.announcements;
 create policy customers_read_sent_announcements on public.announcements
@@ -32,6 +36,7 @@ create policy customers_read_sent_announcements on public.announcements
   using (status = 'sent' and audience in ('all', 'customers'));
 
 drop function if exists public.create_product_promotion(text, text, numeric, timestamptz);
+drop function if exists public.create_product_promotion(text, text, text, numeric, timestamptz);
 create function public.create_product_promotion(
   p_name text,
   p_description text,
@@ -100,8 +105,8 @@ begin
     now(), p_ends_at, 'active', v_uid
   ) returning id into v_promotion_id;
 
-  insert into public.announcements (title, message, audience, status, sent_at, created_by)
-  values (trim(p_name), v_message, 'customers', 'sent', now(), v_uid);
+  insert into public.announcements (title, message, audience, status, sent_at, created_by, kind)
+  values (trim(p_name), v_message, 'customers', 'sent', now(), v_uid, 'promotion');
 
   return v_promotion_id;
 end

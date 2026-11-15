@@ -318,8 +318,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         where promotion.name not like 'DEMO:%'
         order by promotion.name, promotion.created_at desc
       `
-      const announcements = await prisma.$queryRaw<{ title: string; audience: string; status: string; sent_at: Date | null }[]>`
-        select title, audience, status, sent_at
+      const announcements = await prisma.$queryRaw<{ id: string; title: string; message: string; audience: string; status: string; sent_at: Date | null }[]>`
+        select id, title, message, audience, status, sent_at
         from public.announcements where title not like 'DEMO:%' order by created_at desc
       `
       return {
@@ -334,16 +334,16 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           p.id,
           p.description ?? "No description provided",
         ]),
-        announcements: announcements.map((a) => [a.title, title(a.audience), dateLabel(a.sent_at), "View"]),
+        announcements: announcements.map((a) => [a.title, title(a.audience), dateLabel(a.sent_at), "View", "", "", a.id, a.audience, a.message]),
       }
     }
 
     if (slug === "notifications") {
-      const announcements = await prisma.$queryRaw<{ title: string; audience: string; status: string; sent_at: Date | null }[]>`
-        select title, audience, status, sent_at
+      const announcements = await prisma.$queryRaw<{ id: string; title: string; message: string; audience: string; status: string; sent_at: Date | null }[]>`
+        select id, title, message, audience, status, sent_at
         from public.announcements where title not like 'DEMO:%' order by created_at desc
       `
-      return { error: false, rows: announcements.map((a) => [a.title, title(a.audience), "Announcement", dateLabel(a.sent_at), title(a.status), "View"]) }
+      return { error: false, rows: announcements.map((a) => [a.title, title(a.audience), a.message, dateLabel(a.sent_at), title(a.status), "View", a.id, a.audience]) }
     }
 
     if (slug === "audit-logs") {

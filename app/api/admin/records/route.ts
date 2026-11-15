@@ -354,11 +354,13 @@ export async function POST(request: NextRequest) {
     if (values["Valid Until"]) patch.ends_at = new Date(value("Valid Until")).toISOString()
     result = await supabase.from("promotions").update(patch).eq("id", promotionId).select("id")
   } else if (module === "notifications") {
-    if (action !== "create") return fail("Announcements can be saved as drafts; sending requires a configured notification service.")
+    if (action !== "create") return fail("Unsupported announcement action.")
     const title = value("Title")
-    const message = value("Message")
-    if (!title || !message) return fail("Announcement title and message are required.")
-    result = await supabase.from("announcements").insert({ title, message, audience: value("Target").toLowerCase().includes("staff") ? "staff" : "customers", status: "draft", created_by: claims.sub })
+    const message = value("Description")
+    const role = value("Target Role").toLowerCase()
+    const audience = role === "customer" ? "customers" : role === "driver" ? "drivers" : role === "staff" ? "staff" : ""
+    if (!title || title.length > 120 || !message || message.length > 2000 || !audience) return fail("Enter a title, description (up to 2,000 characters), and choose Customers, Staff, or Drivers.")
+    result = await supabase.from("announcements").insert({ title, message, audience, status: "sent", sent_at: new Date().toISOString(), created_by: claims.sub, kind: "announcement" })
   } else {
     return fail("This module is view-only or has no safe database action configured.", 422)
   }

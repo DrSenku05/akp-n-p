@@ -39,7 +39,7 @@ const sections = [
     { label: "Products", href: "/products", icon: Package },
     { label: "Heritage Showcase", href: "/heritage-showcase", icon: Archive },
     { label: "Promotions", href: "/promotions", icon: Shapes },
-    { label: "Notifications", href: "/notifications", icon: Bell },
+    { label: "Announcements", href: "/notifications", icon: Bell },
   ] },
   { label: "System", href: "/reports", icon: Settings2, links: [
     { label: "Reports", href: "/reports", icon: BarChart3 },
