@@ -239,11 +239,24 @@ begin
       raise exception 'Item quantity exceeds the limit.' using errcode = '22023';
     end if;
 
-    select p.id, p.sku, p.name, p.price, p.stock_quantity
+    select p.id, p.sku, p.name,
+      coalesce(round(p.price * (1 - active_promotion.discount_value / 100), 2), p.price) as price,
+      p.stock_quantity
     into v_product
     from public.products p
+    left join lateral (
+      select promotion.discount_value
+      from public.promotions promotion
+      where promotion.product_id = p.id
+        and promotion.discount_type = 'percentage'
+        and promotion.status = 'active'
+        and promotion.starts_at <= now()
+        and promotion.ends_at > now()
+      order by promotion.discount_value desc, promotion.created_at desc
+      limit 1
+    ) active_promotion on true
     where p.sku = trim(v_item->>'sku') and p.visibility = 'published'
-    for update;
+    for update of p;
     if not found then
       raise exception 'A product in your cart is no longer available.' using errcode = 'P0002';
     end if;
@@ -333,6 +346,51 @@ as $$
 $$;
 revoke all on function public.cancel_customer_order(text) from public, anon;
 grant execute on function public.cancel_customer_order(text) to authenticated;
+
+create or replace function app_private.customer_confirm_delivery(p_order_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_order_id uuid;
+begin
+  if v_uid is null then
+    raise exception 'Sign in before confirming delivery.' using errcode = '28000';
+  end if;
+
+  update public.orders o
+  set status = 'delivered'
+  from public.customers c
+  where o.customer_id = c.id
+    and c.auth_user_id = v_uid
+    and o.id = p_order_id
+    and o.status = 'shipped'
+    and o.fulfillment_method = 'delivery'
+  returning o.id into v_order_id;
+
+  if v_order_id is null then
+    raise exception 'This order is not awaiting delivery confirmation.' using errcode = 'P0002';
+  end if;
+  return true;
+end;
+$$;
+revoke all on function app_private.customer_confirm_delivery(uuid) from public, anon;
+grant usage on schema app_private to authenticated;
+grant execute on function app_private.customer_confirm_delivery(uuid) to authenticated;
+
+create or replace function public.customer_confirm_delivery(p_order_id uuid)
+returns boolean
+language sql
+volatile
+set search_path = ''
+as $$
+  select app_private.customer_confirm_delivery(p_order_id)
+$$;
+revoke all on function public.customer_confirm_delivery(uuid) from public, anon;
+grant execute on function public.customer_confirm_delivery(uuid) to authenticated;
 
 create or replace function public.save_customer_address(
   p_address_id uuid,

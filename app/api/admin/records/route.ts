@@ -273,6 +273,20 @@ export async function POST(request: NextRequest) {
       result = await supabase.from("customers").update({ status: suspend ? "suspended" : "active" }).eq("id", accountId).select("id")
     } else return fail("Unsupported account type.")
   } else if (module === "returns-refunds") {
+    if (action === "record refund") {
+      const refundAmount = money(value("Refund Amount"))
+      const refundReference = value("GCash Transaction Reference")
+      if (!Number.isFinite(refundAmount) || refundAmount <= 0 || !refundReference || refundReference.length > 120) {
+        return fail("Enter a positive refund amount and a GCash transaction reference of up to 120 characters.")
+      }
+      const { error } = await supabase.rpc("record_customer_return_refund", {
+        p_request_number: row[0],
+        p_refund_amount: refundAmount,
+        p_refund_reference: refundReference,
+      })
+      if (error) return fail(error.message, error.code === "42501" ? 403 : 400)
+      return NextResponse.json({ ok: true })
+    }
     const status = action.includes("approve") ? "approved" : action.includes("reject") ? "rejected" : ""
     if (!status) return fail("Unsupported return request action.")
     result = await supabase.from("return_requests").update({ status, decision_note: value("Decision Notes") || null, decided_by: claims.sub, decided_at: new Date().toISOString() }).eq("request_number", row[0]).select("id")
@@ -307,17 +321,26 @@ export async function POST(request: NextRequest) {
   } else if (module === "promotions") {
     if (action === "create") {
       const promoName = value("Promo Name")
-      const discountText = value("Discount")
-      const percent = discountText.includes("%")
-      const discountValue = Number(discountText.replace(/[^\d.]/g, ""))
-      if (!promoName || !Number.isFinite(discountValue) || discountValue <= 0) return fail("Promotion name and discount are required.")
-      const ends = new Date(value("Valid Until"))
-      if (!Number.isFinite(ends.getTime())) return fail("Enter a valid promotion end date.")
-      result = await supabase.from("promotions").insert({ name: promoName, discount_type: percent ? "percentage" : "fixed_amount", discount_value: discountValue, starts_at: new Date().toISOString(), ends_at: ends.toISOString(), status: "draft", created_by: claims.sub })
-      if (result.error) return fail(result.error.message)
+      const productSku = value("Promotion Product").split(" · ")[0]
+      const discountInput = value("Discount (%)")
+      const discount = Number(discountInput)
+      const endDate = value("Valid Until")
+      if (!promoName || promoName.length > 120 || !productSku || !/^\d{1,2}(?:\.\d{1,2})?$/.test(discountInput) || !Number.isFinite(discount) || discount <= 0 || discount >= 100) return fail("Enter a name, published product, and percentage from 0.01 to 99.99.")
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return fail("Choose a valid promotion end date.")
+      const ends = new Date(`${endDate}T23:59:59+08:00`)
+      if (!Number.isFinite(ends.getTime()) || ends.toISOString().slice(0, 10) !== endDate || ends <= new Date()) return fail("Choose a valid future end date.")
+      const { error } = await supabase.rpc("create_product_promotion", {
+        p_name: promoName,
+        p_product_sku: productSku,
+        p_discount_percent: discount,
+        p_ends_at: ends.toISOString(),
+      })
+      if (error) return fail(error.message, error.code === "42501" ? 403 : 400)
       return NextResponse.json({ ok: true })
     }
-    const status = action.includes("publish") || action.includes("reactivate") ? "active" : action.includes("end") || action.includes("archive") ? "archived" : null
+    const promotionId = typeof row[6] === "string" ? row[6] : ""
+    if (!promotionId) return fail("Promotion identifier is missing. Refresh and try again.")
+    const status = action.includes("publish") || action.includes("reactivate") ? "active" : action.includes("end") ? "ended" : action.includes("archive") ? "archived" : null
     const patch: Record<string, string | number | null> = { name: value("Promo Name") || row[0] }
     if (values.Description !== undefined) patch.description = value("Description") || null
     if (status) patch.status = status
@@ -327,7 +350,7 @@ export async function POST(request: NextRequest) {
       patch.discount_value = Number(discount.replace(/[^\d.]/g, ""))
     }
     if (values["Valid Until"]) patch.ends_at = new Date(value("Valid Until")).toISOString()
-    result = await supabase.from("promotions").update(patch).eq("name", row[0]).select("id")
+    result = await supabase.from("promotions").update(patch).eq("id", promotionId).select("id")
   } else if (module === "notifications") {
     if (action !== "create") return fail("Announcements can be saved as drafts; sending requires a configured notification service.")
     const title = value("Title")

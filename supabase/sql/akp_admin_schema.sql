@@ -60,6 +60,7 @@ create table if not exists public.customer_addresses (
   recipient_name text not null,
   phone text,
   address_line text not null,
+  landmark text,
   barangay text,
   city text not null,
   province text,
@@ -406,6 +407,8 @@ as $$
 declare
   changed_row jsonb;
   target_id uuid;
+  audit_actor_id uuid := (select auth.uid());
+  audit_actor_role text := (select app_private.current_admin_role());
 begin
   if tg_op = 'DELETE' then
     changed_row := to_jsonb(old);
@@ -419,10 +422,16 @@ begin
     target_id := (changed_row ->> 'user_id')::uuid;
   end if;
 
+  -- actor_id references admin_users, so customers and service operations must
+  -- be recorded as system/customer activity with a null admin actor.
+  if audit_actor_role is null then
+    audit_actor_id := null;
+  end if;
+
   insert into public.audit_logs (actor_id, actor_role, module, action, entity_id, metadata)
   values (
-    (select auth.uid()),
-    (select app_private.current_admin_role()),
+    audit_actor_id,
+    audit_actor_role,
     tg_table_name,
     lower(tg_op),
     target_id,

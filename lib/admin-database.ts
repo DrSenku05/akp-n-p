@@ -228,17 +228,45 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "returns-refunds") {
-      const returns = await prisma.$queryRaw<{ request_number: string; order_number: string; customer: string | null; reason: string; amount: string; status: string }[]>`
+      const returns = await prisma.$queryRaw<{
+        request_number: string
+        order_number: string
+        customer: string | null
+        reason: string
+        amount: string
+        status: string
+        refund_amount: string | null
+        refund_reference: string | null
+        refunded_at: Date | null
+      }[]>`
         select r.request_number, o.order_number, c.name as customer, r.reason,
-          o.total_amount::text as amount, r.status
+          coalesce(returned.amount, 0)::text as amount, r.status,
+          r.refund_amount::text as refund_amount, r.refund_reference, r.refunded_at
         from public.return_requests r
         join public.orders o on o.id = r.order_id
         left join public.customers c on c.id = r.customer_id
+        left join lateral (
+          select sum(oi.unit_price * oi.quantity) as amount
+          from public.order_items oi
+          where oi.order_id = r.order_id and oi.sku = any(r.product_ids)
+        ) returned on true
         where r.request_number not like 'DEMO-RET-%'
           and o.order_number not like 'DEMO-ORD-%'
         order by r.created_at desc
       `
-      return { error: false, rows: returns.map((r) => [r.request_number, r.order_number, r.customer ?? "Unknown", r.reason, "Refund", money(r.amount), title(r.status), r.status === "pending" ? "Review · Approve · Reject" : "View"]) }
+      return { error: false, rows: returns.map((r) => [
+        r.request_number,
+        r.order_number,
+        r.customer ?? "Unknown",
+        r.reason,
+        "Return + Refund",
+        money(r.amount),
+        title(r.status),
+        r.refunded_at ? "View" : r.status === "pending" ? "Review · Approve · Reject" : r.status === "approved" ? "View · Record Refund" : "View",
+        r.refund_amount ? money(r.refund_amount) : "",
+        r.refund_reference ?? "",
+        dateTimeLabel(r.refunded_at),
+      ]) }
     }
 
     if (slug === "feedback") {
@@ -281,9 +309,14 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "promotions") {
-      const promotions = await prisma.$queryRaw<{ name: string; discount_type: string; discount_value: string; ends_at: Date; status: string }[]>`
-        select name, discount_type, discount_value::text as discount_value, ends_at, status
-        from public.promotions where name not like 'DEMO:%' order by name
+      const promotions = await prisma.$queryRaw<{ id: string; name: string; product_name: string | null; discount_type: string; discount_value: string; ends_at: Date; status: string }[]>`
+        select promotion.id, promotion.name, product.name as product_name,
+          promotion.discount_type, promotion.discount_value::text as discount_value,
+          promotion.ends_at, promotion.status
+        from public.promotions promotion
+        left join public.products product on product.id = promotion.product_id
+        where promotion.name not like 'DEMO:%'
+        order by promotion.name, promotion.created_at desc
       `
       const announcements = await prisma.$queryRaw<{ title: string; audience: string; status: string; sent_at: Date | null }[]>`
         select title, audience, status, sent_at
@@ -291,7 +324,15 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       `
       return {
         error: false,
-        rows: promotions.map((p) => [p.name, p.discount_type === "percentage" ? `${p.discount_value}% off` : `${money(p.discount_value)} off`, dateLabel(p.ends_at), title(p.status), p.status === "draft" ? "Edit · Publish" : "Edit · End"]),
+        rows: promotions.map((p) => [
+          p.name,
+          p.product_name ?? "Product unavailable",
+          p.discount_type === "percentage" ? `${p.discount_value}% off` : `${money(p.discount_value)} off`,
+          dateLabel(p.ends_at),
+          title(p.status === "active" && p.ends_at <= new Date() ? "ended" : p.status),
+          p.status === "active" && p.ends_at > new Date() ? "End" : "View",
+          p.id,
+        ]),
         announcements: announcements.map((a) => [a.title, title(a.audience), dateLabel(a.sent_at), "View"]),
       }
     }
