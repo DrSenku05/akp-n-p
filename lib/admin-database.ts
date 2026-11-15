@@ -277,7 +277,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
 
     if (slug === "heritage-showcase") {
       const products = await getAdminProducts()
-      return { error: false, rows: products.map((p) => [p.name, p.craft_origin ?? "Origin not provided", title(p.visibility), p.featured ? "Yes" : "No", p.visibility === "published" ? `Edit · Archive · ${p.featured ? "Remove" : "Feature"}` : p.visibility === "archived" ? `Edit · Publish · ${p.featured ? "Remove" : "Feature"}` : `Edit · Publish · Archive · ${p.featured ? "Remove" : "Feature"}`, p.sku]) }
+      return { error: false, rows: products.map((p) => [p.name, p.craft_origin ?? "Origin not provided", title(p.visibility), p.featured ? "Yes" : "No", p.visibility === "published" ? `Edit · Archive · ${p.featured ? "Remove" : "Feature"}` : p.visibility === "archived" ? `Edit · Publish · ${p.featured ? "Remove" : "Feature"}` : `Edit · Publish · Archive · ${p.featured ? "Remove" : "Feature"}`, p.sku, p.description ?? ""] ) }
     }
 
     if (slug === "promotions") {

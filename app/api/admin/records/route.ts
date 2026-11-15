@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
         result = await supabase.from("products").update({
           is_featured: true,
           visibility: "draft",
-          ...(values["Heritage Description"] !== undefined ? { craft_origin: value("Heritage Description") || null } : {}),
+          ...(values["Craft / Origin"] !== undefined ? { craft_origin: value("Craft / Origin") || null } : {}),
+          ...(values["Heritage Description"] !== undefined ? { description: value("Heritage Description") || null } : {}),
         }).eq("sku", showcaseSku).select("id")
       } else if (action === "feature") {
         result = await supabase.from("products").update({ is_featured: true }).eq("sku", showcaseSku).select("id")
