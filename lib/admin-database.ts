@@ -26,7 +26,7 @@ type InventoryMovement = {
 }
 
 const money = (amount: string | number) => `₱${Number(amount).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`
-const dateLabel = (value: Date | string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"
+const dateLabel = (value: Date | string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }) : "—"
 const dateTimeLabel = (value: Date | string | null) => value ? new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }) : "Never"
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 const orderStatusLabel = (status: string, fulfillment: string) => {
@@ -450,9 +450,9 @@ export async function getAdminDashboardPreview() {
   try {
     const [metrics] = await prisma.$queryRaw<{ orders_today: number; pending_orders: number; revenue_month: string; low_stock: number; open_returns: number; flagged_feedback: number }[]>`
       select
-        (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and created_at >= date_trunc('day', now())) as orders_today,
+        (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and created_at >= (date_trunc('day', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila')) as orders_today,
         (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and status = 'pending') as pending_orders,
-        (select coalesce(sum(p.amount), 0)::text from public.payments p join public.orders o on o.id = p.order_id where o.order_number not like 'DEMO-ORD-%' and coalesce(p.reference, '') not like 'DEMO-PAY-%' and p.status = 'verified' and p.created_at >= date_trunc('month', now())) as revenue_month,
+        (select coalesce(sum(p.amount), 0)::text from public.payments p join public.orders o on o.id = p.order_id where o.order_number not like 'DEMO-ORD-%' and coalesce(p.reference, '') not like 'DEMO-PAY-%' and p.status = 'verified' and p.created_at >= (date_trunc('month', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila')) as revenue_month,
         (select count(*)::int from public.products where sku like 'AKP-ACT-%' and visibility <> 'archived' and stock_quantity <= coalesce((select low_stock_threshold from public.store_inventory_settings where id = true), 10)) as low_stock,
         (select count(*)::int from public.return_requests r join public.orders o on o.id = r.order_id where r.request_number not like 'DEMO-RET-%' and o.order_number not like 'DEMO-ORD-%' and r.status = 'pending') as open_returns,
         (select count(*)::int from public.feedback f left join public.orders o on o.id = f.order_id where f.comment not like 'DEMO:%' and coalesce(o.order_number, '') not like 'DEMO-ORD-%' and f.moderation_status = 'flagged') as flagged_feedback
