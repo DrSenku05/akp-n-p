@@ -242,6 +242,59 @@ export async function POST(request: NextRequest) {
     } else return fail("Only editing existing delivery personnel is supported here.")
   } else if (module === "users") {
     if (admin.role !== "owner") return fail("Only an owner can manage accounts.", 403)
+    if (action === "edit-credentials") {
+      const [accountType, accountId] = (row[0] ?? "").split(":")
+      if (!accountId || !/^[0-9a-f-]{36}$/i.test(accountId)) return fail("Account identifier is invalid.")
+      const newEmail = value("email").toLowerCase()
+      const password = typeof values.password === "string" ? values.password : ""
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail) || newEmail.length > 254) return fail("Enter a valid email address.")
+      if (password && (password.length < 8 || password.length > 128)) return fail("A new password must be between 8 and 128 characters.")
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (!supabaseUrl || !serviceKey) return fail("Account editing needs SUPABASE_SECRET_KEY configured in the Vercel project environment.", 503)
+      const authAdmin = createSupabaseClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } }).auth.admin
+      let authUserId = ""
+      let expectedEmail = ""
+      if (accountType === "admin") {
+        authUserId = accountId
+      } else if (accountType === "driver") {
+        const { data: driver, error } = await supabase.from("delivery_personnel").select("auth_user_id,email").eq("id", accountId).maybeSingle()
+        if (error) return fail(error.message)
+        if (!driver) return fail("Delivery driver was not found.", 404)
+        authUserId = driver.auth_user_id ?? row[7] ?? ""
+        expectedEmail = driver.email?.trim().toLowerCase() ?? ""
+      } else if (accountType === "customer") {
+        const { data: customer, error } = await supabase.from("customers").select("auth_user_id,email").eq("id", accountId).maybeSingle()
+        if (error) return fail(error.message)
+        if (!customer) return fail("Customer profile was not found.", 404)
+        authUserId = customer.auth_user_id ?? row[7] ?? ""
+        expectedEmail = customer.email?.trim().toLowerCase() ?? ""
+      } else if (accountType === "customer-auth") {
+        authUserId = accountId
+      } else return fail("Unsupported account type.")
+      if (!authUserId || !/^[0-9a-f-]{36}$/i.test(authUserId)) return fail("This profile has no linked login account.", 409)
+      if (authUserId === claims.sub) return fail("You cannot edit your own login here.", 403)
+      const { data: target, error: targetError } = await authAdmin.getUserById(authUserId)
+      if (targetError || !target.user) return fail(targetError?.message ?? "Auth account was not found.", 404)
+      if (expectedEmail && target.user.email?.trim().toLowerCase() !== expectedEmail) return fail("The login no longer matches this profile email. Refresh the account list and try again.", 409)
+      const emailChanged = target.user.email?.trim().toLowerCase() !== newEmail
+      if (!emailChanged && !password) return fail("Enter a different email or a new password.")
+      const { error } = await authAdmin.updateUserById(authUserId, {
+        ...(emailChanged ? { email: newEmail, email_confirm: true } : {}),
+        ...(password ? { password } : {}),
+      })
+      if (error) return fail(error.message, 400)
+      if (emailChanged && (accountType === "driver" || accountType === "customer")) {
+        const profileUpdate = accountType === "driver"
+          ? await supabase.from("delivery_personnel").update({ email: newEmail }).eq("id", accountId)
+          : await supabase.from("customers").update({ email: newEmail }).eq("id", accountId)
+        if (profileUpdate.error) {
+          const { error: rollbackError } = await authAdmin.updateUserById(authUserId, { email: target.user.email ?? expectedEmail, email_confirm: true })
+          return fail(rollbackError ? `Profile email update failed and the Auth email rollback also failed: ${profileUpdate.error.message}; ${rollbackError.message}` : profileUpdate.error.message, 409)
+        }
+      }
+      return NextResponse.json({ ok: true })
+    }
     if (action === "create") {
       const role = value("role").toLowerCase()
       const name = value("name")

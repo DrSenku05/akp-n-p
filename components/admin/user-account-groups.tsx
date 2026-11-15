@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Button, Chip, Modal } from "@heroui/react"
+import { Pencil } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -20,6 +21,10 @@ export default function UserAccountGroups({ rows, busy, onAction }: { rows: stri
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState("")
   const [account, setAccount] = useState({ role: "staff", name: "", email: "", phone: "", password: "" })
+  const [editRow, setEditRow] = useState<string[] | null>(null)
+  const [loginDraft, setLoginDraft] = useState({ email: "", password: "" })
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState("")
   useEffect(() => {
     let mounted = true
     const supabase = createClient()
@@ -47,6 +52,24 @@ export default function UserAccountGroups({ rows, busy, onAction }: { rows: stri
       setCreateError(error instanceof Error ? error.message : "Could not create account.")
     } finally {
       setCreating(false)
+    }
+  }
+
+  const saveLogin = async () => {
+    if (!editRow) return
+    setEditBusy(true)
+    setEditError("")
+    try {
+      const response = await fetch("/api/admin/records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ module: "users", action: "edit-credentials", row: editRow, values: loginDraft }) })
+      const result = await response.json() as { error?: string }
+      if (!response.ok) throw new Error(result.error || "Could not update login.")
+      setEditRow(null)
+      setLoginDraft({ email: "", password: "" })
+      router.refresh()
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "Could not update login.")
+    } finally {
+      setEditBusy(false)
     }
   }
 
@@ -78,6 +101,7 @@ export default function UserAccountGroups({ rows, busy, onAction }: { rows: stri
                 <div className="sm:col-span-2"><dt className="text-default-500">Last sign in</dt><dd className="mt-0.5">{row[5] || "Never"}</dd></div>
               </dl>
               <div className="flex flex-wrap gap-2 border-t border-default-100 pt-3">
+                {canManage && !isSelf && row[7] && <Button size="sm" variant="outline" isDisabled={busy || editBusy} onPress={() => { setEditError(""); setLoginDraft({ email: row[2] === "—" ? "" : row[2], password: "" }); setEditRow(row) }}><Pencil size={14}/>Edit login</Button>}
                 {canManage && actions.map((action) => <Button key={action} size="sm" variant={action === "Delete" || action === "Ban" ? "danger" : action === "Reactivate" || action === "Unban" ? "primary" : "outline"} isDisabled={busy || isSelf} onPress={() => onAction(action, row)}>{action}</Button>)}
                 {isSelf && <span className="self-center text-[11px] text-default-500">Your account is protected.</span>}
                 {!canManage && !isSelf && <span className="self-center text-[11px] text-default-500">Owner access required.</span>}
@@ -100,6 +124,17 @@ export default function UserAccountGroups({ rows, busy, onAction }: { rows: stri
           <label className="block space-y-1 text-xs font-medium">Initial password<input aria-label="Initial password" type="password" autoComplete="new-password" minLength={8} maxLength={128} value={account.password} onChange={(event) => setAccount((current) => ({ ...current, password: event.target.value }))} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm"/></label>
         </div>
       </Modal.Body><Modal.Footer><Button variant="outline" isDisabled={creating} onPress={() => setCreateOpen(false)}>Cancel</Button><Button variant="primary" isDisabled={creating || !account.name.trim() || !account.email.trim() || account.password.length < 8} onPress={createAccount}>{creating ? "Creating…" : "Create account"}</Button></Modal.Footer></Modal.Dialog></Modal.Container>
+    </Modal.Backdrop>
+    <Modal.Backdrop isOpen={Boolean(editRow)} onOpenChange={(open) => { if (!open && !editBusy) setEditRow(null) }}>
+      <Modal.Container><Modal.Dialog className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"><Modal.CloseTrigger/><Modal.Header><Modal.Heading>Edit account login</Modal.Heading></Modal.Header><Modal.Body>
+        <div className="space-y-3">
+          <p className="text-xs leading-5 text-default-500">Change the email or set a new password now. Supabase stores passwords as hashes, so the current password cannot be viewed. Leave the password blank to keep it unchanged.</p>
+          {editError && <p role="alert" className="rounded-md bg-danger/10 p-3 text-xs text-danger">{editError}</p>}
+          <label className="block space-y-1 text-xs font-medium">Email<input aria-label="New account email" type="email" autoComplete="email" maxLength={254} value={loginDraft.email} onChange={(event) => setLoginDraft((current) => ({ ...current, email: event.target.value }))} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm"/></label>
+          <label className="block space-y-1 text-xs font-medium">New password (optional)<input aria-label="New account password" type="password" autoComplete="new-password" minLength={8} maxLength={128} value={loginDraft.password} onChange={(event) => setLoginDraft((current) => ({ ...current, password: event.target.value }))} className="h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm"/></label>
+          <p className="rounded-md bg-warning/10 p-3 text-xs leading-5 text-warning">The new email is confirmed immediately without an email verification step. Share any new password securely with the account holder. You cannot edit your own login here.</p>
+        </div>
+      </Modal.Body><Modal.Footer><Button variant="outline" isDisabled={editBusy} onPress={() => setEditRow(null)}>Cancel</Button><Button variant="primary" isDisabled={editBusy || !loginDraft.email.trim() || (loginDraft.password.length > 0 && loginDraft.password.length < 8)} onPress={saveLogin}>{editBusy ? "Saving…" : "Save login"}</Button></Modal.Footer></Modal.Dialog></Modal.Container>
     </Modal.Backdrop>
   </>
 }
