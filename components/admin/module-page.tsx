@@ -1155,9 +1155,21 @@ function RecordDirectory({ config, rows, selectable, selectedIds, onToggle, onTo
         </div>
         <div id={panelId} aria-hidden={!expanded} inert={!expanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
           <div className="min-h-0 overflow-hidden"><div className="space-y-4 border-t border-default-200 p-3 sm:p-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {config.title === "Customer Feedback Management" ? <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {details.filter(({ heading }) => !["Rating", "Comment"].includes(heading)).map(({ heading, value }) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">{heading}</p><p className="mt-1 whitespace-pre-wrap break-words text-xs font-medium">{value}</p></div>)}
+              </div>
+              <div className="space-y-3">
+                <div aria-label={`Rating ${row[3]}`} className="text-center text-2xl leading-none tracking-[0.2em] text-amber-500">{row[3] || "☆☆☆☆☆"}</div>
+                <section aria-label="Customer feedback receipt" className="min-h-64 overflow-hidden rounded-xl border border-default-200 bg-background/80">
+                  <div className="border-b border-dashed border-default-300 px-5 py-4"><p className="text-xs font-semibold uppercase tracking-[0.12em]">Customer feedback</p><p className="mt-1 text-[11px] text-default-500">{row[1]} · {row[2]}</p></div>
+                  <div className="min-h-48 whitespace-pre-wrap break-words px-5 py-6 text-sm leading-7">{row[4] || "No written comment was provided."}</div>
+                  <div className="border-t border-dashed border-default-300 px-5 py-3 text-[11px] text-default-500">Order {row[5] || "—"} <span className="mx-2">·</span> {row[6] || "Date unavailable"}</div>
+                </section>
+              </div>
+            </> : <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {details.map(({ heading, value }) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3"><p className="text-[11px] text-default-500">{heading}</p>{heading === "Image" && /^(https?:\/\/|\/)/i.test(value) ? <Image src={value} alt={`${row[titleColumn] || "Record"} image`} width={240} height={160} unoptimized className="mt-2 max-h-40 w-auto max-w-full rounded-md border border-default-200 object-cover" /> : heading === "Image" ? <p className="mt-1 text-xs text-default-500">No image uploaded</p> : /^(status|payment status|order status|availability|visibility)$/i.test(heading) ? <div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(value)}>{value}</Chip></div> : <p className="mt-1 whitespace-pre-wrap break-words text-xs font-medium">{value}</p>}</div>)}
-            </div>
+            </div>}
             {hasPaymentReceipt && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-default-200 p-3"><div><p className="text-xs font-semibold">Customer payment evidence</p><p className="mt-1 text-[11px] text-default-500">A screenshot was attached. Verify the transfer in GCash before confirming.</p></div><Button size="sm" variant="outline" onPress={() => onAction?.("View Receipt", row, index)}><Eye size={14} />View receipt</Button></div>}
             {actions.length > 0 && <div className="flex flex-wrap justify-end gap-1 border-t border-default-100 pt-3">{actions.filter((action) => !(hasPaymentReceipt && /^view receipt$/i.test(action))).map((action) => <Button key={action} size="sm" variant={action.toLowerCase().includes("reject") || action.toLowerCase().includes("remove") || action.toLowerCase().includes("delete") ? "ghost" : "outline"} className={action.toLowerCase().includes("reject") || action.toLowerCase().includes("remove") || action.toLowerCase().includes("delete") ? "text-danger" : ""} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}</div>}
           </div></div>
