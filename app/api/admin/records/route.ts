@@ -28,16 +28,19 @@ export async function POST(request: NextRequest) {
   if (module === "products" || module === "heritage-showcase") {
     const sku = module === "products" ? row[0] : ""
     const showcaseSku = row[6] || value("Product SKU").split(" · ")[0]
-    let categoryName = value("Category")
+    const selectedCategory = value("Category")
     const newCategoryName = value("New Category")
-    if (newCategoryName) categoryName = newCategoryName
+    const isNewCategory = selectedCategory === "Add new category"
+    const categoryName = isNewCategory ? newCategoryName : selectedCategory
+    if (isNewCategory && !categoryName) return fail("Enter a category name.")
+    if (categoryName.length > 80) return fail("Category names must be 80 characters or fewer.")
     let category = null as { id: string } | null
     let categoryError: { message: string } | null = null
     if (categoryName) {
       const existing = await supabase.from("product_categories").select("id").eq("name", categoryName).maybeSingle()
       category = existing.data
       categoryError = existing.error
-      if (!category && !categoryError && newCategoryName) {
+      if (!category && !categoryError && isNewCategory) {
         const created = await supabase.from("product_categories").insert({ name: newCategoryName }).select("id").single()
         category = created.data
         categoryError = created.error
