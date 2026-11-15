@@ -417,7 +417,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
       Category: row?.[3] ?? "", Price: (row?.[4] ?? "").replace(/^₱/, ""),
       "Craft / Origin": row?.[11] ?? "", Visibility: row?.[9] ?? "", Featured: row?.[10] ?? "No",
     }
-    const values = Object.fromEntries(fields.map((field) => [field, slug === "products" ? (productValues[field] ?? "") : row?.[config.columns.indexOf(field)] ?? ""]))
+    const values = Object.fromEntries(fields.map((field) => [field, slug === "products" ? (productValues[field] ?? "") : slug === "heritage-showcase" ? field === "Craft / Origin" ? row?.[1] === "Origin not provided" ? "" : row?.[1] ?? "" : field === "Heritage Description" ? row?.[6] ?? "" : row?.[config.columns.indexOf(field)] ?? "" : row?.[config.columns.indexOf(field)] ?? ""]))
     setDialog({ title, kind: "form", row, rowIndex, action, values })
   }
   const exportRows = (format: "csv" | "pdf" | "sql" = "csv") => {
@@ -470,7 +470,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
       return
     }
     if (lower.includes("edit") || lower === "adjust") {
-      const fields = lower === "adjust" ? ["Current Stock", "Reason"] : slug === "products" ? ["Product Name", "Image URL", "Description", "Category", "Price", "Craft / Origin", "Visibility", "Featured"] : slug === "heritage-showcase" ? ["Heritage Description"] : undefined
+      const fields = lower === "adjust" ? ["Current Stock", "Reason"] : slug === "products" ? ["Product Name", "Image URL", "Description", "Category", "Price", "Craft / Origin", "Visibility", "Featured"] : slug === "heritage-showcase" ? ["Craft / Origin", "Heritage Description"] : undefined
       openForm(`${action}: ${row[0]}`, row, index, action, fields)
       return
     }

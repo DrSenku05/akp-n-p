@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         const patch: Record<string, string | boolean | null> = {
           visibility: "draft",
         }
-        if (values["Heritage Description"] !== undefined) patch.craft_origin = value("Heritage Description") || null
+        if (values["Heritage Description"] !== undefined) patch.description = value("Heritage Description") || null
         if (values["Craft / Origin"] !== undefined) patch.craft_origin = value("Craft / Origin") || null
         if (!Object.keys(patch).length) return fail("No showcase changes were provided.")
         result = await supabase.from("products").update(patch).eq("sku", showcaseSku).select("id")
