@@ -17,6 +17,7 @@ const LOCK_CLASS_ID = 0x414b50
 const LOCK_OBJECT_ID = 0x424b50
 const BACKUP_MARKER = "-- AKP_DATABASE_BACKUP_FORMAT=1"
 const BACKUP_SCOPE_MARKER = "-- AKP_DATABASE_BACKUP_SCHEMAS=public,app_private"
+const INSERT_BATCH_SIZE = 100
 
 export type AdminRole = "owner" | "staff" | null
 export type BackupMetadata = {
@@ -80,6 +81,37 @@ function preserveFunctionDependencies(sql: string) {
     .replace(/^DROP (FUNCTION|PROCEDURE) IF EXISTS .+;\r?$/gm, "")
     .replace(/^CREATE FUNCTION /gm, "CREATE OR REPLACE FUNCTION ")
     .replace(/^CREATE PROCEDURE /gm, "CREATE OR REPLACE PROCEDURE ")
+}
+
+function batchInsertStatements(sql: string) {
+  const output: string[] = []
+  let prefix = ""
+  let rows: string[] = []
+
+  const flush = () => {
+    if (rows.length) output.push(`${prefix}${rows.join(", ")};`)
+    prefix = ""
+    rows = []
+  }
+
+  for (const line of sql.split(/\r?\n/)) {
+    const valuesIndex = line.startsWith("INSERT INTO ") ? line.indexOf(" VALUES ") : -1
+    const statementPrefix = valuesIndex < 0 ? "" : line.slice(0, valuesIndex + " VALUES ".length)
+    const values = valuesIndex < 0 ? "" : line.slice(valuesIndex + " VALUES ".length)
+
+    if (!statementPrefix || !values.startsWith("(") || !values.endsWith(");")) {
+      flush()
+      output.push(line)
+      continue
+    }
+
+    if (prefix !== statementPrefix || rows.length === INSERT_BATCH_SIZE) flush()
+    prefix = statementPrefix
+    rows.push(values.slice(0, -1))
+  }
+
+  flush()
+  return output.join("\n")
 }
 
 export function createBackupClient() {
@@ -206,7 +238,7 @@ export async function generateSqlBackup(connectionString: string) {
     "--clean",
     "--if-exists",
     "--no-owner",
-    "--inserts",
+    `--rows-per-insert=${INSERT_BATCH_SIZE}`,
     "--quote-all-identifiers",
     "--schema=public",
     "--schema=app_private",
@@ -356,7 +388,10 @@ export async function executeSqlRestore(client: Client, connectionString: string
   const sqlPath = join(directory, "restore.sql")
   try {
     const policies = await getExternalPolicyStatements(client, sql)
-    const dependencySafeSql = Buffer.from(preserveFunctionDependencies(sql.toString("utf8")), "utf8")
+    const dependencySafeSql = Buffer.from(
+      batchInsertStatements(preserveFunctionDependencies(sql.toString("utf8"))),
+      "utf8",
+    )
     const restoreSql = Buffer.concat([
       new Uint8Array(Buffer.from(`${policies.before}\n`, "utf8")),
       new Uint8Array(dependencySafeSql),
