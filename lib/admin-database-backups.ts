@@ -280,11 +280,84 @@ export async function readAndVerifyBackup(id: string) {
   }
 }
 
-export async function executeSqlRestore(connectionString: string, sql: Buffer) {
+async function getExternalPolicyStatements(client: Client, sql: Buffer) {
+  const targets = Array.from(
+    sql.toString("utf8").matchAll(/^DROP TABLE IF EXISTS "(public|app_private)"\."((?:""|[^"])*)";$/gm),
+    ([, schema, table]) => ({ schema, table: table.replaceAll('""', '"') }),
+  )
+  if (!targets.length) return { before: "", after: "" }
+
+  const { rows } = await client.query<{ drop_statement: string; create_statement: string }>(
+    `with drop_targets as (
+       select * from unnest($1::text[], $2::text[]) as target(schema_name, table_name)
+     ),
+     external_policies as (
+       select distinct on (policy.oid)
+         policy.oid,
+         policy.polname as policy_name,
+         policy_table_ns.nspname as policy_schema,
+         policy_table.relname as policy_table,
+         policy.polpermissive as permissive,
+         policy.polcmd as command,
+         coalesce((
+           select string_agg(
+             case when role_oid = 0 then 'PUBLIC' else quote_ident(pg_get_userbyid(role_oid)) end,
+             ', ' order by role_oid
+           )
+           from unnest(policy.polroles) role_oid
+         ), 'PUBLIC') as roles,
+         pg_get_expr(policy.polqual, policy.polrelid) as using_expression,
+         pg_get_expr(policy.polwithcheck, policy.polrelid) as check_expression
+       from pg_depend dependency
+       join pg_policy policy
+         on dependency.classid = 'pg_policy'::regclass
+        and dependency.objid = policy.oid
+       join pg_class policy_table on policy_table.oid = policy.polrelid
+       join pg_namespace policy_table_ns on policy_table_ns.oid = policy_table.relnamespace
+       join pg_class target_table on target_table.oid = dependency.refobjid
+       join pg_namespace target_ns on target_ns.oid = target_table.relnamespace
+       join drop_targets target
+         on target.schema_name = target_ns.nspname
+        and target.table_name = target_table.relname
+       where dependency.refclassid = 'pg_class'::regclass
+         and policy_table_ns.nspname <> all($3::text[])
+       order by policy.oid
+     )
+     select
+       format('drop policy %I on %I.%I;', policy_name, policy_schema, policy_table) as drop_statement,
+       format(
+         'create policy %I on %I.%I as %s for %s to %s%s%s;',
+         policy_name,
+         policy_schema,
+         policy_table,
+         case when permissive then 'permissive' else 'restrictive' end,
+         case command when '*' then 'all' when 'r' then 'select' when 'a' then 'insert' when 'w' then 'update' when 'd' then 'delete' end,
+         roles,
+         case when using_expression is null then '' else format(' using (%s)', using_expression) end,
+         case when check_expression is null then '' else format(' with check (%s)', check_expression) end
+       ) as create_statement
+     from external_policies
+     order by policy_schema, policy_table, policy_name`,
+    [targets.map(({ schema }) => schema), targets.map(({ table }) => table), BACKUP_SCHEMAS],
+  )
+
+  return {
+    before: rows.map(({ drop_statement }) => drop_statement).join("\n"),
+    after: rows.map(({ create_statement }) => create_statement).join("\n"),
+  }
+}
+
+export async function executeSqlRestore(client: Client, connectionString: string, sql: Buffer) {
   const directory = await mkdtemp(join(tmpdir(), "akp-database-restore-"))
   const sqlPath = join(directory, "restore.sql")
   try {
-    await writeFile(sqlPath, new Uint8Array(sql), { mode: 0o600, flag: "wx" })
+    const policies = await getExternalPolicyStatements(client, sql)
+    const restoreSql = Buffer.concat([
+      new Uint8Array(Buffer.from(`${policies.before}\n`, "utf8")),
+      new Uint8Array(sql),
+      new Uint8Array(Buffer.from(`\n${policies.after}\n`, "utf8")),
+    ])
+    await writeFile(sqlPath, new Uint8Array(restoreSql), { mode: 0o600, flag: "wx" })
     await runTool("psql", [
       "--no-psqlrc",
       "--set=ON_ERROR_STOP=1",
