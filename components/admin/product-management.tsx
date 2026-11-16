@@ -231,11 +231,14 @@ export default function ProductManagement({ initialSection = "general" }: { init
     const selectedImages = deletableImages.filter((image) => selectedDeletableImageIds.includes(image.id))
     if (!selectedImages.length || !confirm(`Remove ${selectedImages.length} selected gallery image(s)?`)) return
     setBusy(true)
-    const { error } = await supabase.from("product_images").delete().in("id", selectedImages.map((image) => image.id)).eq("product_id", selected.id)
+    const { data: deletedRows, error } = await supabase.from("product_images").delete().in("id", selectedImages.map((image) => image.id)).eq("product_id", selected.id).select("id")
     if (error) return fail(error.message)
-    setSelectedImageIds([])
+    const deletedIds = new Set((deletedRows || []).map((row) => row.id))
+    const deletedImages = selectedImages.filter((image) => deletedIds.has(image.id))
+    if (!deletedImages.length) return fail("No selected images were deleted. Check your admin permissions and try again.")
+    setSelectedImageIds((current) => current.filter((id) => !deletedIds.has(id)))
     const marker = "/storage/v1/object/public/product-images/"
-    const paths = selectedImages.flatMap((image) => {
+    const paths = deletedImages.flatMap((image) => {
       try {
         const path = decodeURIComponent(new URL(image.image_url).pathname.split(marker)[1] || "")
         return path ? [path] : []
@@ -246,7 +249,12 @@ export default function ProductManagement({ initialSection = "general" }: { init
     const { error: storageError } = paths.length ? await supabase.storage.from("product-images").remove(paths) : { error: null }
     await load()
     setBusy(false)
-    setNotice(storageError ? `Selected gallery images were removed, but some stored files could not be deleted: ${storageError.message}` : "Selected gallery images removed.")
+    const skippedCount = selectedImages.length - deletedImages.length
+    setNotice(storageError
+      ? `${deletedImages.length} gallery image record(s) removed, but some stored files could not be deleted: ${storageError.message}`
+      : skippedCount
+        ? `${deletedImages.length} gallery image(s) removed. ${skippedCount} selected image(s) could not be deleted.`
+        : `Selected ${deletedImages.length} gallery image(s) removed.`)
   }
   async function permanentlyDeleteSelected() {
     if (!selected || !confirm(`Permanently delete ${selected.name}? Historical orders and movements keep their snapshots; this cannot be undone.`)) return
