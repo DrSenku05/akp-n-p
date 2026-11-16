@@ -64,8 +64,30 @@
 .product-detail-scroll::-webkit-scrollbar-track { background: var(--default); border-radius: 999px; }
 .product-detail-scroll::-webkit-scrollbar-thumb { background: var(--accent); border: 2px solid var(--default); border-radius: 999px; }
 
+@property --product-selector-track {
+	syntax: "<length-percentage>";
+	inherits: false;
+	initial-value: 50%;
+}
+
 .product-selector-layout {
-	transition: grid-template-columns 420ms cubic-bezier(.22, 1, .36, 1), grid-template-rows 420ms cubic-bezier(.22, 1, .36, 1);
+	--product-selector-track: 50%;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: minmax(0, var(--product-selector-track)) minmax(0, 1fr);
+	transition: --product-selector-track 420ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.product-selector-layout[data-has-selection="true"] {
+	--product-selector-track: 35%;
+}
+
+@media (min-width: 64rem) {
+	.product-selector-layout { grid-template-columns: minmax(0, var(--product-selector-track)) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+	.product-selector-layout[data-has-selection="true"] { --product-selector-track: 340px; }
+}
+
+@media (min-width: 80rem) {
+	.product-selector-layout[data-has-selection="true"] { --product-selector-track: 360px; }
 }
 
 @keyframes product-panel-enter {
