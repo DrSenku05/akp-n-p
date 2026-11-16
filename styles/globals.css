@@ -64,6 +64,10 @@
 .product-detail-scroll::-webkit-scrollbar-track { background: var(--default); border-radius: 999px; }
 .product-detail-scroll::-webkit-scrollbar-thumb { background: var(--accent); border: 2px solid var(--default); border-radius: 999px; }
 
+.product-selector-layout {
+	transition: grid-template-columns 420ms cubic-bezier(.22, 1, .36, 1), grid-template-rows 420ms cubic-bezier(.22, 1, .36, 1);
+}
+
 @keyframes product-panel-enter {
 	from { opacity: 0; transform: translateX(2rem); }
 	to { opacity: 1; transform: translateX(0); }
@@ -81,8 +85,9 @@
 .product-mode-enter-back { --product-mode-offset: -1.5rem; }
 
 @media (prefers-reduced-motion: reduce) {
+	.product-selector-layout,
 	.product-panel-enter,
-	.product-mode-enter { animation: none; }
+	.product-mode-enter { animation: none; transition: none; }
 }
 
 button:not(:disabled):not([aria-disabled="true"]) {
