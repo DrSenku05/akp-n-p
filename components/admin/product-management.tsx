@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Archive, ImagePlus, PackagePlus, Search, Star, X } from "lucide-react"
+import { Archive, Eye, ImagePlus, PackagePlus, Pencil, Search, Star, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 type Section = "general" | "stock" | "heritage" | "publishing"
@@ -32,6 +32,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [images, setImages] = useState<ProductImage[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [selectedId, setSelectedId] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
   const [section, setSection] = useState<Section>(initialSection)
   const [role, setRole] = useState<string | null>(null)
   const [query, setQuery] = useState("")
@@ -96,6 +97,10 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const story = stories.find((item) => item.product_id === selected?.id) || null
   const productImages = images.filter((item) => item.product_id === selected?.id)
   const topCategories = categories.filter((item) => !item.parent_category_id && !item.archived_at)
+
+  const selectedCategory = categories.find((c) => c.id === selected?.category_id) || null
+  const selectedSubcategory = categories.find((c) => c.id === selected?.subcategory_id) || null
+
   const visibleRows = products.filter((item) => {
     const matchesText = `${item.name} ${item.sku}`.toLowerCase().includes(query.toLowerCase())
     const matchesFilter = filter === "all" || (filter === "low" ? item.available_stock <= Number(threshold) : filter === "featured" ? item.is_featured : item.visibility === filter)
@@ -253,17 +258,215 @@ export default function ProductManagement({ initialSection = "general" }: { init
         <div className="relative mb-3"><Search className="absolute left-3 top-2.5 text-default-400" size={16}/><input className={`${inputClass} pl-9`} placeholder="Search name or SKU" value={query} onChange={(e) => setQuery(e.target.value)}/></div>
         <div className="mb-3 grid grid-cols-2 gap-2"><select className={inputClass} value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">All status</option><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option><option value="low">Low stock</option><option value="featured">Featured</option></select><select className={inputClass} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="all">All categories</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.parent_category_id ? "↳ " : ""}{c.name}{c.archived_at ? " (archived)" : ""}</option>)}</select><select className={`${inputClass} col-span-2`} value={sort} onChange={(e) => setSort(e.target.value)}><option value="name">Sort by name</option><option value="stock">Sort by available stock</option><option value="price">Sort by price</option></select></div>
         <div className="min-h-40 flex-1 space-y-1 overflow-y-auto" aria-label="Products list">
-          {loading ? <p className="p-4 text-sm text-default-500">Loading products…</p> : visibleRows.length === 0 ? <div className="p-5 text-center text-sm text-default-500">No products match. Add a product to begin.</div> : visibleRows.map((item) => <button key={item.id} onClick={() => setSelectedId(item.id)} className={`flex w-full items-center gap-3 rounded-lg p-2.5 text-left hover:bg-default-100 ${selectedId === item.id ? "bg-primary/10 ring-1 ring-primary/30" : ""}`}>
+          {loading ? <p className="p-4 text-sm text-default-500">Loading products…</p> : visibleRows.length === 0 ? <div className="p-5 text-center text-sm text-default-500">No products match. Add a product to begin.</div> : visibleRows.map((item) => <button key={item.id} onClick={() => { setSelectedId(item.id); setIsEditing(false) }} className={`flex w-full items-center gap-3 rounded-lg p-2.5 text-left hover:bg-default-100 ${selectedId === item.id ? "bg-primary/10 ring-1 ring-primary/30" : ""}`}>
             <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-default-100">{item.image_url && <img src={item.image_url} alt="" className="h-full w-full object-cover"/>}</div><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{item.name}</span><span className="mt-1 flex flex-wrap items-center gap-1.5"><span className="truncate text-[11px] text-default-500">{item.sku}</span><span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold capitalize ${visibilityClass[item.visibility]}`}>{item.visibility}</span></span><span className={`block text-xs ${item.available_stock <= Number(threshold) ? "font-semibold text-danger" : "text-default-500"}`}>Available {item.available_stock}{item.available_stock <= Number(threshold) ? " · Low stock" : ""}</span></span>{item.is_featured && <Star size={15} className="fill-accent text-accent"/>}
           </button>)}
         </div>
         <div className="mt-3 border-t border-default-200 pt-3 text-xs text-default-500">{products.length} products · {products.filter((p) => p.visibility === "published").length} published</div>
       </aside>
       <section className={`${cardClass} flex min-h-0 min-w-0 flex-col overflow-hidden p-3 md:p-4`}>
-        {!selected ? <div className="grid min-h-0 flex-1 place-items-center text-center"><div><PackagePlus className="mx-auto mb-3 text-default-400" size={36}/><p className="font-semibold">Select a product to edit</p><p className="mt-1 text-sm text-default-500">Your product list stays here while its details open beside it.</p><button onClick={() => setShowCreate(true)} className="mt-4 rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Add product</button></div></div> : <div key={selected.id} className="product-panel-enter flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-default-200 pb-2"><div className="flex items-center gap-2.5"><div className="h-12 w-12 overflow-hidden rounded-lg bg-default-100">{selected.image_url && <img src={selected.image_url} alt="" className="h-full w-full object-cover"/>}</div><div><h2 className="text-base font-bold">{selected.name}</h2><p className="text-xs text-default-500">{selected.sku}</p></div></div><span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${visibilityClass[selected.visibility]}`}>{selected.visibility}</span></div>
-          <nav className="my-2 flex shrink-0 gap-1 overflow-x-auto border-b border-default-200" aria-label="Product sections">{sections.map((item) => <button key={item.id} onClick={() => { setSection(item.id); const url = new URL(window.location.href); url.searchParams.set("section", item.id); window.history.replaceState({}, "", url) }} className={`whitespace-nowrap border-b-2 px-2.5 py-1.5 text-xs font-medium ${section === item.id ? "border-accent text-accent" : "border-transparent text-default-500 hover:text-foreground"}`}>{item.title}</button>)}</nav>
+        {!selected ? <div className="grid min-h-0 flex-1 place-items-center text-center"><div><PackagePlus className="mx-auto mb-3 text-default-400" size={36}/><p className="font-semibold">Select a product to view details</p><p className="mt-1 text-sm text-default-500">Your product list stays here while extended details open beside it.</p><button onClick={() => setShowCreate(true)} className="mt-4 rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Add product</button></div></div> : <div key={selected.id} className="product-panel-enter flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-default-200 pb-2">
+            <div className="flex items-center gap-2.5">
+              <div className="h-12 w-12 overflow-hidden rounded-lg bg-default-100">{selected.image_url && <img src={selected.image_url} alt="" className="h-full w-full object-cover"/>}</div>
+              <div>
+                <h2 className="text-base font-bold">{selected.name}</h2>
+                <p className="text-xs text-default-500">{selected.sku}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${visibilityClass[selected.visibility]}`}>{selected.visibility}</span>
+              {isEditing ? (
+                <button type="button" onClick={() => setIsEditing(false)} className="inline-flex items-center gap-1.5 rounded-lg border border-default-400 bg-background px-3 py-1.5 text-xs font-semibold hover:border-accent">
+                  <Eye size={14}/> View details
+                </button>
+              ) : (
+                <button type="button" onClick={() => setIsEditing(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                  <Pencil size={14}/> Edit product
+                </button>
+              )}
+            </div>
+          </div>
+          {isEditing && (
+            <nav className="my-2 flex shrink-0 gap-1 overflow-x-auto border-b border-default-200" aria-label="Product sections">{sections.map((item) => <button key={item.id} onClick={() => { setSection(item.id); const url = new URL(window.location.href); url.searchParams.set("section", item.id); window.history.replaceState({}, "", url) }} className={`whitespace-nowrap border-b-2 px-2.5 py-1.5 text-xs font-medium ${section === item.id ? "border-accent text-accent" : "border-transparent text-default-500 hover:text-foreground"}`}>{item.title}</button>)}</nav>
+          )}
           <div className="product-detail-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {!isEditing ? (
+            <div className="space-y-4 pt-1">
+              {/* Quick Actions & Highlights */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-default-200 bg-default-50/60 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-default-500">Quick actions:</span>
+                  <button type="button" onClick={() => { setIsEditing(true); setSection("general") }} className="rounded-md border border-default-300 bg-background px-2.5 py-1 text-xs font-medium hover:border-accent">Edit info</button>
+                  <button type="button" onClick={() => { setIsEditing(true); setSection("stock") }} className="rounded-md border border-default-300 bg-background px-2.5 py-1 text-xs font-medium hover:border-accent">Adjust stock</button>
+                  <button type="button" onClick={() => { setIsEditing(true); setSection("heritage") }} className="rounded-md border border-default-300 bg-background px-2.5 py-1 text-xs font-medium hover:border-accent">Heritage story</button>
+                  <button type="button" onClick={() => { setIsEditing(true); setSection("publishing") }} className="rounded-md border border-default-300 bg-background px-2.5 py-1 text-xs font-medium hover:border-accent">Publishing</button>
+                </div>
+                {selected.visibility === "published" && (
+                  <button type="button" disabled={busy} onClick={() => void createWalkInOrder()} className="rounded-md border border-default-400 bg-background px-3 py-1 text-xs font-semibold hover:border-accent">
+                    + Walk-in order
+                  </button>
+                )}
+              </div>
+
+              {/* Top Overview: 3 Metric Cards */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className={cardClass}>
+                  <span className={labelClass}>Price</span>
+                  <p className="text-2xl font-bold text-foreground">₱{Number(selected.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-default-500">Retail price</p>
+                </div>
+                <div className={cardClass}>
+                  <span className={labelClass}>Physical stock</span>
+                  <p className="text-2xl font-bold text-accent">{selected.stock_quantity}</p>
+                  <p className="text-xs text-default-500">Total units on hand</p>
+                </div>
+                <div className={cardClass}>
+                  <span className={labelClass}>Reserved</span>
+                  <p className="text-2xl font-bold text-warning">{selected.reserved_stock}</p>
+                  <p className="text-xs text-default-500">Held for pending orders</p>
+                </div>
+                <div className={`${cardClass} ${selected.available_stock <= Number(threshold) ? "border-danger/30 bg-danger/5" : "border-success/20 bg-success/5"}`}>
+                  <span className={labelClass}>Available</span>
+                  <p className={`text-2xl font-bold ${selected.available_stock <= Number(threshold) ? "text-danger" : "text-success"}`}>{selected.available_stock}</p>
+                  <p className="text-xs text-default-500">{selected.available_stock <= Number(threshold) ? "At or below threshold" : "Ready for order"}</p>
+                </div>
+              </div>
+
+              {/* Main Specifications & Categories */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className={`${cardClass} space-y-3`}>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-default-500">General Information</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between border-b border-default-100 pb-1.5">
+                      <span className="text-default-500">Product Name:</span>
+                      <span className="font-semibold text-foreground text-right">{selected.name}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-default-100 pb-1.5">
+                      <span className="text-default-500">SKU:</span>
+                      <span className="font-mono text-xs font-semibold text-foreground">{selected.sku}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-default-100 pb-1.5">
+                      <span className="text-default-500">Category:</span>
+                      <span className="font-medium text-foreground">{selectedCategory?.name || "Uncategorized"}</span>
+                    </div>
+                    {selectedSubcategory && (
+                      <div className="flex justify-between border-b border-default-100 pb-1.5">
+                        <span className="text-default-500">Subcategory:</span>
+                        <span className="font-medium text-foreground">{selectedSubcategory.name}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-b border-default-100 pb-1.5">
+                      <span className="text-default-500">Visibility:</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${visibilityClass[selected.visibility]}`}>{selected.visibility}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-default-100 pb-1.5">
+                      <span className="text-default-500">Featured in Heritage:</span>
+                      <span className="font-medium text-foreground">{selected.is_featured ? "Yes" : "No"}</span>
+                    </div>
+                    <div className="flex justify-between pb-1">
+                      <span className="text-default-500">Heritage Required:</span>
+                      <span className="font-medium text-foreground">{selected.heritage_required ? "Yes (by owner)" : "Optional"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`${cardClass} flex flex-col justify-between space-y-3`}>
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-default-500 mb-2">Description</h3>
+                    <p className="text-sm leading-relaxed text-default-700 whitespace-pre-wrap">
+                      {selected.description ? selected.description : <span className="italic text-default-400">No description provided yet.</span>}
+                    </p>
+                  </div>
+                  {selected.craft_origin && (
+                    <div className="border-t border-default-100 pt-2 text-xs">
+                      <span className="text-default-500">Craft / Origin: </span>
+                      <span className="font-medium text-foreground">{selected.craft_origin}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Gallery Images */}
+              <div className={cardClass}>
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm">Product Gallery ({productImages.length} images)</h3>
+                    <p className="text-xs text-default-500">Primary display image and supplemental views</p>
+                  </div>
+                  <button type="button" onClick={() => { setIsEditing(true); setSection("general") }} className="text-xs text-primary hover:underline">Manage images</button>
+                </div>
+                {productImages.length ? (
+                  <div className="flex flex-wrap gap-3">
+                    {productImages.map((image) => (
+                      <figure key={image.id} className="relative h-24 w-24 overflow-hidden rounded-lg border border-default-200">
+                        <img src={image.image_url} alt="" className="h-full w-full object-cover"/>
+                        {image.is_primary && <span className="absolute bottom-0 w-full bg-black/65 px-1 py-1 text-center text-[10px] text-white">Primary</span>}
+                      </figure>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs italic text-default-400">No gallery images uploaded.</p>
+                )}
+              </div>
+
+              {/* Native Heritage Story */}
+              <div className="rounded-xl border border-accent/20 bg-accent/5 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-accent text-sm">Native Heritage & Artisan Story</h3>
+                  <button type="button" onClick={() => { setIsEditing(true); setSection("heritage") }} className="text-xs text-accent hover:underline">Edit story</button>
+                </div>
+                {story?.heritage_description || story?.origin || story?.traditional_craft || story?.cover_image_url ? (
+                  <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+                    <div className="space-y-2 text-xs text-default-700">
+                      {story.origin && <p><b className="text-default-900">Origin / Community:</b> {story.origin}</p>}
+                      {story.traditional_craft && <p><b className="text-default-900">Traditional Craft:</b> {story.traditional_craft}</p>}
+                      {story.heritage_description && (
+                        <p className="mt-1 leading-relaxed whitespace-pre-wrap text-sm text-foreground">{story.heritage_description}</p>
+                      )}
+                    </div>
+                    {story.cover_image_url && (
+                      <div className="shrink-0">
+                        <p className="text-[11px] text-default-500 mb-1">Cover Image</p>
+                        <img src={story.cover_image_url} alt="Cover preview" className="h-24 w-36 rounded-lg object-cover border border-default-200"/>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs italic text-default-500">No Native Heritage story recorded for this product yet.</p>
+                )}
+              </div>
+
+              {/* Recent Inventory Movements */}
+              <div className={cardClass}>
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm">Recent Inventory History</h3>
+                    <p className="text-xs text-default-500">Audit trail of stock received, damaged, or adjusted</p>
+                  </div>
+                  <button type="button" onClick={() => { setIsEditing(true); setSection("stock") }} className="text-xs text-primary hover:underline">Record movement</button>
+                </div>
+                {history.length ? (
+                  <div className="space-y-2">
+                    {history.slice(0, 5).map((m) => (
+                      <div key={m.id} className="flex flex-wrap justify-between gap-2 border-b border-default-100 py-2 text-xs">
+                        <span>
+                          <b className="capitalize text-foreground">{m.movement_type}</b> · {m.reason}
+                          <span className="block text-default-500">{m.created_by ? `Admin ${m.created_by}` : "System / order"}</span>
+                        </span>
+                        <span className={m.quantity_delta > 0 ? "font-semibold text-success" : m.quantity_delta < 0 ? "font-semibold text-danger" : "text-default-600"}>
+                          Physical {m.stock_before} → {m.stock_after} · Reserved {m.reserved_before} → {m.reserved_after} · {new Date(m.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-default-500">No inventory movements recorded yet.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
           {section === "general" && <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2"><label><span className={labelClass}>Product name</span><input className={inputClass} value={draft.name || ""} onChange={(e) => updateDraft("name", e.target.value)}/></label><label><span className={labelClass}>SKU · permanent</span><input className={`${inputClass} bg-default-100`} readOnly value={selected.sku}/></label><label className="md:col-span-2"><span className={labelClass}>Description</span><textarea className={inputClass} rows={4} value={draft.description || ""} onChange={(e) => updateDraft("description", e.target.value)}/></label>
               <label><span className={labelClass}>Category</span><select className={inputClass} value={draft.category_id || ""} onChange={(e) => { updateDraft("category_id", e.target.value || null); updateDraft("subcategory_id", null) }}><option value="">Choose category</option>{topCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label><span className={labelClass}>Subcategory</span><select className={inputClass} value={draft.subcategory_id || ""} onChange={(e) => updateDraft("subcategory_id", e.target.value || null)}><option value="">None</option>{categories.filter((c) => c.parent_category_id === draft.category_id && !c.archived_at).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
@@ -281,6 +484,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
           </div>}
           {section === "heritage" && <div className="space-y-4"><div className="rounded-xl border border-accent/20 bg-accent/5 p-4"><h3 className="text-lg font-semibold text-accent">Native Heritage story</h3><p className="text-sm text-default-600">Optional unless the owner marks it required before publishing.</p></div><label><span className={labelClass}>Story</span><textarea className={inputClass} rows={6} value={storyDraft.heritage_description || ""} onChange={(e) => updateStory("heritage_description", e.target.value)}/></label><div className="grid gap-4 md:grid-cols-2"><label><span className={labelClass}>Origin / community</span><input className={inputClass} value={storyDraft.origin || ""} onChange={(e) => updateStory("origin", e.target.value)}/></label><label><span className={labelClass}>Traditional craft</span><input className={inputClass} value={storyDraft.traditional_craft || ""} onChange={(e) => updateStory("traditional_craft", e.target.value)}/></label></div><div className="flex flex-wrap items-center gap-3"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-default-400 px-4 py-2 text-sm hover:border-accent"><ImagePlus size={16}/> Upload heritage cover<input hidden type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setBusy(true); try { const uploaded = await upload(file, `heritage/${selected.sku}`); updateStory("cover_image_url", uploaded.url); setNotice("Cover uploaded. Save the story to keep it.") } catch (error) { fail(error instanceof Error ? error.message : "Could not upload cover.") } setBusy(false) }}/></label>{storyDraft.cover_image_url && <img src={storyDraft.cover_image_url} alt="Heritage cover preview" className="h-20 w-32 rounded-lg object-cover"/>}{role === "owner" && <label className="ml-auto inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.heritage_required} onChange={(e) => void rpc("set_product_heritage_required", { p_sku: selected.sku, p_required: e.target.checked }, e.target.checked ? "Heritage fields are now required." : "Heritage fields are optional.")}/> Required before publishing</label>}</div><button disabled={busy} onClick={() => void saveStory()} className="rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Save story</button><div className={cardClass}><label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.is_featured} onChange={(e) => void rpc("set_product_featured", { p_sku: selected.sku, p_featured: e.target.checked }, e.target.checked ? "Product featured." : "Product unfeatured.")}/> Feature in Native Heritage presentation</label><p className="mt-1 text-xs text-default-500">Featured selection only; the storefront keeps its current rotation behavior.</p></div></div>}
           {section === "publishing" && <div className="w-full space-y-4"><div className={cardClass}><h3 className="font-semibold">Publishing checklist</h3><ul className="mt-3 space-y-2 text-sm">{[["Name", !!selected.name.trim()], ["Primary image", !!selected.image_url], ["Category", !!selected.category_id], ["Price above zero", Number(selected.price) > 0], ["Required heritage story", !selected.heritage_required || !!(story?.heritage_description?.trim() && story.origin?.trim() && story.traditional_craft?.trim() && story.cover_image_url) ]].map(([label, ok]) => <li key={String(label)} className="flex justify-between border-b border-default-100 py-2"><span>{label}</span><span className={ok ? "text-success" : "text-danger"}>{ok ? "Ready" : "Needs attention"}</span></li>)}</ul></div><div className="flex flex-wrap gap-2">{selected.visibility !== "published" && <button disabled={busy} onClick={() => void rpc("publish_product", { p_sku: selected.sku }, "Product published.")} className="rounded-lg border border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">Publish</button>}{selected.visibility !== "archived" && <button disabled={busy} onClick={() => void rpc("archive_product", { p_sku: selected.sku }, "Product archived.")} className="rounded-lg border border-default-400 px-4 py-2.5 text-sm font-semibold hover:border-accent">Archive</button>}{role === "owner" && <button disabled={busy} onClick={() => void permanentlyDeleteSelected()} className="ml-auto rounded-lg border border-danger/50 px-4 py-2.5 text-sm font-semibold text-danger hover:bg-danger/5">Permanently delete</button>}</div><p className="text-xs text-default-500">Drafts and archived products stay hidden. Published products remain listed when stock reaches zero; checkout enforces available stock.</p></div>}
+          </>)}
           </div>
         </div>}
       </section>
