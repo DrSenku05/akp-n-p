@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Archive, Eye, ImagePlus, PackagePlus, Pencil, Search, Star, Trash2, X } from "lucide-react"
+import { Archive, ImagePlus, PackagePlus, Pencil, Search, Star, Trash2, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 type Section = "general" | "stock" | "heritage" | "publishing"
@@ -140,12 +140,14 @@ export default function ProductManagement({ initialSection = "general" }: { init
     if (error) throw error
     return { path, url: supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl }
   }
-  async function saveGeneral() {
+  async function saveGeneral(asDraft = false) {
     if (!selected) return
     setBusy(true); setNotice("")
-    const { error } = await supabase.from("products").update({ name: draft.name, description: draft.description, category_id: draft.category_id, subcategory_id: draft.subcategory_id || null, price: Number(draft.price), image_url: draft.image_url }).eq("id", selected.id)
+    const { error } = asDraft
+      ? await supabase.rpc("save_product_draft", { p_product_id: selected.id, p_name: draft.name, p_description: draft.description, p_category_id: draft.category_id, p_subcategory_id: draft.subcategory_id || null, p_price: Number(draft.price), p_image_url: draft.image_url })
+      : await supabase.from("products").update({ name: draft.name, description: draft.description, category_id: draft.category_id, subcategory_id: draft.subcategory_id || null, price: Number(draft.price), image_url: draft.image_url }).eq("id", selected.id)
     if (error) return fail(error.message)
-    setNotice("Product details saved."); setBusy(false); await load()
+    setNotice(asDraft ? "Product details saved as a draft." : "Product details saved."); setBusy(false); await load()
   }
   async function createDraft(event: React.FormEvent) {
     event.preventDefault(); if (!newName.trim() || !newImage) return fail("A product image and name are required.")
@@ -320,11 +322,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
             </div>
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${visibilityClass[selected.visibility]}`}>{selected.visibility}</span>
-              {isEditing ? (
-                <button type="button" onClick={() => setIsEditing(false)} className="inline-flex items-center gap-1.5 rounded-lg border border-default-400 bg-background px-3 py-1.5 text-xs font-semibold hover:border-accent">
-                  <Eye size={14}/> View details
-                </button>
-              ) : (
+              {!isEditing && (
                 <button type="button" onClick={() => setIsEditing(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
                   <Pencil size={14}/> Edit product
                 </button>
@@ -533,7 +531,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
             </div>
             <div className={`${cardClass} space-y-3`}><div><h3 className="font-semibold">Categories</h3><p className="text-xs text-default-500">Rename or archive categories. Archiving keeps current product assignments.</p></div><form onSubmit={saveCategory} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]"><input className={inputClass} placeholder="Category name" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} required/><select className={inputClass} value={categoryParent} onChange={(e) => setCategoryParent(e.target.value)}><option value="">Top-level category</option>{topCategories.map((c) => <option key={c.id} value={c.id}>Subcategory of {c.name}</option>)}</select><button disabled={busy} className="rounded-lg border border-default-400 px-4 py-2 text-sm font-semibold hover:border-accent">Add</button></form><div className="flex flex-wrap gap-2">{categories.filter((c) => !c.archived_at).map((c) => <span key={c.id} className="inline-flex items-center gap-2 rounded-full bg-default-100 px-3 py-1 text-xs">{c.parent_category_id ? "↳ " : ""}{c.name}<button title={`Rename ${c.name}`} onClick={() => void renameCategory(c)} className="rounded border border-default-300 px-1 hover:border-accent hover:text-accent"><span aria-hidden="true">✎</span></button><button title={`Archive ${c.name}`} onClick={() => void archiveCategory(c)} className="rounded border border-default-300 p-1 hover:border-accent hover:text-accent"><Archive size={13}/></button></span>)}</div></div>
             {role === "owner" && <div className={`${cardClass} grid gap-3 md:grid-cols-[1fr_1fr_auto]`}><label><span className={labelClass}>New SKU prefix</span><input className={inputClass} value={skuPrefix} maxLength={24} onChange={(e) => setSkuPrefix(e.target.value)}/></label><label><span className={labelClass}>Minimum number digits</span><input className={inputClass} type="number" min="1" max="16" value={skuDigits} onChange={(e) => setSkuDigits(e.target.value)}/></label><button onClick={() => void saveSkuFormat()} className="self-end rounded-lg border border-default-400 px-4 py-2 text-sm font-semibold hover:border-accent">Save SKU format</button></div>}
-            <button disabled={busy} onClick={() => void saveGeneral()} className="rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Save general details</button>
+            <button disabled={busy} onClick={() => void saveGeneral(true)} className="rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Save details as draft</button>
           </div>}
           {section === "stock" && <div className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><div className={cardClass}><span className={labelClass}>Physical stock</span><p className="text-2xl font-bold text-accent">{selected.stock_quantity}</p></div><div className={cardClass}><span className={labelClass}>Reserved</span><p className="text-2xl font-bold text-warning">{selected.reserved_stock}</p></div><div className={`${cardClass} ${selected.available_stock <= Number(threshold) ? "border-danger/30 bg-danger/5" : "border-success/20 bg-success/5"}`}><span className={labelClass}>Available</span><p className={`text-2xl font-bold ${selected.available_stock <= Number(threshold) ? "text-danger" : "text-success"}`}>{selected.available_stock}</p><p className="text-xs text-default-500">Physical stock minus reserved</p></div></div>
             {selected.visibility === "published" && <button disabled={busy} onClick={() => void createWalkInOrder()} className="rounded-lg border border-default-400 px-4 py-2.5 text-sm font-semibold hover:border-accent">Create walk-in order for this product</button>}
