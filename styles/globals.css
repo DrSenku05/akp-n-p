@@ -71,8 +71,18 @@
 
 .product-panel-enter { animation: product-panel-enter 240ms ease-out both; }
 
+@keyframes product-mode-enter {
+	from { opacity: 0; transform: translateX(var(--product-mode-offset)); }
+	to { opacity: 1; transform: translateX(0); }
+}
+
+.product-mode-enter { animation: product-mode-enter 240ms ease-out both; }
+.product-mode-enter-forward { --product-mode-offset: 1.5rem; }
+.product-mode-enter-back { --product-mode-offset: -1.5rem; }
+
 @media (prefers-reduced-motion: reduce) {
-	.product-panel-enter { animation: none; }
+	.product-panel-enter,
+	.product-mode-enter { animation: none; }
 }
 
 button:not(:disabled):not([aria-disabled="true"]) {
