@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Archive, Eye, ImagePlus, PackagePlus, Pencil, Search, Star, X } from "lucide-react"
+import { Archive, Eye, ImagePlus, PackagePlus, Pencil, Search, Star, Trash2, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 type Section = "general" | "stock" | "heritage" | "publishing"
@@ -30,6 +30,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [images, setImages] = useState<ProductImage[]>([])
+  const [selectedImageIds, setSelectedImageIds] = useState<string[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [imagePreview, setImagePreview] = useState<{ url: string; alt: string } | null>(null)
   const [selectedId, setSelectedId] = useState("")
@@ -97,6 +98,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
     window.addEventListener("keydown", closeOnEscape)
     return () => window.removeEventListener("keydown", closeOnEscape)
   }, [imagePreview])
+  useEffect(() => { setSelectedImageIds([]) }, [selectedId])
   useEffect(() => {
     void fetch("/api/admin/inventory-settings").then(async (r) => r.ok ? r.json() : null).then((data) => {
       if (data) { setThreshold(String(data.threshold)); setCanEditThreshold(data.canEdit) }
@@ -106,6 +108,8 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const selected = products.find((item) => item.id === selectedId) || null
   const story = stories.find((item) => item.product_id === selected?.id) || null
   const productImages = images.filter((item) => item.product_id === selected?.id)
+  const deletableImages = productImages.filter((image) => !image.is_primary)
+  const selectedDeletableImageIds = selectedImageIds.filter((id) => deletableImages.some((image) => image.id === id))
   const topCategories = categories.filter((item) => !item.parent_category_id && !item.archived_at)
 
   const selectedCategory = categories.find((c) => c.id === selected?.category_id) || null
@@ -221,6 +225,28 @@ export default function ProductManagement({ initialSection = "general" }: { init
       if (path) await supabase.storage.from("product-images").remove([path])
     } catch { /* An external image URL has no product-images object to remove. */ }
     setBusy(false); setNotice("Gallery image removed."); await load()
+  }
+  async function removeSelectedImages() {
+    if (!selected) return
+    const selectedImages = deletableImages.filter((image) => selectedDeletableImageIds.includes(image.id))
+    if (!selectedImages.length || !confirm(`Remove ${selectedImages.length} selected gallery image(s)?`)) return
+    setBusy(true)
+    const { error } = await supabase.from("product_images").delete().in("id", selectedImages.map((image) => image.id)).eq("product_id", selected.id)
+    if (error) return fail(error.message)
+    setSelectedImageIds([])
+    const marker = "/storage/v1/object/public/product-images/"
+    const paths = selectedImages.flatMap((image) => {
+      try {
+        const path = decodeURIComponent(new URL(image.image_url).pathname.split(marker)[1] || "")
+        return path ? [path] : []
+      } catch {
+        return []
+      }
+    })
+    const { error: storageError } = paths.length ? await supabase.storage.from("product-images").remove(paths) : { error: null }
+    await load()
+    setBusy(false)
+    setNotice(storageError ? `Selected gallery images were removed, but some stored files could not be deleted: ${storageError.message}` : "Selected gallery images removed.")
   }
   async function permanentlyDeleteSelected() {
     if (!selected || !confirm(`Permanently delete ${selected.name}? Historical orders and movements keep their snapshots; this cannot be undone.`)) return
@@ -482,7 +508,21 @@ export default function ProductManagement({ initialSection = "general" }: { init
             <div className="grid gap-4 md:grid-cols-2"><label><span className={labelClass}>Product name</span><input className={inputClass} value={draft.name || ""} onChange={(e) => updateDraft("name", e.target.value)}/></label><label><span className={labelClass}>SKU · permanent</span><input className={`${inputClass} bg-default-100`} readOnly value={selected.sku}/></label><label className="md:col-span-2"><span className={labelClass}>Description</span><textarea className={inputClass} rows={4} value={draft.description || ""} onChange={(e) => updateDraft("description", e.target.value)}/></label>
               <label><span className={labelClass}>Category</span><select className={inputClass} value={draft.category_id || ""} onChange={(e) => { updateDraft("category_id", e.target.value || null); updateDraft("subcategory_id", null) }}><option value="">Choose category</option>{topCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label><span className={labelClass}>Subcategory</span><select className={inputClass} value={draft.subcategory_id || ""} onChange={(e) => updateDraft("subcategory_id", e.target.value || null)}><option value="">None</option>{categories.filter((c) => c.parent_category_id === draft.category_id && !c.archived_at).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             </div>
-            <div className={cardClass}><div className="mb-3 flex items-center justify-between"><div><h3 className="font-semibold">Product images</h3><p className="text-xs text-default-500">One primary image plus additional gallery images.</p></div><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-default-400 px-3 py-2 text-sm hover:border-accent"><ImagePlus size={16}/> Add image<input hidden type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && void addImage(e.target.files[0])}/></label></div><div className="flex flex-wrap gap-3">{productImages.map((image) => <figure key={image.id} className="relative h-24 w-24 overflow-hidden rounded-lg border border-default-200"><img src={image.image_url} alt="" className="h-full w-full object-cover"/>{image.is_primary ? <span className="absolute bottom-0 w-full bg-black/65 px-1 py-1 text-center text-[10px] text-white">Primary</span> : <><button onClick={() => void rpc("set_product_primary_image", { p_image_id: image.id }, "Primary image updated.")} className="absolute inset-x-1 bottom-1 rounded border border-default-400 bg-background/95 py-1 text-[10px]">Make primary</button><button aria-label="Remove image" onClick={() => void removeImage(image)} className="absolute right-1 top-1 rounded-full border border-default-400 bg-background/95 p-1"><X size={12}/></button></>}</figure>)}</div></div>
+            <div className={cardClass}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div><h3 className="font-semibold">Product images</h3><p className="text-xs text-default-500">One primary image plus additional gallery images.</p></div>
+                <div className="flex items-center gap-2">
+                  {deletableImages.length > 0 && <button type="button" onClick={() => setSelectedImageIds(selectedDeletableImageIds.length === deletableImages.length ? [] : deletableImages.map((image) => image.id))} className="rounded-lg border border-default-400 px-3 py-2 text-xs font-medium">{selectedDeletableImageIds.length === deletableImages.length ? "Clear selection" : "Select all"}</button>}
+                  <button type="button" disabled={busy || selectedDeletableImageIds.length === 0} onClick={() => void removeSelectedImages()} className="inline-flex items-center gap-1.5 rounded-lg border border-danger/50 px-3 py-2 text-xs font-medium text-danger disabled:opacity-50"><Trash2 size={14}/> Delete selected ({selectedDeletableImageIds.length})</button>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-default-400 px-3 py-2 text-sm hover:border-accent"><ImagePlus size={16}/> Add image<input hidden type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && void addImage(e.target.files[0])}/></label>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">{productImages.map((image) => <figure key={image.id} className="relative h-24 w-24 overflow-hidden rounded-lg border border-default-200">
+                <button type="button" aria-label={`Preview ${selected.name} gallery image`} onClick={() => setImagePreview({ url: image.image_url, alt: `${selected.name} gallery image` })} className="h-full w-full"><img src={image.image_url} alt="" className="h-full w-full object-cover"/></button>
+                <input type="checkbox" aria-label={`Select ${selected.name} gallery image for deletion`} disabled={image.is_primary || busy} checked={selectedImageIds.includes(image.id)} onChange={(event) => setSelectedImageIds((current) => event.target.checked ? [...current, image.id] : current.filter((id) => id !== image.id))} className="absolute left-1 top-1 h-4 w-4 accent-red-600"/>
+                {image.is_primary ? <span className="absolute bottom-0 w-full bg-black/65 px-1 py-1 text-center text-[10px] text-white">Primary</span> : <><button type="button" onClick={() => void rpc("set_product_primary_image", { p_image_id: image.id }, "Primary image updated.")} className="absolute inset-x-1 bottom-1 rounded border border-default-400 bg-background/95 py-1 text-[10px]">Make primary</button><button type="button" aria-label="Remove image" onClick={() => void removeImage(image)} className="absolute right-1 top-1 rounded-full border border-default-400 bg-background/95 p-1"><X size={12}/></button></>}
+              </figure>)}</div>
+            </div>
             <div className={`${cardClass} space-y-3`}><div><h3 className="font-semibold">Categories</h3><p className="text-xs text-default-500">Rename or archive categories. Archiving keeps current product assignments.</p></div><form onSubmit={saveCategory} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]"><input className={inputClass} placeholder="Category name" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} required/><select className={inputClass} value={categoryParent} onChange={(e) => setCategoryParent(e.target.value)}><option value="">Top-level category</option>{topCategories.map((c) => <option key={c.id} value={c.id}>Subcategory of {c.name}</option>)}</select><button disabled={busy} className="rounded-lg border border-default-400 px-4 py-2 text-sm font-semibold hover:border-accent">Add</button></form><div className="flex flex-wrap gap-2">{categories.filter((c) => !c.archived_at).map((c) => <span key={c.id} className="inline-flex items-center gap-2 rounded-full bg-default-100 px-3 py-1 text-xs">{c.parent_category_id ? "↳ " : ""}{c.name}<button title={`Rename ${c.name}`} onClick={() => void renameCategory(c)} className="rounded border border-default-300 px-1 hover:border-accent hover:text-accent"><span aria-hidden="true">✎</span></button><button title={`Archive ${c.name}`} onClick={() => void archiveCategory(c)} className="rounded border border-default-300 p-1 hover:border-accent hover:text-accent"><Archive size={13}/></button></span>)}</div></div>
             {role === "owner" && <div className={`${cardClass} grid gap-3 md:grid-cols-[1fr_1fr_auto]`}><label><span className={labelClass}>New SKU prefix</span><input className={inputClass} value={skuPrefix} maxLength={24} onChange={(e) => setSkuPrefix(e.target.value)}/></label><label><span className={labelClass}>Minimum number digits</span><input className={inputClass} type="number" min="1" max="16" value={skuDigits} onChange={(e) => setSkuDigits(e.target.value)}/></label><button onClick={() => void saveSkuFormat()} className="self-end rounded-lg border border-default-400 px-4 py-2 text-sm font-semibold hover:border-accent">Save SKU format</button></div>}
             <button disabled={busy} onClick={() => void saveGeneral()} className="rounded-lg border border-primary bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Save general details</button>
