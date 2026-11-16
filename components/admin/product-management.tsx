@@ -60,7 +60,6 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [storyDraft, setStoryDraft] = useState<Partial<Story>>({})
 
   const load = useCallback(async () => {
-    setLoading(true)
     const [p, c, i, h, admin] = await Promise.all([
       supabase.from("products").select("id,sku,name,description,category_id,subcategory_id,price,stock_quantity,reserved_stock,available_stock,reorder_level,image_url,craft_origin,is_featured,heritage_required,visibility").order("name"),
       supabase.from("product_categories").select("id,name,parent_category_id,archived_at").order("name"),
@@ -70,10 +69,14 @@ export default function ProductManagement({ initialSection = "general" }: { init
     ])
     const fetchError = p.error || c.error || i.error || h.error
     if (fetchError) setNotice(`Could not load catalog: ${fetchError.message}`)
-    const nextProducts = (p.data || []) as Product[]
-    setProducts(nextProducts); setCategories((c.data || []) as Category[])
-    setImages((i.data || []) as ProductImage[]); setStories((h.data || []) as Story[])
-    if (selectedId && !nextProducts.some((item) => item.id === selectedId)) setSelectedId("")
+    if (!p.error) {
+      const nextProducts = p.data as Product[]
+      setProducts(nextProducts)
+      setSelectedId((current) => current && !nextProducts.some((item) => item.id === current) ? "" : current)
+    }
+    if (!c.error) setCategories(c.data as Category[])
+    if (!i.error) setImages(i.data as ProductImage[])
+    if (!h.error) setStories(h.data as Story[])
     if (admin.data.user) {
       const { data: adminRow } = await supabase.from("admin_users").select("role,is_active").eq("user_id", admin.data.user.id).maybeSingle()
       setRole(adminRow?.is_active ? adminRow.role : null)
@@ -84,7 +87,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
       }
     }
     setLoading(false)
-  }, [selectedId, supabase])
+  }, [supabase])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
