@@ -17,12 +17,13 @@ export async function GET() {
   }
 
   try {
-    const records = await prisma.$queryRaw<{ id: bigint; module: string; action: string; actor_role: string | null; actor_email: string | null; entity_id: string | null; metadata: { row?: Record<string, unknown> } | null; created_at: Date }[]>`
+    const records = await prisma.$queryRaw<{ id: bigint; module: string; action: string; actor_role: string | null; actor_email: string | null; entity_id: string | null; metadata: (Record<string, unknown> & { row?: Record<string, unknown> }) | null; created_at: Date }[]>`
       select l.id, l.module, l.action, l.actor_role, u.email as actor_email,
         l.entity_id::text as entity_id, l.metadata, l.created_at
       from public.audit_logs l
       left join auth.users u on u.id = l.actor_id
-      where (${admin.role === "owner"} or l.actor_id = ${userId}::uuid)
+      where (${admin.role === "owner"} or l.actor_id = ${userId}::uuid
+        or (l.module = 'inventory' and l.action = 'low_stock'))
       order by l.created_at desc, l.id desc
       limit 100
     `
@@ -35,13 +36,17 @@ export async function GET() {
       const module = record.module.replaceAll("_", " ")
       const action = record.action.toLowerCase()
       const orderNumber = typeof row.order_number === "string" ? row.order_number : ""
-      const title = record.module === "orders" && action === "insert"
+      const title = record.module === "inventory" && action === "low_stock"
+        ? "Low stock warning"
+        : record.module === "orders" && action === "insert"
         ? "New customer order"
         : `${module.replace(/\b\w/g, (letter) => letter.toUpperCase())} ${action === "insert" ? "created" : action === "update" ? "updated" : action === "delete" ? "removed" : action}`
-      const detail = orderNumber
+      const detail = record.module === "inventory" && action === "low_stock"
+        ? `${String(record.metadata?.available_stock ?? "Stock")} available · ${String(record.metadata?.product ?? "Product")} · threshold ${String(record.metadata?.threshold ?? "")}`
+        : orderNumber
         ? `Order ${orderNumber} was placed${typeof row.total_amount === "string" || typeof row.total_amount === "number" ? ` · ₱${Number(row.total_amount).toLocaleString("en-PH")}` : ""}.`
         : record.actor_email ? `${record.actor_email} · ${module}` : `New ${module} activity · ${record.actor_role ?? "System"}`
-      const href = record.module === "orders" ? "/orders" : record.module === "payments" ? "/payments" : record.module === "feedback" ? "/feedback" : record.module === "return_requests" ? "/returns-refunds" : "/audit-logs"
+      const href = record.module === "inventory" ? "/products?section=stock" : record.module === "orders" ? "/orders" : record.module === "payments" ? "/payments" : record.module === "feedback" ? "/feedback" : record.module === "return_requests" ? "/returns-refunds" : "/audit-logs"
       return {
         id: String(record.id),
         title,

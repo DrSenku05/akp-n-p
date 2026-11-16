@@ -18,6 +18,9 @@ export const BACKUP_TABLES = [
   "orders",
   "payments",
   "product_categories",
+  "product_images",
+  "native_heritage_stories",
+  "order_inventory_reservations",
   "products",
   "promotions",
   "return_requests",
@@ -32,6 +35,12 @@ const LOCK_OBJECT_ID = 0x424b50
 const BACKUP_MARKER = "-- AKP_DATABASE_BACKUP_FORMAT=1"
 const LEGACY_BACKUP_SCOPE_MARKER = "-- AKP_DATABASE_BACKUP_SCHEMAS=public,app_private"
 const BACKUP_TABLE_SCOPE_MARKER = `-- AKP_DATABASE_BACKUP_TABLES=${BACKUP_TABLES.join(",")}`
+const PRE_STEP2_BACKUP_TABLES = [
+  "announcements", "feedback", "inventory_movements", "order_items", "orders", "payments",
+  "product_categories", "products", "promotions", "return_requests", "store_inventory_settings",
+  "store_payment_settings", "store_settings",
+] as const
+const PRE_STEP2_BACKUP_TABLE_SCOPE_MARKER = `-- AKP_DATABASE_BACKUP_TABLES=${PRE_STEP2_BACKUP_TABLES.join(",")}`
 const INSERT_BATCH_SIZE = 100
 const BUSINESS_DATA_DELETE_ORDER = [
   "feedback",
@@ -39,6 +48,7 @@ const BUSINESS_DATA_DELETE_ORDER = [
   "order_items",
   "payments",
   "return_requests",
+  "order_inventory_reservations",
   "orders",
   "products",
   "product_categories",
@@ -52,11 +62,14 @@ const BUSINESS_DATA_RESTORE_ORDER = [
   "announcements",
   "product_categories",
   "products",
+  "product_images",
+  "native_heritage_stories",
   "promotions",
   "store_inventory_settings",
   "store_payment_settings",
   "store_settings",
   "orders",
+  "order_inventory_reservations",
   "feedback",
   "inventory_movements",
   "order_items",
@@ -138,7 +151,7 @@ function restrictRestoreToBusinessTables(sql: string) {
     if (!header) continue
     const [, name, type] = header
 
-    if (type === "TABLE") declaredTables.add(name)
+    if (type === "TABLE" || type === "TABLE DATA") declaredTables.add(name)
     if (type === "SEQUENCE OWNED BY") {
       const owner = section.match(/OWNED BY (?:"public"|public)\.(?:"((?:""|[^"])*)"|([A-Za-z_][\w$]*))\./)
       if (owner) sequenceOwners.set(name, (owner[1] ?? owner[2]).replaceAll('""', '"'))
@@ -156,8 +169,12 @@ function restrictRestoreToBusinessTables(sql: string) {
     }
   }
 
-  if (!sql.includes(`${BACKUP_TABLE_SCOPE_MARKER}\n`)) {
-    const missingTables = BACKUP_TABLES.filter((table) => !declaredTables.has(table))
+  const isCurrentBackup = sql.includes(`${BACKUP_TABLE_SCOPE_MARKER}\n`)
+  const isPreStep2Backup = sql.includes(`${PRE_STEP2_BACKUP_TABLE_SCOPE_MARKER}\n`)
+    || PRE_STEP2_BACKUP_TABLES.every((table) => declaredTables.has(table))
+  if (!isCurrentBackup) {
+    const requiredTables = isPreStep2Backup ? PRE_STEP2_BACKUP_TABLES : BACKUP_TABLES
+    const missingTables = requiredTables.filter((table) => !declaredTables.has(table))
     if (missingTables.length) {
       throw new BackupError(`This older backup is missing required business tables: ${missingTables.join(", ")}.`, 422)
     }
@@ -520,16 +537,36 @@ async function getExternalPolicyStatements(client: Client, sql: Buffer) {
 
 export async function executeSqlRestore(client: Client, sql: Buffer) {
   const policies = await getExternalPolicyStatements(client, sql)
-  const restoreSql = prepareSqlRestore(sql.toString("utf8"))
+  const sourceSql = sql.toString("utf8")
+  const restoreSql = prepareSqlRestore(sourceSql)
+  const legacyPendingOrderReservations = sourceSql.includes(`${PRE_STEP2_BACKUP_TABLE_SCOPE_MARKER}\n`)
+    || PRE_STEP2_BACKUP_TABLES.every((table) => sourceSql.includes(`-- Data for Name: ${table}; Type: TABLE DATA;`))
+    ? `
+      insert into public.order_inventory_reservations(order_id, product_id, product_sku, product_name, quantity, status)
+      select o.id, p.id, p.sku, coalesce(min(oi.product_name), p.name), sum(oi.quantity)::integer, 'reserved'
+      from public.orders o
+      join public.order_items oi on oi.order_id = o.id and oi.product_id is not null
+      join public.products p on p.id = oi.product_id
+      where o.status = 'pending'
+      group by o.id, p.id, p.sku, p.name;
+      insert into public.inventory_movements(product_id, movement_type, quantity_delta, reserved_delta, reason, reference_id)
+      select r.product_id, 'reservation', 0, r.quantity, 'Reserved for restored order ' || o.order_number, r.order_id
+      from public.order_inventory_reservations r
+      join public.orders o on o.id = r.order_id
+      where r.status = 'reserved' and r.product_id is not null;`
+    : ""
   await client.query("begin")
   try {
     await client.query(`set local statement_timeout = '240s';
+      set local akp.restore_mode = 'true';
       ${policies.before}
       alter table public.inventory_movements disable trigger inventory_movements_are_immutable;
       alter table public.inventory_movements disable trigger inventory_movement_apply_stock;
       ${restoreSql}
       alter table public.inventory_movements enable trigger inventory_movement_apply_stock;
       alter table public.inventory_movements enable trigger inventory_movements_are_immutable;
+      ${legacyPendingOrderReservations}
+      set local akp.restore_mode = 'false';
       ${policies.after}`)
     await client.query("commit")
   } catch (error) {

@@ -1,9 +1,9 @@
-import ModulePage from "@/components/admin/module-page"
-import { getAdminDatabasePreview } from "@/lib/admin-database"
+import ProductManagement from "@/components/admin/product-management"
 
 export const dynamic = "force-dynamic"
 
-export default async function ProductsPage() {
-  const preview = await getAdminDatabasePreview("products")
-  return <ModulePage slug="products" databaseRows={preview?.rows} databaseCategories={preview?.categories} databaseError={preview?.error} />
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ section?: string }> }) {
+  const { section } = await searchParams
+  const initialSection = section === "stock" || section === "heritage" || section === "publishing" ? section : "general"
+  return <ProductManagement initialSection={initialSection} />
 }

@@ -27,7 +27,7 @@ export default async function Home() {
   ] as const
   const attention = [
     { count: preview.metrics.pendingOrders, label: "Orders to fulfill", detail: "Review pending customer orders.", href: "/orders", tone: "warning", icon: Boxes },
-    { count: preview.metrics.lowStock, label: "Products need restocking", detail: "Check stock levels and reorder.", href: "/inventory", tone: "danger", icon: Package },
+    { count: preview.metrics.lowStock, label: "Products need restocking", detail: "Check stock levels and reorder.", href: "/products?section=stock", tone: "danger", icon: Package },
     { count: preview.metrics.openReturns, label: "Returns to review", detail: "Respond to open return requests.", href: "/returns-refunds", tone: "accent", icon: ArrowUpRight },
     { count: preview.metrics.flaggedFeedback, label: "Feedback flagged", detail: "Review items needing moderation.", href: "/feedback", tone: "success", icon: Bell },
   ].filter((item) => item.count > 0)

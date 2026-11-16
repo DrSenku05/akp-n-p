@@ -7,7 +7,6 @@ import {
   Archive,
   BarChart3,
   Bell,
-  Boxes,
   ChevronDown,
   ClipboardList,
   LayoutDashboard,
@@ -26,7 +25,6 @@ const sections = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, links: [] },
   { label: "Operations", href: "/orders", icon: ClipboardList, links: [
     { label: "Orders", href: "/orders", icon: ClipboardList },
-    { label: "Inventory", href: "/inventory", icon: Boxes },
     { label: "Delivery Personnel", href: "/delivery-personnel", icon: Truck },
     { label: "Return & Refund", href: "/returns-refunds", icon: RotateCcw },
   ] },
@@ -37,7 +35,6 @@ const sections = [
   ] },
   { label: "Catalog & Marketing", href: "/products", icon: Shapes, links: [
     { label: "Products", href: "/products", icon: Package },
-    { label: "Heritage Showcase", href: "/heritage-showcase", icon: Archive },
     { label: "Promotions", href: "/promotions", icon: Shapes },
   ] },
   { label: "System", href: "/reports", icon: Settings2, links: [
