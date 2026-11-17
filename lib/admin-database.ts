@@ -11,6 +11,7 @@ type ProductRecord = {
   category: string | null
   price: string
   stock: number
+  reserved?: number
   visibility: string
   featured: boolean
   craft_origin: string | null
@@ -89,7 +90,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     if (slug === "inventory") {
       const [products, threshold] = await Promise.all([prisma.$queryRaw<(ProductRecord & { movement_history: InventoryMovement[] | null })[]>`
         select p.sku, p.name, c.name as category, p.price::text as price,
-          p.stock_quantity as stock, p.visibility,
+          p.stock_quantity as stock, p.reserved_stock as reserved, p.visibility,
           p.is_featured as featured, p.craft_origin, p.description, p.image_url,
           movement.movement_history
         from public.products p
@@ -106,12 +107,12 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           from public.inventory_movements im
           where im.product_id = p.id
         ) movement on true
-        where p.sku like 'AKP-ACT-%'
         order by p.sku
       `, getLowStockThreshold()])
       return { error: false, rows: products.map((p) => {
         const movements = p.movement_history ?? []
-        return [p.sku, p.name, String(p.stock), `${movements.length} ${movements.length === 1 ? "activity" : "activities"}`, p.stock === 0 ? "Out of Stock" : p.stock <= threshold ? "Low Stock" : "Normal", "", JSON.stringify(movements)]
+        const available = p.stock - (p.reserved ?? 0)
+        return [p.sku, p.name, String(p.stock), `${movements.length} ${movements.length === 1 ? "activity" : "activities"}`, available === 0 ? "Out of Stock" : available <= threshold ? "Low Stock" : "Normal", "", JSON.stringify(movements)]
       }) }
     }
 
@@ -453,7 +454,7 @@ export async function getAdminDashboardPreview() {
         (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and created_at >= (date_trunc('day', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila')) as orders_today,
         (select count(*)::int from public.orders where order_number not like 'DEMO-ORD-%' and status = 'pending') as pending_orders,
         (select coalesce(sum(p.amount), 0)::text from public.payments p join public.orders o on o.id = p.order_id where o.order_number not like 'DEMO-ORD-%' and coalesce(p.reference, '') not like 'DEMO-PAY-%' and p.status = 'verified' and p.created_at >= (date_trunc('month', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila')) as revenue_month,
-        (select count(*)::int from public.products where sku like 'AKP-ACT-%' and visibility <> 'archived' and stock_quantity <= coalesce((select low_stock_threshold from public.store_inventory_settings where id = true), 10)) as low_stock,
+        (select count(*)::int from public.products where visibility <> 'archived' and stock_quantity - reserved_stock <= coalesce((select low_stock_threshold from public.store_inventory_settings where id = true), 10)) as low_stock,
         (select count(*)::int from public.return_requests r join public.orders o on o.id = r.order_id where r.request_number not like 'DEMO-RET-%' and o.order_number not like 'DEMO-ORD-%' and r.status = 'pending') as open_returns,
         (select count(*)::int from public.feedback f left join public.orders o on o.id = f.order_id where f.comment not like 'DEMO:%' and coalesce(o.order_number, '') not like 'DEMO-ORD-%' and f.moderation_status = 'flagged') as flagged_feedback
     `
