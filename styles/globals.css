@@ -15,8 +15,10 @@
 	--accent-foreground: oklch(0.985 0.008 84);
 	--border: oklch(0.76 0.022 79 / 92%);
 	--separator: oklch(0.81 0.018 79 / 86%);
-	--admin-button-hover: color-mix(in oklch, var(--default) 80%, var(--accent) 20%);
-	--admin-button-pressed: color-mix(in oklch, var(--default) 72%, var(--foreground) 28%);
+	--admin-border-strong: oklch(0.58 0.022 78);
+	--admin-button-surface: color-mix(in oklch, var(--background) 82%, var(--accent) 18%);
+	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 80%, var(--accent) 20%);
+	--admin-button-pressed: color-mix(in oklch, var(--admin-button-surface) 72%, var(--foreground) 28%);
 	--field-background: oklch(0.995 0.007 83);
 	--field-foreground: var(--foreground);
 	--field-placeholder: oklch(0.58 0.02 70);
@@ -35,8 +37,10 @@
 	--accent-foreground: oklch(0.22 0.025 70);
 	--border: oklch(0.48 0.025 78 / 94%);
 	--separator: oklch(0.43 0.022 78 / 90%);
-	--admin-button-hover: color-mix(in oklch, var(--default) 78%, black 22%);
-	--admin-button-pressed: color-mix(in oklch, var(--default) 65%, black 35%);
+	--admin-border-strong: oklch(0.60 0.022 78);
+	--admin-button-surface: color-mix(in oklch, var(--background) 82%, var(--accent) 18%);
+	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 78%, var(--accent) 22%);
+	--admin-button-pressed: color-mix(in oklch, var(--admin-button-surface) 65%, black 35%);
 	--field-background: oklch(0.23 0.02 77);
 	--field-foreground: var(--foreground);
 	--field-placeholder: oklch(0.68 0.018 80);
@@ -113,12 +117,15 @@
 }
 
 button:not(:disabled):not([aria-disabled="true"]) {
-	border-color: color-mix(in oklch, var(--border) 72%, var(--foreground) 28%);
 	transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 button:not(:disabled):not([aria-disabled="true"]):not([class*="border-"]):not([role="tab"]) {
-	border: 1px solid color-mix(in oklch, var(--border) 72%, var(--foreground) 28%);
+	border: 1px solid var(--admin-border-strong);
+}
+
+button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):not([role="tab"]) {
+	background-color: var(--admin-button-surface);
 }
 
 button:not(:disabled):not([aria-disabled="true"]):hover {
@@ -150,6 +157,10 @@ button[aria-disabled="true"] {
 	border-color: color-mix(in oklch, var(--accent) 12%, var(--border));
 	box-shadow: 0 3px 14px color-mix(in oklch, var(--foreground) 5%, transparent);
 }
+
+[class*="border-default-"] { border-color: var(--admin-border-strong); }
+[class*="divide-default-"] { --tw-divide-color: var(--admin-border-strong); }
+hr { border-color: var(--admin-border-strong); }
 
 .dark .akp-admin-canvas .card:not(.card--transparent) {
 	box-shadow: 0 5px 20px rgb(0 0 0 / 12%);
