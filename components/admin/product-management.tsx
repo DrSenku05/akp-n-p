@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Archive, ArrowLeft, Cog, ImagePlus, PackagePlus, Pencil, Search, Star, Trash2, X } from "lucide-react"
+import { Button, Modal } from "@heroui/react"
 import { createClient } from "@/lib/supabase/client"
 
 type Section = "general" | "stock" | "heritage" | "publishing"
@@ -14,6 +15,10 @@ type Product = {
 type Category = { id: string; name: string; parent_category_id: string | null; archived_at: string | null }
 type ProductImage = { id: string; product_id: string; image_url: string; is_primary: boolean; sort_order: number }
 type Story = { product_id: string; heritage_description: string | null; origin: string | null; traditional_craft: string | null; cover_image_url: string | null }
+type ProductDialog =
+  | { kind: "confirm"; title: string; description: string; confirmLabel: string; destructive?: boolean; onConfirm: () => Promise<void> }
+  | { kind: "rename-category"; category: Category; name: string }
+  | { kind: "walk-in-order"; product: Product; quantity: string; customerName: string }
 type Movement = { id: string; movement_type: string; quantity_delta: number; reserved_delta: number; reason: string; stock_before: number; stock_after: number; reserved_before: number; reserved_after: number; created_by: string | null; created_at: string }
 
 const sections: { id: Section; title: string }[] = [
@@ -33,6 +38,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [selectedImageIds, setSelectedImageIds] = useState<string[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [imagePreview, setImagePreview] = useState<{ url: string; alt: string } | null>(null)
+  const [productDialog, setProductDialog] = useState<ProductDialog | null>(null)
   const [selectedId, setSelectedId] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [section, setSection] = useState<Section>(initialSection)
@@ -251,73 +257,101 @@ export default function ProductManagement({ initialSection = "general" }: { init
     if (error) return fail(error.message)
     setCategoryName(""); setNotice("Category added."); setBusy(false); await load()
   }
-  async function archiveCategory(category: Category) {
-    if (!confirm(`Archive “${category.name}”? Existing product assignments will stay.`)) return
-    setBusy(true); const { error } = await supabase.from("product_categories").update({ archived_at: new Date().toISOString() }).eq("id", category.id)
-    if (error) return fail(error.message)
-    setNotice("Category archived."); setBusy(false); await load()
+  function archiveCategory(category: Category) {
+    setProductDialog({
+      kind: "confirm", title: "Archive category", description: `Archive “${category.name}”? Existing product assignments will stay.`,
+      confirmLabel: "Archive category", destructive: true,
+      onConfirm: async () => {
+        setBusy(true); const { error } = await supabase.from("product_categories").update({ archived_at: new Date().toISOString() }).eq("id", category.id)
+        if (error) return fail(error.message)
+        setNotice("Category archived."); setBusy(false); await load()
+      },
+    })
   }
-  async function renameCategory(category: Category) {
-    const name = prompt("Category name", category.name)?.trim()
+  function renameCategory(category: Category) {
+    setProductDialog({ kind: "rename-category", category, name: category.name })
+  }
+  async function saveRenamedCategory(category: Category, value: string) {
+    const name = value.trim()
     if (!name || name === category.name) return
     setBusy(true); const { error } = await supabase.from("product_categories").update({ name }).eq("id", category.id)
     if (error) return fail(error.message)
     setNotice("Category renamed."); setBusy(false); await load()
   }
-  async function removeImage(image: ProductImage) {
-    if (image.is_primary || !confirm("Remove this gallery image?")) return
-    setBusy(true)
-    const { error } = await supabase.from("product_images").delete().eq("id", image.id)
-    if (error) return fail(error.message)
-    try {
-      const marker = "/storage/v1/object/public/product-images/"
-      const path = decodeURIComponent(new URL(image.image_url).pathname.split(marker)[1] || "")
-      if (path) await supabase.storage.from("product-images").remove([path])
-    } catch { /* An external image URL has no product-images object to remove. */ }
-    setBusy(false); setNotice("Gallery image removed."); await load()
+  function removeImage(image: ProductImage) {
+    if (image.is_primary) return
+    setProductDialog({
+      kind: "confirm", title: "Remove gallery image", description: "Remove this image from the product gallery?",
+      confirmLabel: "Remove image", destructive: true,
+      onConfirm: async () => {
+        setBusy(true)
+        const { error } = await supabase.from("product_images").delete().eq("id", image.id)
+        if (error) return fail(error.message)
+        try {
+          const marker = "/storage/v1/object/public/product-images/"
+          const path = decodeURIComponent(new URL(image.image_url).pathname.split(marker)[1] || "")
+          if (path) await supabase.storage.from("product-images").remove([path])
+        } catch { /* An external image URL has no product-images object to remove. */ }
+        setBusy(false); setNotice("Gallery image removed."); await load()
+      },
+    })
   }
-  async function removeSelectedImages() {
+  function removeSelectedImages() {
     if (!selected) return
     const selectedImages = deletableImages.filter((image) => selectedDeletableImageIds.includes(image.id))
-    if (!selectedImages.length || !confirm(`Remove ${selectedImages.length} selected gallery image(s)?`)) return
-    setBusy(true)
-    const { data: deletedRows, error } = await supabase.from("product_images").delete().in("id", selectedImages.map((image) => image.id)).eq("product_id", selected.id).select("id")
-    if (error) return fail(error.message)
-    const deletedIds = new Set((deletedRows || []).map((row) => row.id))
-    const deletedImages = selectedImages.filter((image) => deletedIds.has(image.id))
-    if (!deletedImages.length) return fail("No selected images were deleted. Check your admin permissions and try again.")
-    setSelectedImageIds((current) => current.filter((id) => !deletedIds.has(id)))
-    const marker = "/storage/v1/object/public/product-images/"
-    const paths = deletedImages.flatMap((image) => {
-      try {
-        const path = decodeURIComponent(new URL(image.image_url).pathname.split(marker)[1] || "")
-        return path ? [path] : []
-      } catch {
-        return []
-      }
+    if (!selectedImages.length) return
+    const productId = selected.id
+    setProductDialog({
+      kind: "confirm", title: "Remove selected images", description: `Remove ${selectedImages.length} selected gallery image(s)?`,
+      confirmLabel: "Remove selected", destructive: true,
+      onConfirm: async () => {
+        setBusy(true)
+        const { data: deletedRows, error } = await supabase.from("product_images").delete().in("id", selectedImages.map((image) => image.id)).eq("product_id", productId).select("id")
+        if (error) return fail(error.message)
+        const deletedIds = new Set((deletedRows || []).map((row) => row.id))
+        const deletedImages = selectedImages.filter((image) => deletedIds.has(image.id))
+        if (!deletedImages.length) return fail("No selected images were deleted. Check your admin permissions and try again.")
+        setSelectedImageIds((current) => current.filter((id) => !deletedIds.has(id)))
+        const marker = "/storage/v1/object/public/product-images/"
+        const paths = deletedImages.flatMap((image) => {
+          try {
+            const path = decodeURIComponent(new URL(image.image_url).pathname.split(marker)[1] || "")
+            return path ? [path] : []
+          } catch {
+            return []
+          }
+        })
+        const { error: storageError } = paths.length ? await supabase.storage.from("product-images").remove(paths) : { error: null }
+        await load()
+        setBusy(false)
+        const skippedCount = selectedImages.length - deletedImages.length
+        setNotice(storageError
+          ? `${deletedImages.length} gallery image record(s) removed, but some stored files could not be deleted: ${storageError.message}`
+          : skippedCount
+            ? `${deletedImages.length} gallery image(s) removed. ${skippedCount} selected image(s) could not be deleted.`
+            : `Selected ${deletedImages.length} gallery image(s) removed.`)
+      },
     })
-    const { error: storageError } = paths.length ? await supabase.storage.from("product-images").remove(paths) : { error: null }
-    await load()
-    setBusy(false)
-    const skippedCount = selectedImages.length - deletedImages.length
-    setNotice(storageError
-      ? `${deletedImages.length} gallery image record(s) removed, but some stored files could not be deleted: ${storageError.message}`
-      : skippedCount
-        ? `${deletedImages.length} gallery image(s) removed. ${skippedCount} selected image(s) could not be deleted.`
-        : `Selected ${deletedImages.length} gallery image(s) removed.`)
   }
-  async function permanentlyDeleteSelected() {
-    if (!selected || !confirm(`Permanently delete ${selected.name}? Historical orders and movements keep their snapshots; this cannot be undone.`)) return
-    setBusy(true)
-    const { error } = await supabase.rpc("delete_product", { p_sku: selected.sku })
-    if (error) return fail(error.message)
-    const marker = "/storage/v1/object/public/product-images/"
+  function permanentlyDeleteSelected() {
+    if (!selected) return
+    const product = selected
     const urls = [...productImages.map((image) => image.image_url), story?.cover_image_url || ""]
-    const paths = urls.flatMap((url) => {
-      try { const path = decodeURIComponent(new URL(url).pathname.split(marker)[1] || ""); return path ? [path] : [] } catch { return [] }
+    setProductDialog({
+      kind: "confirm", title: "Permanently delete product", description: `Permanently delete ${product.name}? Historical orders and inventory movements keep their snapshots; this cannot be undone.`,
+      confirmLabel: "Permanently delete", destructive: true,
+      onConfirm: async () => {
+        setBusy(true)
+        const { error } = await supabase.rpc("delete_product", { p_sku: product.sku })
+        if (error) return fail(error.message)
+        const marker = "/storage/v1/object/public/product-images/"
+        const paths = urls.flatMap((url) => {
+          try { const path = decodeURIComponent(new URL(url).pathname.split(marker)[1] || ""); return path ? [path] : [] } catch { return [] }
+        })
+        if (paths.length) await supabase.storage.from("product-images").remove(paths)
+        setBusy(false); setNotice("Product deleted. Historical order and inventory snapshots remain; its SKU stays reserved."); await load()
+      },
     })
-    if (paths.length) await supabase.storage.from("product-images").remove(paths)
-    setBusy(false); setNotice("Product deleted. Historical order and inventory snapshots remain; its SKU stays reserved."); await load()
   }
   async function saveThreshold() {
     const response = await fetch("/api/admin/inventory-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: Number(threshold) }) })
@@ -328,15 +362,15 @@ export default function ProductManagement({ initialSection = "general" }: { init
     const { error } = await supabase.rpc("set_product_sku_format", { p_prefix: skuPrefix, p_minimum_digits: Number(skuDigits) })
     setNotice(error ? error.message : "SKU format saved. Existing SKUs remain unchanged.")
   }
-  async function createWalkInOrder() {
+  function createWalkInOrder() {
     if (!selected || selected.visibility !== "published") return
-    const rawQuantity = prompt(`Quantity for ${selected.name}`)
-    if (rawQuantity === null) return
+    setProductDialog({ kind: "walk-in-order", product: selected, quantity: "", customerName: "" })
+  }
+  async function saveWalkInOrder(product: Product, rawQuantity: string, customerName: string) {
     const quantity = Number(rawQuantity)
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return setNotice("Enter a whole-number quantity from 1 to 99.")
-    const customerName = prompt("Customer name (optional)") || null
     setBusy(true)
-    const { data, error } = await supabase.rpc("create_walk_in_order", { p_items: [{ sku: selected.sku, quantity }], p_customer_name: customerName })
+    const { data, error } = await supabase.rpc("create_walk_in_order", { p_items: [{ sku: product.sku, quantity }], p_customer_name: customerName.trim() || null })
     if (error) return fail(error.message)
     setNotice(`Walk-in order ${data.order_number} created and ${quantity} unit(s) reserved.`); setBusy(false); await load()
   }
@@ -607,6 +641,35 @@ export default function ProductManagement({ initialSection = "general" }: { init
         </div>}
       </section>
     </div>
+    <Modal.Backdrop isOpen={Boolean(productDialog)} onOpenChange={(open) => { if (!open) setProductDialog(null) }}>
+      <Modal.Container>
+        <Modal.Dialog className="sm:max-w-md">
+          <Modal.CloseTrigger />
+          <Modal.Header><Modal.Heading>{productDialog?.kind === "confirm" ? productDialog.title : productDialog?.kind === "rename-category" ? "Rename category" : productDialog?.kind === "walk-in-order" ? "Create walk-in order" : ""}</Modal.Heading></Modal.Header>
+          <Modal.Body>
+            {productDialog?.kind === "rename-category"
+              ? <label className="block space-y-1.5 text-sm"><span className={labelClass}>Category name</span><input autoFocus className={inputClass} value={productDialog.name} maxLength={80} onChange={(event) => setProductDialog((current) => current?.kind === "rename-category" ? { ...current, name: event.target.value } : current)} /></label>
+              : productDialog?.kind === "walk-in-order"
+                ? <div className="space-y-3"><p className="text-sm font-medium">{productDialog.product.name}</p><label className="block space-y-1.5 text-sm"><span className={labelClass}>Quantity</span><input autoFocus className={inputClass} type="number" min="1" max="99" step="1" value={productDialog.quantity} onChange={(event) => setProductDialog((current) => current?.kind === "walk-in-order" ? { ...current, quantity: event.target.value } : current)} /></label><label className="block space-y-1.5 text-sm"><span className={labelClass}>Customer name (optional)</span><input className={inputClass} value={productDialog.customerName} onChange={(event) => setProductDialog((current) => current?.kind === "walk-in-order" ? { ...current, customerName: event.target.value } : current)} /></label></div>
+                : <p className="text-sm leading-6 text-default-600">{productDialog?.kind === "confirm" ? productDialog.description : ""}</p>}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="outline" slot="close">Cancel</Button>
+            <Button
+              variant={productDialog?.kind === "confirm" && productDialog.destructive ? "danger" : "primary"}
+              isDisabled={productDialog?.kind === "rename-category" && (!productDialog.name.trim() || productDialog.name.trim() === productDialog.category.name) || productDialog?.kind === "walk-in-order" && (!Number.isInteger(Number(productDialog.quantity)) || Number(productDialog.quantity) < 1 || Number(productDialog.quantity) > 99)}
+              onPress={() => {
+                const pending = productDialog
+                setProductDialog(null)
+                if (pending?.kind === "rename-category") void saveRenamedCategory(pending.category, pending.name)
+                else if (pending?.kind === "walk-in-order") void saveWalkInOrder(pending.product, pending.quantity, pending.customerName)
+                else if (pending?.kind === "confirm") void pending.onConfirm()
+              }}
+            >{productDialog?.kind === "rename-category" ? "Save category" : productDialog?.kind === "walk-in-order" ? "Create order" : productDialog?.kind === "confirm" ? productDialog.confirmLabel : "Confirm"}</Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
     {imagePreview && <div className="fixed inset-0 z-[70] grid place-items-center p-4">
       <button type="button" data-preserve-button-hover aria-label="Close image preview" onClick={() => setImagePreview(null)} style={{ backgroundColor: "rgb(0 0 0 / 55%)" }} className="absolute inset-0 border-0"/>
       <div role="dialog" aria-modal="true" aria-label="Image preview" className="relative max-h-full max-w-full" onClick={(event) => event.stopPropagation()}>
