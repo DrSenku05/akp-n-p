@@ -68,7 +68,7 @@ export function AdminNotificationBell() {
       {unreadCount > 0 && <span aria-hidden="true" className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-4 text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
     </button>
     {open && <>
-      <button aria-label="Close notifications" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpen(false)} />
+      <button data-preserve-button-hover aria-label="Close notifications" className="fixed inset-0 z-30 cursor-default border-0 bg-transparent" onClick={() => setOpen(false)} />
       <section aria-label="Recent system notifications" className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-default-200 bg-content1 text-foreground shadow-xl">
         <div className="flex items-center justify-between border-b border-default-200 px-4 py-3"><h2 className="text-sm font-semibold">System notifications</h2><Link href="/notifications" onClick={() => setOpen(false)} className="text-xs font-medium text-accent hover:underline">See all</Link></div>
         <div className="max-h-[min(70vh,28rem)] overflow-y-auto">

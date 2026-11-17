@@ -16,11 +16,10 @@
 	--border: oklch(0.58 0.022 78);
 	--separator: oklch(0.68 0.018 79);
 	--admin-border-strong: oklch(0.58 0.022 78);
-	--admin-button-surface: color-mix(in oklch, var(--background) 68%, var(--accent) 32%);
 	--admin-button-secondary: var(--accent);
 	--admin-button-secondary-foreground: var(--accent-foreground);
-	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 70%, var(--accent) 30%);
-	--admin-button-pressed: color-mix(in oklch, var(--admin-button-surface) 72%, var(--foreground) 28%);
+	--admin-button-hover: var(--accent-hover);
+	--admin-button-pressed: color-mix(in oklch, var(--accent) 82%, var(--foreground) 18%);
 	--field-background: oklch(0.995 0.007 83);
 	--field-foreground: var(--foreground);
 	--field-placeholder: oklch(0.58 0.02 70);
@@ -40,11 +39,10 @@
 	--border: oklch(0.60 0.022 78);
 	--separator: oklch(0.54 0.022 78);
 	--admin-border-strong: oklch(0.60 0.022 78);
-	--admin-button-surface: color-mix(in oklch, var(--background) 72%, var(--accent) 28%);
 	--admin-button-secondary: var(--accent);
 	--admin-button-secondary-foreground: var(--accent-foreground);
-	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 60%, var(--accent) 40%);
-	--admin-button-pressed: color-mix(in oklch, var(--admin-button-surface) 65%, black 35%);
+	--admin-button-hover: var(--accent-hover);
+	--admin-button-pressed: color-mix(in oklch, var(--accent) 82%, var(--foreground) 18%);
 	--field-background: oklch(0.23 0.02 77);
 	--field-foreground: var(--foreground);
 	--field-placeholder: oklch(0.68 0.018 80);
@@ -140,33 +138,11 @@ button.button--tertiary {
 	color: var(--admin-button-secondary-foreground);
 }
 
-button.button--secondary:hover,
-button.button--tertiary:hover {
-	background-color: var(--admin-button-hover);
-	border-color: var(--accent);
-}
-
-button.button--secondary:active,
-button.button--tertiary:active {
-	background-color: var(--admin-button-pressed);
-}
-
 button.button--outline,
 button.button--ghost {
 	background-color: transparent;
 	border: 1px solid var(--admin-border-strong);
 	color: var(--foreground);
-}
-
-button.button--outline:hover,
-button.button--ghost:hover {
-	background-color: var(--admin-button-hover);
-	border-color: var(--accent);
-}
-
-button.button--outline:active,
-button.button--ghost:active {
-	background-color: var(--admin-button-pressed);
 }
 
 button.button--primary {
@@ -175,28 +151,43 @@ button.button--primary {
 	color: var(--accent-foreground);
 }
 
-button.button--primary:hover,
-button.button--primary:active {
-	background-color: var(--accent-hover);
-	border-color: var(--accent-hover);
+button[aria-pressed="true"],
+button[aria-selected="true"] {
+	background-color: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-foreground);
 }
 
-button:not(:disabled):not([aria-disabled="true"]):hover {
+button:not(:disabled):not([aria-disabled="true"]):not([data-preserve-button-hover]):hover {
 	border-color: var(--accent);
 }
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-"]):not([class*="button--"]):not(.product-selector-row):hover {
+button:not(:disabled):not([aria-disabled="true"]):not([data-preserve-button-hover]):hover {
 	background-color: var(--admin-button-hover);
-	color: var(--admin-button-secondary-foreground);
+	color: var(--accent-foreground);
 }
 
-button[class*="bg-primary"]:not(:disabled):hover { background-color: var(--accent-hover); }
-button[class*="bg-success"]:not(:disabled):hover { background-color: var(--success-hover); }
-button[class*="bg-warning"]:not(:disabled):hover { background-color: var(--warning-hover); }
-button[class*="bg-danger"]:not(:disabled):hover { background-color: var(--danger-hover); }
+button:not(:disabled):not([aria-disabled="true"]):not([data-preserve-button-hover]):is([class*="text-danger"], [class*="bg-danger"], [class*="button--danger"]):hover {
+	background-color: var(--danger-hover);
+	border-color: var(--danger);
+	color: var(--danger-foreground);
+}
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-"]):not([class*="button--"]):not(.product-selector-row):active {
+button:not(:disabled):not([aria-disabled="true"]):not([data-preserve-button-hover]):active {
 	background-color: var(--admin-button-pressed);
+	border-color: var(--accent);
+	color: var(--accent-foreground);
+}
+
+button:not(:disabled):not([aria-disabled="true"]):not([data-preserve-button-hover]):is([class*="text-danger"], [class*="bg-danger"], [class*="button--danger"]):active {
+	background-color: color-mix(in oklch, var(--danger) 82%, var(--danger-foreground) 18%);
+	border-color: var(--danger);
+	color: var(--danger-foreground);
+}
+
+button:focus-visible:not([aria-disabled="true"]):not([data-preserve-button-hover]) {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
 }
 
 button:disabled,

@@ -85,6 +85,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
   return <div className={`fixed inset-0 z-40 ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
     <button
       type="button"
+      data-preserve-button-hover
       tabIndex={open ? 0 : -1}
       aria-label="Close admin navigation"
       onClick={onClose}

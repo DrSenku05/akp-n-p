@@ -583,7 +583,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
       </section>
     </div>
     {imagePreview && <div className="fixed inset-0 z-[70] grid place-items-center p-4">
-      <button type="button" aria-label="Close image preview" onClick={() => setImagePreview(null)} style={{ backgroundColor: "rgb(0 0 0 / 55%)" }} className="absolute inset-0 border-0"/>
+      <button type="button" data-preserve-button-hover aria-label="Close image preview" onClick={() => setImagePreview(null)} style={{ backgroundColor: "rgb(0 0 0 / 55%)" }} className="absolute inset-0 border-0"/>
       <div role="dialog" aria-modal="true" aria-label="Image preview" className="relative max-h-full max-w-full" onClick={(event) => event.stopPropagation()}>
         <button type="button" autoFocus aria-label="Close image preview" onClick={() => setImagePreview(null)} className="absolute -right-3 -top-3 z-10 rounded-full border border-default-300 bg-background p-2 text-foreground shadow-lg"><X size={18}/></button>
         <img src={imagePreview.url} alt={imagePreview.alt} className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"/>
