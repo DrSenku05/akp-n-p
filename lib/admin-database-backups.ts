@@ -77,6 +77,14 @@ const BUSINESS_DATA_RESTORE_ORDER = [
   "return_requests",
 ] as const
 
+function isPreStep2Backup(sql: string, declaredTables?: Set<string>) {
+  if (sql.includes(`${BACKUP_TABLE_SCOPE_MARKER}\n`)) return false
+  if (sql.includes(`${PRE_STEP2_BACKUP_TABLE_SCOPE_MARKER}\n`)) return true
+  return PRE_STEP2_BACKUP_TABLES.every((table) => declaredTables
+    ? declaredTables.has(table)
+    : sql.includes(`-- Data for Name: ${table}; Type: TABLE DATA;`))
+}
+
 export type AdminRole = "owner" | "staff" | null
 export type BackupMetadata = {
   id: string
@@ -170,10 +178,8 @@ function restrictRestoreToBusinessTables(sql: string) {
   }
 
   const isCurrentBackup = sql.includes(`${BACKUP_TABLE_SCOPE_MARKER}\n`)
-  const isPreStep2Backup = sql.includes(`${PRE_STEP2_BACKUP_TABLE_SCOPE_MARKER}\n`)
-    || PRE_STEP2_BACKUP_TABLES.every((table) => declaredTables.has(table))
   if (!isCurrentBackup) {
-    const requiredTables = isPreStep2Backup ? PRE_STEP2_BACKUP_TABLES : BACKUP_TABLES
+    const requiredTables = isPreStep2Backup(sql, declaredTables) ? PRE_STEP2_BACKUP_TABLES : BACKUP_TABLES
     const missingTables = requiredTables.filter((table) => !declaredTables.has(table))
     if (missingTables.length) {
       throw new BackupError(`This older backup is missing required business tables: ${missingTables.join(", ")}.`, 422)
@@ -539,8 +545,7 @@ export async function executeSqlRestore(client: Client, sql: Buffer) {
   const policies = await getExternalPolicyStatements(client, sql)
   const sourceSql = sql.toString("utf8")
   const restoreSql = prepareSqlRestore(sourceSql)
-  const legacyPendingOrderReservations = sourceSql.includes(`${PRE_STEP2_BACKUP_TABLE_SCOPE_MARKER}\n`)
-    || PRE_STEP2_BACKUP_TABLES.every((table) => sourceSql.includes(`-- Data for Name: ${table}; Type: TABLE DATA;`))
+  const legacyPendingOrderReservations = isPreStep2Backup(sourceSql)
     ? `
       insert into public.order_inventory_reservations(order_id, product_id, product_sku, product_name, quantity, status)
       select o.id, p.id, p.sku, coalesce(min(oi.product_name), p.name), sum(oi.quantity)::integer, 'reserved'
