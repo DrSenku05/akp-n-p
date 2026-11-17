@@ -17,6 +17,8 @@
 	--separator: oklch(0.68 0.018 79);
 	--admin-border-strong: oklch(0.58 0.022 78);
 	--admin-button-surface: color-mix(in oklch, var(--background) 68%, var(--accent) 32%);
+	--admin-button-secondary: var(--accent);
+	--admin-button-secondary-foreground: var(--accent-foreground);
 	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 70%, var(--accent) 30%);
 	--admin-button-pressed: color-mix(in oklch, var(--admin-button-surface) 72%, var(--foreground) 28%);
 	--field-background: oklch(0.995 0.007 83);
@@ -39,6 +41,8 @@
 	--separator: oklch(0.54 0.022 78);
 	--admin-border-strong: oklch(0.60 0.022 78);
 	--admin-button-surface: color-mix(in oklch, var(--background) 72%, var(--accent) 28%);
+	--admin-button-secondary: var(--accent);
+	--admin-button-secondary-foreground: var(--accent-foreground);
 	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 60%, var(--accent) 40%);
 	--admin-button-pressed: color-mix(in oklch, var(--admin-button-surface) 65%, black 35%);
 	--field-background: oklch(0.23 0.02 77);
@@ -120,33 +124,46 @@ button:not(:disabled):not([aria-disabled="true"]) {
 	transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="border-"]):not([role="tab"]) {
+button:not(:disabled):not([aria-disabled="true"]):not([class*="border-"]):not([role="tab"]):not([class*="button--"]) {
 	border: 1px solid var(--admin-border-strong);
 }
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):not([class*="button--"]):not([role="tab"]) {
-	background-color: var(--admin-button-surface);
+button:not(:disabled):not([aria-disabled="true"]):not([role="tab"]):not([class*="bg-"]):not([class*="button--"]):not(.product-selector-row) {
+	background-color: var(--admin-button-secondary);
+	color: var(--admin-button-secondary-foreground);
 }
 
 button.button--secondary,
-button.button--tertiary,
+button.button--tertiary {
+	background-color: var(--admin-button-secondary);
+	border: 1px solid var(--admin-border-strong);
+	color: var(--admin-button-secondary-foreground);
+}
+
+button.button--secondary:hover,
+button.button--tertiary:hover {
+	background-color: var(--admin-button-hover);
+	border-color: var(--accent);
+}
+
+button.button--secondary:active,
+button.button--tertiary:active {
+	background-color: var(--admin-button-pressed);
+}
+
 button.button--outline,
 button.button--ghost {
-	background-color: var(--admin-button-surface);
+	background-color: transparent;
 	border: 1px solid var(--admin-border-strong);
 	color: var(--foreground);
 }
 
-button.button--secondary:hover,
-button.button--tertiary:hover,
 button.button--outline:hover,
 button.button--ghost:hover {
 	background-color: var(--admin-button-hover);
 	border-color: var(--accent);
 }
 
-button.button--secondary:active,
-button.button--tertiary:active,
 button.button--outline:active,
 button.button--ghost:active {
 	background-color: var(--admin-button-pressed);
@@ -168,8 +185,9 @@ button:not(:disabled):not([aria-disabled="true"]):hover {
 	border-color: var(--accent);
 }
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):not([class*="button--"]):hover {
+button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):not([class*="button--"]):not(.product-selector-row):hover {
 	background-color: var(--admin-button-hover);
+	color: var(--admin-button-secondary-foreground);
 }
 
 button[class*="bg-primary"]:not(:disabled):hover { background-color: var(--accent-hover); }
@@ -177,7 +195,7 @@ button[class*="bg-success"]:not(:disabled):hover { background-color: var(--succe
 button[class*="bg-warning"]:not(:disabled):hover { background-color: var(--warning-hover); }
 button[class*="bg-danger"]:not(:disabled):hover { background-color: var(--danger-hover); }
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="button--"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):active {
+button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):not([class*="button--"]):not(.product-selector-row):active {
 	background-color: var(--admin-button-pressed);
 }
 
