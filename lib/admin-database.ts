@@ -159,7 +159,9 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           items.items as items, o.total_amount::text as total, o.subtotal::text as subtotal, o.delivery_fee::text as delivery_fee,
           coalesce(nullif(o.payment_method, ''), p.method) as method,
           coalesce(p.status, o.payment_status) as payment,
-          p.reference, o.fulfillment_method as fulfillment, o.status, o.delivery_status,
+          p.reference, p.id as payment_id, p.amount as payment_amount, p.receipt_url,
+          payment_history.payment_history,
+          o.fulfillment_method as fulfillment, o.status, o.delivery_status,
           d.name as driver_name, o.delivery_claimed_at, o.return_inspected_at,
           nullif(concat_ws(', ', nullif(trim(concat_ws(' ', a.address_line, a.barangay)), ''),
             case when nullif(trim(coalesce(a.landmark, o.delivery_address->>'landmark')), '') is not null
