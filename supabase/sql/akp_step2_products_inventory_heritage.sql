@@ -685,15 +685,18 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare v_reserved integer;
+declare v_reserved integer; v_product_id uuid;
 begin
   if coalesce((select app_private.current_admin_role()), '') <> 'owner' then
     raise exception 'Only an owner can permanently delete a product.' using errcode = '42501';
   end if;
-  select reserved_stock into v_reserved from public.products where sku = pg_catalog.btrim(p_sku) for update;
+  select id, reserved_stock into v_product_id, v_reserved
+  from public.products where sku = pg_catalog.btrim(p_sku) for update;
   if not found then raise exception 'Product was not found.' using errcode = 'P0002'; end if;
   if v_reserved > 0 then raise exception 'Cancel or complete pending orders before permanently deleting this product.' using errcode = '23514'; end if;
+  perform pg_catalog.set_config('akp.product_delete_id', v_product_id::text, true);
   delete from public.products where sku = pg_catalog.btrim(p_sku);
+  perform pg_catalog.set_config('akp.product_delete_id', '', true);
 end
 $$;
 

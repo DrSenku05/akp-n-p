@@ -388,6 +388,17 @@ language plpgsql
 set search_path = ''
 as $$
 begin
+  -- Product deletion uses the FK's ON DELETE SET NULL action to detach this
+  -- historical row while retaining its immutable SKU/name snapshots.
+  if tg_op = 'UPDATE'
+    and old.product_id is not null
+    and new.product_id is null
+    and nullif(pg_catalog.to_jsonb(old)->>'product_sku', '') is not null
+    and nullif(pg_catalog.to_jsonb(old)->>'product_name', '') is not null
+    and coalesce(current_setting('akp.product_delete_id', true), '') = old.product_id::text
+    and (pg_catalog.to_jsonb(new) - 'product_id') is not distinct from (pg_catalog.to_jsonb(old) - 'product_id') then
+    return new;
+  end if;
   raise exception 'Inventory movements are immutable; record a correcting movement instead'
     using errcode = 'insufficient_privilege';
 end
