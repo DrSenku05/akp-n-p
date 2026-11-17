@@ -14,7 +14,7 @@ export async function GET() {
     requireOwner(role)
     client = createBackupClient()
     await client.connect()
-    const { rows } = await client.query("select enabled, last_run_at, last_error from public.database_backup_automation where id = true")
+    const { rows } = await client.query("select enabled, interval_days, last_run_at, last_error from public.database_backup_automation where id = true")
     if (!rows[0]) return fail("Backup automation settings were not found. Run akp_database_backup_automation.sql in Supabase.", 503)
     return NextResponse.json({ ...rows[0], ready, canEdit: true, retention: 5, schedule: "Daily · 02:00 UTC" }, { headers: { "Cache-Control": "no-store" } })
   } catch (error) {
@@ -31,14 +31,15 @@ export async function PUT(request: NextRequest) {
     requireSameOrigin(request)
     const { role, userId } = await getActiveAdmin()
     requireOwner(role)
-    const body = await request.json() as { enabled?: unknown }
+    const body = await request.json() as { enabled?: unknown; intervalDays?: unknown }
     if (typeof body.enabled !== "boolean") return fail("Choose whether automatic backups are enabled.", 400)
+    if (![1, 3, 7, 14, 30].includes(Number(body.intervalDays))) return fail("Choose a backup interval from the available options.", 400)
     if (body.enabled && !ready) return fail("Set CRON_SECRET and DIRECT_URL in Vercel before enabling the schedule.", 503)
     client = createBackupClient()
     await client.connect()
     const { rows } = await client.query(
-      "update public.database_backup_automation set enabled = $1, updated_by = $2, updated_at = now(), last_error = null where id = true returning enabled, last_run_at, last_error",
-      [body.enabled, userId],
+      "update public.database_backup_automation set enabled = $1, interval_days = $2, updated_by = $3, updated_at = now(), last_error = null where id = true returning enabled, interval_days, last_run_at, last_error",
+      [body.enabled, Number(body.intervalDays), userId],
     )
     if (!rows[0]) return fail("Backup automation settings were not found. Run akp_database_backup_automation.sql in Supabase.", 503)
     return NextResponse.json({ ...rows[0], ready, canEdit: true, retention: 5, schedule: "Daily · 02:00 UTC" }, { headers: { "Cache-Control": "no-store" } })

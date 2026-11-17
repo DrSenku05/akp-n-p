@@ -33,21 +33,21 @@ export async function GET(request: NextRequest) {
     connected = true
     await acquireBackupLock(client)
     lockHeld = true
-    const { rows } = await client.query<{ enabled: boolean; last_run_at: Date | null }>(
-      "select enabled, last_run_at from public.database_backup_automation where id = true",
+    const { rows } = await client.query<{ enabled: boolean; interval_days: number; last_run_at: Date | null }>(
+      "select enabled, interval_days, last_run_at from public.database_backup_automation where id = true",
     )
     const settings = rows[0]
     if (!settings) throw new BackupError("Backup automation settings are missing; apply akp_database_backup_automation.sql.", 503)
     if (!settings.enabled) return NextResponse.json({ ok: true, skipped: "disabled" })
-    const { rows: today } = await client.query<{ due: boolean }>(
-      "select $1::timestamptz is null or $1::timestamptz < (date_trunc('day', now() at time zone 'UTC') at time zone 'UTC') as due",
-      [settings.last_run_at],
+    const { rows: dueCheck } = await client.query<{ due: boolean }>(
+      "select $1::timestamptz is null or now() >= $1::timestamptz + make_interval(days => $2::integer) as due",
+      [settings.last_run_at, settings.interval_days],
     )
-    if (!today[0]?.due) return NextResponse.json({ ok: true, skipped: "already-ran-today" })
+    if (!dueCheck[0]?.due) return NextResponse.json({ ok: true, skipped: "interval-not-reached" })
 
     await saveDatabaseBackup(client, {
       backupName: `Automatic backup ${new Date().toISOString().slice(0, 10)}`,
-      description: "Scheduled daily business-data backup.",
+      description: `Scheduled business-data backup every ${settings.interval_days} day(s).`,
       userId: null,
       source: "automatic",
     })
