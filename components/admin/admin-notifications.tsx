@@ -63,7 +63,7 @@ export function AdminNotificationBell() {
   const [open, setOpen] = useState(false)
   const { items, error, loading, unreadCount, markRead } = useNotifications()
   return <div className="relative">
-    <button type="button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"} aria-expanded={open} onClick={() => { setOpen((value) => !value); if (!open) markRead(items) }} className="relative flex size-9 items-center justify-center rounded-lg text-stone-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-300">
+    <button type="button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : "Notifications"} aria-expanded={open} onClick={() => { setOpen((value) => !value); if (!open) markRead(items) }} className="relative flex size-9 items-center justify-center rounded-lg border border-default-300 bg-transparent text-foreground transition hover:border-primary hover:bg-default-100 focus-visible:outline-2 focus-visible:outline-primary">
       <Bell size={17} strokeWidth={1.8} />
       {unreadCount > 0 && <span aria-hidden="true" className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-4 text-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
     </button>

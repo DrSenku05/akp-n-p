@@ -33,7 +33,7 @@ export const ThemeSwitch: FC<ThemeSwitchProps> = ({ className }) => {
       className={clsx(
         "px-px transition-opacity hover:opacity-80 cursor-pointer",
         "inline-flex items-center justify-center",
-        "w-auto h-auto bg-transparent rounded-lg text-muted",
+        "w-auto h-auto bg-transparent rounded-lg",
         className,
       )}
       onClick={handleToggle}
