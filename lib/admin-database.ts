@@ -131,10 +131,11 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "customers") {
-      const customers = await prisma.$queryRaw<{ id: string; name: string; email: string | null; phone: string | null; orders: number; spent: string; status: string; addresses: string | null; address_pin: string | null }[]>`
+      const customers = await prisma.$queryRaw<{ id: string; name: string; email: string | null; phone: string | null; orders: number; spent: string; status: string; addresses: string | null; address_pin: string | null; order_history: string }[]>`
         select c.id::text as id, c.name, c.email, c.phone, c.status,
           address_book.addresses, address_book.address_pin,
-          count(o.id)::int as orders, coalesce(sum(o.total_amount), 0)::text as spent
+          count(o.id)::int as orders, coalesce(sum(o.total_amount), 0)::text as spent,
+          coalesce(order_history.items, '[]') as order_history
         from public.customers c
         left join public.orders o on o.customer_id = c.id and o.order_number not like 'DEMO-ORD-%'
         left join lateral (
@@ -145,12 +146,44 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
              order by pin.is_default desc, pin.created_at limit 1) as address_pin
           from public.customer_addresses a where a.customer_id = c.id
         ) address_book on true
+        left join lateral (
+          select coalesce(json_agg(json_build_object(
+            'order_number', history.order_number,
+            'status', history.status,
+            'payment_status', history.payment_status,
+            'delivery_status', history.delivery_status,
+            'payment_method', history.payment_method,
+            'fulfillment_method', history.fulfillment_method,
+            'total_amount', history.total_amount,
+            'created_at', history.created_at,
+            'items', history.items
+          ) order by history.created_at desc)::text, '[]') as items
+          from (
+            select o.order_number, o.status, o.payment_status,
+              o.delivery_status, coalesce(nullif(o.payment_method, ''), payment.method) as payment_method,
+              o.fulfillment_method, o.total_amount::text as total_amount, o.created_at::text as created_at,
+              item_rows.items
+            from public.orders o
+            left join lateral (
+              select p.method from public.payments p
+              where p.order_id = o.id order by p.created_at desc, p.id desc limit 1
+            ) payment on true
+            left join lateral (
+              select coalesce(json_agg(json_build_object(
+                'product_name', oi.product_name, 'sku', oi.sku,
+                'quantity', oi.quantity, 'line_total', oi.line_total::text
+              ) order by oi.created_at), '[]'::json) as items
+              from public.order_items oi where oi.order_id = o.id
+            ) item_rows on true
+            where o.customer_id = c.id and o.order_number not like 'DEMO-ORD-%'
+          ) history
+        ) order_history on true
         where coalesce(c.email, '') not like '%.demo@example.com'
           and c.name not like 'Demo Customer - %'
         group by c.id, c.name, c.email, c.phone, c.status, address_book.addresses, address_book.address_pin
         order by c.name
       `
-      return { error: false, rows: customers.map((c) => [`CUS-${c.id.slice(0, 8).toUpperCase()}`, c.name, c.email ?? "—", c.phone ?? "—", String(c.orders), money(c.spent), title(c.status), `View · Edit · ${c.status === "active" ? "Suspend" : "Reactivate"}`, c.id, c.addresses ?? "No saved addresses", c.address_pin ?? ""]) }
+      return { error: false, rows: customers.map((c) => [`CUS-${c.id.slice(0, 8).toUpperCase()}`, c.name, c.email ?? "—", c.phone ?? "—", String(c.orders), money(c.spent), title(c.status), "View profile", c.id, c.addresses ?? "No saved addresses", c.address_pin ?? "", c.order_history]) }
     }
 
     if (slug === "orders") {

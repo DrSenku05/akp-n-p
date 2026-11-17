@@ -45,7 +45,7 @@ function parseInventoryMovements(value: string | undefined): InventoryMovement[]
 const modules: Record<string, ModuleConfig> = {
   orders: { title: "Orders & Payments", subtitle: "Review each order, payment, and fulfillment status together", action: "Export Orders", stats: [["Awaiting Action", "0"], ["Preparing", "0"], ["In Fulfillment", "0"], ["Completed", "0"]], search: "Search order ID or customer...", filter: "Order status", filterOptions: ["Pending", "Preparing", "Ready for Pickup", "Out for Delivery", "Completed", "Cancelled"], columns: ["Order ID", "Customer", "Order Type", "Items", "Total", "Payment Method", "Payment Status", "Order Status", "Date", "Actions"], rows: [["#ORD-0041", "Maria Santos", "Delivery", "3", "₱1,200", "GCash", "Pending", "Pending", "Aug 14", "View · Confirm Order & Start Preparation · Cancel"], ["#ORD-0040", "Jose Reyes", "Walk-in", "2", "₱840", "COD", "Pending", "Preparing", "Aug 14", "View · Ready for Pickup · Cancel"], ["#ORD-0039", "Ana Cruz", "Delivery", "5", "₱2,100", "GCash", "Paid", "Out for Delivery", "Aug 13", "View · Complete Order"]], note: "Verify GCash manually in the official account before confirming. COD can remain Pending while preparation starts; record walk-in cash as Paid only after physically collecting it. Walk-in orders progress to Ready for Pickup; delivery orders progress to Out for Delivery." },
   inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Movement History", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "2 activities", "Normal", "", "[{\"movement_type\":\"restock\",\"quantity_delta\":20,\"reason\":\"Supplier delivery\",\"created_at\":\"2026-08-12T09:00:00.000Z\"},{\"movement_type\":\"sale\",\"quantity_delta\":-8,\"reason\":\"Customer orders\",\"created_at\":\"2026-08-13T10:30:00.000Z\"}]"], ["SKU-002", "Native Rattan Basket", "8", "1 activity", "Low Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-3,\"reason\":\"Store sale\",\"created_at\":\"2026-08-10T09:00:00.000Z\"}]"], ["SKU-003", "Handwoven Table Runner", "25", "1 activity", "Normal", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-5,\"reason\":\"Customer order\",\"created_at\":\"2026-08-14T08:30:00.000Z\"}]"], ["SKU-004", "Bamboo Jewelry Set", "2", "1 activity", "Low Stock", "", "[{\"movement_type\":\"damage\",\"quantity_delta\":-4,\"reason\":\"Damaged during inspection\",\"created_at\":\"2026-08-13T08:00:00.000Z\"}]"], ["SKU-005", "Native Buri Hat", "0", "1 activity", "Out of Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-6,\"reason\":\"Customer order\",\"created_at\":\"2026-08-11T09:00:00.000Z\"}]"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
-  customers: { title: "Customer Management", subtitle: "Manage customer accounts, information, and transaction records", action: "Export Customers", search: "Search by name, email, or phone...", filter: "Filter by Status", columns: ["Customer ID", "Name", "Email", "Phone", "Total Orders", "Total Spent", "Status", "Actions"], rows: [["CUS-001", "Maria Santos", "maria@email.com", "09XX-XXX-XXX", "6", "₱5,400", "Active", "View · Suspend"], ["CUS-002", "Jose Reyes", "jose@email.com", "09XX-XXX-XXX", "3", "₱2,100", "Active", "View · Suspend"], ["CUS-003", "Ana Cruz", "ana@email.com", "09XX-XXX-XXX", "10", "₱9,800", "Active", "View · Suspend"], ["CUS-004", "Pedro Lim", "pedro@email.com", "09XX-XXX-XXX", "1", "₱560", "Suspended", "View · Reactivate"]], note: "Customer details include profile information, address book, order history, and feedback records." },
+  customers: { title: "Customer Management", subtitle: "Manage customer profiles and review their order history", action: "Export Customers", search: "Search by name, email, or phone...", filter: "Filter by Status", columns: ["Customer ID", "Name", "Email", "Phone", "Total Orders", "Total Spent", "Status", "Actions"], rows: [["CUS-001", "Maria Santos", "maria@email.com", "09XX-XXX-XXX", "6", "₱5,400", "Active", "View profile"], ["CUS-002", "Jose Reyes", "jose@email.com", "09XX-XXX-XXX", "3", "₱2,100", "Active", "View profile"], ["CUS-003", "Ana Cruz", "ana@email.com", "09XX-XXX-XXX", "10", "₱9,800", "Active", "View profile"], ["CUS-004", "Pedro Lim", "pedro@email.com", "09XX-XXX-XXX", "1", "₱560", "Suspended", "View profile"]], note: "Select a customer to view their profile, saved addresses, and complete order history." },
   "delivery-personnel": { title: "Delivery Personnel Management", subtitle: "Manage delivery staff availability and order assignments", stats: [["Total Personnel", "8"], ["Available", "5"], ["On Delivery", "3"], ["Deliveries Today", "11"]], search: "Search personnel...", columns: ["Personnel ID", "Name", "Contact", "Assigned Orders", "Availability", "Actions"], rows: [["DEL-001", "Ramon Dela Cruz", "09XX-XXX-XXX", "#ORD-0041, #ORD-0039", "On Delivery", "View · Unassign"], ["DEL-002", "Julio Marcos", "09XX-XXX-XXX", "#ORD-0040", "On Delivery", "View · Unassign"], ["DEL-003", "Benito Aquino", "09XX-XXX-XXX", "—", "Available", "View · Suspend"], ["DEL-004", "Carlos Ramos", "09XX-XXX-XXX", "—", "Off Duty", "View · Suspend"]], note: "Use Assign for a specific driver and order, or Auto-assign to balance open deliveries across available personnel." },
   "returns-refunds": { title: "Return and Refund Management", subtitle: "Handle eligible return and refund requests from customers", action: "Export", stats: [["Open Requests", "4"], ["Under Review", "2"], ["Approved", "1"], ["Rejected", "1"]], search: "Search by request, order, or customer...", filter: "All Status", columns: ["Request ID", "Order ID", "Customer", "Reason", "Type", "Amount", "Status", "Actions"], rows: [["RET-007", "#ORD-0033", "Rosa Tan", "Defective item", "Refund", "₱780", "Open", "Review · Approve · Reject"], ["RET-006", "#ORD-0030", "Ana Cruz", "Wrong item received", "Return + Refund", "₱1,200", "Under Review", "Review · Approve · Reject"], ["RET-005", "#ORD-0028", "Jose Reyes", "Changed mind", "Return", "₱430", "Rejected", "View"], ["RET-004", "#ORD-0025", "Maria Santos", "Item not as described", "Refund", "₱650", "Approved", "View"]], note: "Approval records the return decision only. Send the refund manually through GCash first, then record the actual amount and transfer reference here. The database prevents duplicate and over-refunds." },
   feedback: { title: "Customer Feedback Management", subtitle: "Monitor ratings and feedback on products and completed transactions", action: "Export Feedback", stats: [["Avg. Product Rating", "4.3 ★"], ["Total Reviews", "128"], ["Flagged Feedback", "2"], ["Unread", "7"]], search: "Search by product or customer...", filter: "All Ratings", filterOptions: ["★★★★★", "★★★★☆", "★★★☆☆", "★★☆☆☆", "★☆☆☆☆"], columns: ["Feedback ID", "Customer", "Product", "Rating", "Comment", "Order ID", "Date", "Actions"], rows: [["FBK-128", "Maria Santos", "Woven Abaca Bag", "★★★★★", "Beautiful craftsmanship!", "#ORD-0038", "Aug 14", "View · Flag"], ["FBK-127", "Ana Cruz", "Rattan Basket", "★★★★☆", "Good quality, fast delivery", "#ORD-0035", "Aug 13", "View · Flag"], ["FBK-126", "Unknown", "Bamboo Jewelry Set", "★☆☆☆☆", "[flagged content]", "#ORD-0032", "Aug 12", "View · Unflag · Remove"], ["FBK-125", "Jose Reyes", "Table Runner", "★★★★☆", "Nice product", "#ORD-0030", "Aug 11", "View · Flag"]], note: "Flagged feedback is hidden from the storefront pending review. Feedback is linked to verified purchases." },
@@ -216,7 +216,7 @@ const backupsDashboardUrl = supabaseProjectRef ? `https://supabase.com/dashboard
 
 const bulkActions: Record<string, string[]> = {
   orders: ["Cancel"], payments: ["Reject Payment", "Mark Cash Collected"],
-  customers: ["Suspend", "Reactivate"], users: ["Suspend", "Reactivate"],
+  users: ["Suspend", "Reactivate"],
   "returns-refunds": ["Approve", "Reject"], feedback: ["Flag", "Unflag", "Remove"],
   products: ["Archive"],
 }
@@ -1260,34 +1260,79 @@ function DataTable({ config, rows, compact = false, selectable = false, selected
   if (config.title === "Orders & Payments") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
   if (config.title === "Inventory Management") return <InventoryDirectory config={config} rows={rows} onAction={onAction} />
   if (config.title === "Delivery Personnel Management") return <PersonnelDirectory config={config} rows={rows} onAction={onAction} />
-  if (config.title === "Customer Management") return <CustomerDirectory rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onToggleAll={onToggleAll} onAction={onAction} />
+  if (config.title === "Customer Management") return <CustomerDirectory rows={rows} />
   return <RecordDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onToggleAll={onToggleAll} onAction={onAction} />
 }
 
-function CustomerDirectory({ rows, selectable, selectedIds, onToggle, onToggleAll, onAction }: { rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
+type CustomerOrderHistory = {
+  order_number: string; status: string; payment_status: string; delivery_status: string | null
+  payment_method: string | null; fulfillment_method: string; total_amount: string; created_at: string
+  items: { product_name: string; sku: string | null; quantity: number; line_total: string }[]
+}
+
+const customerCardClass = "rounded-xl border border-default-200 bg-background p-4"
+const customerLabelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-default-600"
+
+function parseCustomerOrderHistory(value: string | undefined): CustomerOrderHistory[] {
+  if (!value) return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((order): order is CustomerOrderHistory =>
+      typeof order === "object" && order !== null &&
+      typeof order.order_number === "string" && typeof order.status === "string" &&
+      typeof order.payment_status === "string" && typeof order.total_amount === "string" &&
+      typeof order.created_at === "string" && Array.isArray(order.items)
+    )
+  } catch { return [] }
+}
+
+function CustomerDirectory({ rows }: { rows: string[][] }) {
+  const [selectedId, setSelectedId] = useState("")
+  const selected = rows.find((row) => row[8] === selectedId) ?? null
+  const orders = parseCustomerOrderHistory(selected?.[11])
+
   if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No customers found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
-  return <div className="space-y-3">
-    {selectable && <label className="flex items-center gap-2 px-1 text-xs text-default-500"><input aria-label="Select all visible customers" type="checkbox" checked={rows.length > 0 && rows.every((row) => selectedIds.includes(row[0]))} onChange={(event) => onToggleAll?.(event.target.checked)} className="size-4 accent-[#315f43]" />Select all visible customers</label>}
-    <div className="overflow-x-auto rounded-lg border border-default-200">
-      <table className="w-full min-w-[920px] table-auto text-left text-xs">
-        <thead className="bg-default-50 text-default-500"><tr>{selectable && <th className="w-10 px-3 py-3"/>}{["Customer", "Phone", "Email", "Total Orders", "Total Spent", "Status", "Action"].map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 font-medium">{heading}</th>)}</tr></thead>
-        <tbody>{rows.map((row, index) => {
-          const suspended = row[6]?.toLowerCase() === "suspended"
-          const action = suspended ? "Reactivate" : "Suspend"
-          return <tr key={row[8] || row[0] || index} className="border-t border-default-100 hover:bg-default-50/50">
-            {selectable && <td className="px-3 py-3"><input aria-label={`Select ${row[1]}`} type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} className="size-4 accent-[#315f43]" /></td>}
-            <td className="whitespace-nowrap px-3 py-3 font-semibold">{row[1] || "—"}</td>
-            <td className="whitespace-nowrap px-3 py-3">{row[3] || "—"}</td>
-            <td className="px-3 py-3">{row[2] || "—"}</td>
-            <td className="whitespace-nowrap px-3 py-3 tabular-nums">{row[4] || "0"}</td>
-            <td className="whitespace-nowrap px-3 py-3 tabular-nums">{row[5] || "₱0.00"}</td>
-            <td className="px-3 py-3"><Chip size="sm" variant="soft" color={statusColor(row[6] || "")}>{row[6] || "Unknown"}</Chip></td>
-            <td className="px-3 py-2"><Button size="sm" variant="outline" className={suspended ? "" : "text-danger"} onPress={() => onAction?.(action, row, index)}>{action}</Button></td>
-          </tr>
-        })}</tbody>
-      </table>
-    </div>
-    <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} {rows.length === 1 ? "customer" : "customers"}</div>
+  return <div className="grid min-h-[420px] min-w-0 flex-1 gap-3 lg:grid-cols-[minmax(250px,0.8fr)_minmax(420px,1.5fr)]">
+    <aside className={`${customerCardClass} flex min-h-0 flex-col ${selected ? "hidden lg:flex" : "flex"}`}>
+      <h2 className="mb-3 text-sm font-semibold">Customers</h2>
+      <div className="min-h-40 flex-1 space-y-1 overflow-y-auto" aria-label="Customer profiles">
+        {rows.map((row, index) => <button key={row[8] || row[0] || index} type="button" onClick={() => setSelectedId(row[8] || row[0])} aria-pressed={selectedId === (row[8] || row[0])} className={`flex w-full items-start gap-3 rounded-lg p-3 text-left hover:bg-default-100 ${selectedId === (row[8] || row[0]) ? "bg-primary/10 ring-1 ring-primary/30" : ""}`}>
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent/10 text-sm font-bold text-accent">{(row[1] || "?").slice(0, 1).toUpperCase()}</span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{row[1] || "—"}</span><span className="mt-0.5 block truncate text-xs text-default-500">{row[2] || "—"}</span><span className="mt-1 block text-[11px] text-default-500">{row[4] || "0"} orders · {row[5] || "₱0.00"}</span></span>
+          <Chip size="sm" variant="soft" color={statusColor(row[6] || "")}>{row[6] || "Unknown"}</Chip>
+        </button>)}
+      </div>
+      <div className="mt-3 border-t border-default-200 pt-3 text-xs text-default-500">{rows.length} {rows.length === 1 ? "customer" : "customers"}</div>
+    </aside>
+    <section className={`${customerCardClass} flex min-h-0 min-w-0 flex-col overflow-hidden ${selected ? "flex" : "hidden lg:flex"}`}>
+      {!selected ? <div className="grid min-h-0 flex-1 place-items-center text-center"><div><p className="font-semibold">Select a customer profile</p><p className="mt-1 text-sm text-default-500">Their contact details and order history will appear here.</p></div></div> : <div key={selectedId} className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-default-200 pb-3">
+          <div><button type="button" onClick={() => setSelectedId("")} className="mb-2 text-xs text-accent hover:underline lg:hidden">← Back to customers</button><p className="text-[10px] font-semibold uppercase tracking-[.16em] text-primary">Customer profile</p><h2 className="mt-1 text-lg font-bold">{selected[1]}</h2><p className="text-xs text-default-500">{selected[0]}</p></div>
+          <Chip size="sm" variant="soft" color={statusColor(selected[6] || "")}>{selected[6] || "Unknown"}</Chip>
+        </div>
+        <div className="grid shrink-0 gap-3 border-b border-default-200 py-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={customerCardClass}><span className={customerLabelClass}>Email</span><p className="break-all text-sm">{selected[2] || "—"}</p></div>
+          <div className={customerCardClass}><span className={customerLabelClass}>Phone</span><p className="text-sm">{selected[3] || "—"}</p></div>
+          <div className={customerCardClass}><span className={customerLabelClass}>Total orders</span><p className="text-xl font-bold">{selected[4] || "0"}</p></div>
+          <div className={customerCardClass}><span className={customerLabelClass}>Total spent</span><p className="text-xl font-bold">{selected[5] || "₱0.00"}</p></div>
+        </div>
+        <div className="shrink-0 border-b border-default-200 py-3"><span className={customerLabelClass}>Saved addresses</span><p className="text-sm leading-6">{selected[9] || "No saved addresses"}</p></div>
+        <div className="min-h-0 flex-1 overflow-y-auto py-3">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-default-500">Order history <span className="ml-1 normal-case tracking-normal">({orders.length})</span></h3>
+          {!orders.length ? <div className="rounded-lg border border-dashed border-default-300 p-6 text-center text-sm text-default-500">No order history for this customer.</div> : <div className="space-y-3">{orders.map((order) => {
+            const fulfillment = ["pickup", "walk_in", "walk-in"].includes(order.fulfillment_method?.toLowerCase()) ? "Walk-in" : "Delivery"
+            const status = order.status === "shipped" && order.delivery_status ? order.delivery_status.replaceAll("_", " ") : order.status.replaceAll("_", " ")
+            const date = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(order.created_at))
+            return <article key={order.order_number} className="rounded-xl border border-default-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2"><div><h4 className="text-sm font-semibold">{order.order_number}</h4><p className="mt-1 text-xs text-default-500">{date} · {fulfillment}</p></div><div className="flex flex-wrap gap-1.5"><Chip size="sm" variant="soft" color={statusColor(status)}>{status}</Chip><Chip size="sm" variant="soft" color={statusColor(order.payment_status)}>{order.payment_status.replaceAll("_", " ")}</Chip></div></div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-default-100 pt-3 text-xs"><span>{order.payment_method?.replaceAll("_", " ") || "Payment method unavailable"}</span><span className="font-semibold">₱{Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+              {order.items.length > 0 && <ul className="mt-2 space-y-1 text-xs text-default-600">{order.items.map((item, itemIndex) => <li key={`${item.sku ?? item.product_name}-${itemIndex}`} className="flex justify-between gap-3"><span className="min-w-0 truncate">{item.product_name} × {item.quantity}</span><span className="shrink-0">₱{Number(item.line_total).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></li>)}</ul>}
+            </article>
+          })}</div>}
+        </div>
+      </div>}
+    </section>
   </div>
 }
 
@@ -1634,7 +1679,8 @@ function confirmMessage(action: string, slug: string) {
 
 function defaultRowAction(slug: string) {
   if (slug === "products") return "Edit · Archive"
-  if (slug === "users" || slug === "customers") return "View · Edit · Suspend"
+  if (slug === "customers") return "View profile"
+  if (slug === "users") return "View · Edit · Suspend"
   if (slug === "promotions") return "End"
   return "View · Edit"
 }
