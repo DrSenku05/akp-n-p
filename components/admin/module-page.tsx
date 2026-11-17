@@ -258,9 +258,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
   const [storeSettingsLoaded, setStoreSettingsLoaded] = useState(false)
   const [storeSettingsMessage, setStoreSettingsMessage] = useState("")
   const [inventoryThreshold, setInventoryThreshold] = useState(10)
-  const [thresholdDraft, setThresholdDraft] = useState("10")
-  const [thresholdCanEdit, setThresholdCanEdit] = useState(false)
-  const [thresholdBusy, setThresholdBusy] = useState(false)
   const [thresholdMessage, setThresholdMessage] = useState("")
   const [databaseBackups, setDatabaseBackups] = useState<DatabaseBackup[]>([])
   const [databaseBackupsLoading, setDatabaseBackupsLoading] = useState(false)
@@ -352,16 +349,14 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     return () => { active = false; window.clearInterval(interval) }
   }, [slug])
   useEffect(() => {
-    if (!["inventory", "settings"].includes(slug)) return
+    if (slug !== "inventory") return
     let active = true
     fetch("/api/admin/inventory-settings", { cache: "no-store" }).then(async (response) => {
-      const result = await response.json() as { threshold?: number; canEdit?: boolean; error?: string }
+      const result = await response.json() as { threshold?: number; error?: string }
       if (!response.ok) throw new Error(result.error || "Could not load inventory settings.")
       if (!active) return
       const threshold = result.threshold ?? 10
       setInventoryThreshold(threshold)
-      setThresholdDraft(String(threshold))
-      setThresholdCanEdit(result.canEdit ?? false)
       setThresholdMessage("")
     }).catch((error: unknown) => {
       if (active) setThresholdMessage(error instanceof Error ? error.message : "Could not load inventory settings.")
@@ -965,31 +960,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
       setDatabaseBackupsBusy(false)
     }
   }
-  const saveInventoryThreshold = async () => {
-    const threshold = Number(thresholdDraft)
-    if (!Number.isInteger(threshold) || threshold < 0 || threshold > 100000) {
-      setThresholdMessage("Enter a whole number from 0 to 100,000.")
-      return
-    }
-    setThresholdBusy(true)
-    setThresholdMessage("")
-    try {
-      const response = await fetch("/api/admin/inventory-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threshold }),
-      })
-      const result = await response.json() as { error?: string }
-      if (!response.ok) throw new Error(result.error || "Could not save inventory settings.")
-      setInventoryThreshold(threshold)
-      setThresholdDraft(String(threshold))
-      setThresholdMessage("Low-stock warning threshold saved.")
-    } catch (error) {
-      setThresholdMessage(error instanceof Error ? error.message : "Could not save inventory settings.")
-    } finally {
-      setThresholdBusy(false)
-    }
-  }
   const secondary = slug === "promotions" ? "Catalog & Marketing" : ["customers", "feedback", "payments"].includes(slug) ? "Customers" : ["reports", "audit-logs", "notifications", "backup-restore", "users", "settings"].includes(slug) ? "System" : "Operations"
   const displayStats = getDisplayStats(slug, config.stats, rows, isDatabasePreview)
   const movementProduct = dialog?.action === "Record Movement" ? rows.find((item) => item[0] === dialog.values?.Product) : undefined
@@ -1100,7 +1070,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     {slug === "payments" && <Card className="rounded-md border border-warning/30 bg-warning/5 shadow-none"><Card.Content className="grid gap-4 p-4 md:grid-cols-2"><div><p className="text-xs font-semibold text-foreground">GCash · verify outside the website</p><p className="mt-1 text-xs leading-5 text-default-600">Open the platform’s official GCash account separately. Match the actual incoming transfer, exact amount, and customer reference before confirming. A screenshot or reference alone is not proof.</p></div><div><p className="text-xs font-semibold text-foreground">Cash on Delivery · collect first</p><p className="mt-1 text-xs leading-5 text-default-600">Keep COD pending until the full cash amount is physically received. Record collection with “Mark Cash Collected.”</p></div></Card.Content></Card>}
     {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="space-y-4 p-5"><div><h2 className="text-sm font-semibold">Store profile and return policy</h2><p className="mt-1 text-xs leading-5 text-default-500">The store name is used across the admin and customer apps. Return eligibility is enforced by Supabase using the recorded delivery time.</p></div>{storeSettingsMessage && <p role={storeSettingsMessage.includes("saved") ? "status" : "alert"} className={`text-xs ${storeSettingsMessage.includes("saved") ? "text-success" : "text-danger"}`}>{storeSettingsMessage}</p>}<div className="grid gap-4 md:grid-cols-2"><label className="space-y-1 text-xs font-medium">Store name<input aria-label="Store name" maxLength={120} value={storeNameDraft} disabled={!storeSettingsCanEdit || !storeSettingsLoaded || storeSettingsBusy} onChange={(event) => setStoreNameDraft(event.target.value)} className="block h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm disabled:opacity-60"/></label><label className="space-y-1 text-xs font-medium">Return window (days)<input aria-label="Return window in days" type="number" min="1" max="365" step="1" value={returnWindowDraft} disabled={!storeSettingsCanEdit || !storeSettingsLoaded || storeSettingsBusy} onChange={(event) => setReturnWindowDraft(event.target.value)} className="block h-10 w-full rounded-md border border-default-200 bg-background px-3 text-sm disabled:opacity-60"/></label></div><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-default-500">Currency: <strong>PHP (₱)</strong> — fixed because current catalog, orders, and payment amounts are stored in pesos.</p><Button size="sm" variant="primary" isDisabled={!storeSettingsCanEdit || !storeSettingsLoaded || storeSettingsBusy || !storeNameDraft.trim() || !returnWindowDraft.trim()} onPress={saveStoreSettings}>{storeSettingsBusy ? "Saving…" : "Save store settings"}</Button></div></Card.Content></Card>}
     {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="space-y-4 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning"><Archive size={17}/></span><div><h2 className="text-sm font-semibold">Automatic database backups</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-default-500">Save a daily business-data SQL backup at 02:00 UTC (about 10–11 AM Philippines time). The schedule runs from Vercel and keeps the newest five manual or automatic backups.</p></div></div><Chip size="sm" variant="soft" color={backupAutomation.enabled ? "success" : "default"}>{backupAutomation.enabled ? "Enabled" : "Disabled"}</Chip></div>{backupAutomationMessage && <p role={backupAutomationMessageIsError ? "alert" : "status"} className={`rounded-md px-3 py-2 text-xs ${backupAutomationMessageIsError ? "bg-danger/10 text-danger" : "bg-success/10 text-success"}`}>{backupAutomationMessage}</p>}{!backupAutomation.ready && <p className="rounded-md bg-warning/10 p-3 text-xs leading-5 text-warning">Automatic scheduling needs the Supabase DIRECT_URL and a Vercel CRON_SECRET environment variable. Apply the akp_database_backup_automation.sql migration first.</p>}{backupAutomation.lastError && <p role="alert" className="rounded-md bg-danger/10 p-3 text-xs leading-5 text-danger">Last scheduled run failed: {backupAutomation.lastError}</p>}<div className="flex flex-wrap items-center justify-between gap-4 border-t border-default-100 pt-4"><div className="space-y-1"><label className="flex items-center gap-2 text-xs font-medium"><input aria-label="Enable daily automatic backups" type="checkbox" checked={backupAutomation.enabled} disabled={!backupAutomation.canEdit || !backupAutomation.ready || !backupAutomation.loaded || backupAutomationBusy} onChange={(event) => setBackupAutomation((current) => ({ ...current, enabled: event.target.checked }))}/>Enable daily automatic backups</label><p className="text-[11px] text-default-500">Last automatic backup: {backupAutomation.lastRunAt ? new Date(backupAutomation.lastRunAt).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }) : "Never"}</p></div><Button size="sm" variant="primary" isDisabled={!backupAutomation.canEdit || !backupAutomation.ready || !backupAutomation.loaded || backupAutomationBusy} onPress={saveBackupAutomation}>{backupAutomationBusy ? "Saving…" : "Save backup setting"}</Button></div></Card.Content></Card>}
-    {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="flex flex-wrap items-center gap-5 p-5"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning"><PackagePlus size={19}/></span><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Low-stock warning threshold</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-default-500">Use one store-wide stock quantity for low-stock warnings across inventory and the dashboard. Products at or below this quantity are flagged.</p>{thresholdMessage && <p role={thresholdMessage.includes("saved") ? "status" : "alert"} className={`mt-2 text-xs ${thresholdMessage.includes("saved") ? "text-success" : "text-danger"}`}>{thresholdMessage}</p>}</div><label className="flex items-center gap-2 text-xs font-medium">Units<input aria-label="Low-stock warning threshold" type="number" min="0" max="100000" step="1" value={thresholdDraft} disabled={!thresholdCanEdit || thresholdBusy} onChange={(event) => setThresholdDraft(event.target.value)} className="h-9 w-24 rounded-md border border-default-200 bg-background px-2 text-sm disabled:opacity-60"/></label><Button size="sm" variant="primary" isDisabled={!thresholdCanEdit || thresholdBusy || !thresholdDraft.trim()} onPress={saveInventoryThreshold}>{thresholdBusy ? "Saving…" : "Save threshold"}</Button></Card.Content></Card>}
     {slug === "settings" && <Card className="rounded-xl border border-default-200 shadow-none"><Card.Content className="grid gap-5 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"><div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success"><Smartphone size={19}/></span><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold">GCash online payments</h2><Chip size="sm" variant="soft" color={gcash.enabled ? "success" : "default"}>{gcash.enabled ? "Enabled" : "Not enabled"}</Chip></div><p className="mt-1 max-w-2xl text-xs leading-5 text-default-500">Set the account details and QR image customers should see after choosing GCash in the app. This displays payment instructions only; transfers still require manual verification.</p><p className="mt-2 text-xs text-default-600">{gcash.accountName || "Account name not set"}{gcash.accountNumber ? ` · ${gcash.accountNumber}` : ""}</p>{gcashMessage && <p role="status" className="mt-2 text-xs text-success">{gcashMessage}</p>}</div></div><div className="flex items-center gap-3">{gcashPreview ? <img src={gcashPreview} alt="Configured GCash QR code" className="size-16 rounded-lg border border-default-200 bg-white object-contain p-1"/> : <div className="flex size-16 items-center justify-center rounded-lg border border-dashed border-default-300 text-default-400"><ImagePlus size={20}/></div>}<Button size="sm" variant="outline" isDisabled={!gcash.canEdit} onPress={() => { setGcashMessage(""); setGcashDialogOpen(true) }}>{gcash.qrUrl ? "Manage GCash" : "Set up GCash"}</Button></div></Card.Content></Card>}
     {displayStats && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{displayStats.map(([label, value, note]) => <Card key={label} className="rounded-md border border-default-200 shadow-none"><Card.Content className="p-4"><p className="text-xs text-default-500">{label}</p><p className="mt-2 text-xl font-bold">{value}</p>{note && <p className="mt-1 text-[11px] text-default-400">{note}</p>}</Card.Content></Card>)}</div>}
     {slug === "backup-restore" && <>
