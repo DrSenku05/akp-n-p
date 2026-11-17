@@ -66,12 +66,36 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [storyDraft, setStoryDraft] = useState<Partial<Story>>({})
 
   const load = useCallback(async () => {
-    const [p, c, i, h, admin] = await Promise.all([
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+    if (authError || !authData.user) {
+      setRole(null)
+      setProducts([]); setCategories([]); setImages([]); setStories([])
+      setNotice("Sign in with an active owner or staff account to load the catalog. Products are protected by admin access policies.")
+      setLoading(false)
+      return
+    }
+
+    const { data: adminRow, error: adminError } = await supabase
+      .from("admin_users")
+      .select("role,is_active")
+      .eq("user_id", authData.user.id)
+      .maybeSingle()
+    if (adminError || !adminRow?.is_active || !["owner", "staff"].includes(adminRow.role)) {
+      setRole(null)
+      setProducts([]); setCategories([]); setImages([]); setStories([])
+      setNotice(adminError
+        ? `Could not verify catalog access: ${adminError.message}`
+        : "This signed-in account is not an active owner or staff admin. The catalog is hidden by row-level security; no product rows were removed.")
+      setLoading(false)
+      return
+    }
+    setRole(adminRow.role)
+
+    const [p, c, i, h] = await Promise.all([
       supabase.from("products").select("id,sku,name,description,category_id,subcategory_id,price,supplier_cost,stock_quantity,reserved_stock,available_stock,reorder_level,image_url,craft_origin,is_featured,heritage_required,visibility").order("name"),
       supabase.from("product_categories").select("id,name,parent_category_id,archived_at").order("name"),
       supabase.from("product_images").select("id,product_id,image_url,is_primary,sort_order").order("sort_order"),
       supabase.from("native_heritage_stories").select("product_id,heritage_description,origin,traditional_craft,cover_image_url"),
-      supabase.auth.getUser(),
     ])
     const fetchError = p.error || c.error || i.error || h.error
     if (fetchError) setNotice(`Could not load catalog: ${fetchError.message}`)
@@ -83,14 +107,10 @@ export default function ProductManagement({ initialSection = "general" }: { init
     if (!c.error) setCategories(c.data as Category[])
     if (!i.error) setImages(i.data as ProductImage[])
     if (!h.error) setStories(h.data as Story[])
-    if (admin.data.user) {
-      const { data: adminRow } = await supabase.from("admin_users").select("role,is_active").eq("user_id", admin.data.user.id).maybeSingle()
-      setRole(adminRow?.is_active ? adminRow.role : null)
-      if (adminRow?.is_active && adminRow.role === "owner") {
-        const { data: formatResult } = await supabase.rpc("get_product_sku_format").maybeSingle()
-        const format = formatResult as { prefix: string; minimum_digits: number } | null
-        if (format) { setSkuPrefix(format.prefix); setSkuDigits(String(format.minimum_digits)) }
-      }
+    if (adminRow.role === "owner") {
+      const { data: formatResult } = await supabase.rpc("get_product_sku_format").maybeSingle()
+      const format = formatResult as { prefix: string; minimum_digits: number } | null
+      if (format) { setSkuPrefix(format.prefix); setSkuDigits(String(format.minimum_digits)) }
     }
     setLoading(false)
   }, [supabase])
@@ -175,14 +195,19 @@ export default function ProductManagement({ initialSection = "general" }: { init
   async function createDraft(event: React.FormEvent) {
     event.preventDefault(); if (!newName.trim() || !newImage || newSupplierCost === "" || !Number.isFinite(Number(newSupplierCost)) || Number(newSupplierCost) < 0) return fail("Enter a product name, supplier cost, and image.")
     setBusy(true); setNotice("")
+    let stage = "uploading the product image"
     try {
       const uploaded = await upload(newImage, "products")
+      stage = "creating the product draft"
       const { data, error } = await supabase.rpc("create_product_draft_with_cost", { p_name: newName.trim(), p_image_url: uploaded.url, p_supplier_cost: Number(newSupplierCost) })
       if (error) { await supabase.storage.from("product-images").remove([uploaded.path]); return fail(error.message) }
       const created = Array.isArray(data) ? data[0] : data
       setShowCreate(false); setNewName(""); setNewSupplierCost(""); setNewImage(null); setNotice(`Draft created with SKU ${created?.sku || ""}.`)
       await load(); if (created?.id) setSelectedId(created.id)
-    } catch (error) { fail(error instanceof Error ? error.message : "Could not create draft.") }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Unknown error."
+      fail(`Could not create product while ${stage}: ${detail}${stage === "uploading the product image" ? " Check that this session belongs to an active owner or staff admin; the storage upload policy checks the signed-in account." : ""}`)
+    }
     setBusy(false)
   }
   async function addImage(file: File, primary = false) {
