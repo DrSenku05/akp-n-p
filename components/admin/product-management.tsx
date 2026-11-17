@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Archive, ImagePlus, PackagePlus, Pencil, Search, Star, Trash2, X } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Archive, ArrowLeft, Cog, ImagePlus, PackagePlus, Pencil, Search, Star, Trash2, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 type Section = "general" | "stock" | "heritage" | "publishing"
@@ -45,6 +45,9 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState("")
   const [showCreate, setShowCreate] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsTrigger = useRef<HTMLButtonElement>(null)
+  const settingsBack = useRef<HTMLButtonElement>(null)
   const [newName, setNewName] = useState("")
   const [newSupplierCost, setNewSupplierCost] = useState("")
   const [newImage, setNewImage] = useState<File | null>(null)
@@ -93,6 +96,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
   }, [supabase])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { if (settingsOpen) settingsBack.current?.focus() }, [settingsOpen])
   useEffect(() => {
     if (!imagePreview) return
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setImagePreview(null) }
@@ -315,7 +319,10 @@ export default function ProductManagement({ initialSection = "general" }: { init
   return <main className="mx-auto flex h-full min-h-0 w-full flex-col overflow-hidden p-2 sm:p-3">
     <header className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
       <div><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-primary">Catalog</p><h1 className="mt-0.5 text-xl font-bold">Products</h1><p className="mt-0.5 text-xs text-default-500">Manage product details, stock, heritage, and publishing in one place.</p></div>
-      <button type="button" onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"><PackagePlus size={16}/> Add product</button>
+      <div className="flex items-center gap-2">
+        <button ref={settingsTrigger} type="button" aria-label="Product settings" aria-expanded={settingsOpen} aria-controls="product-settings-drawer" onClick={() => setSettingsOpen(true)} className="inline-flex size-9 items-center justify-center rounded-lg border border-default-400 bg-background transition-colors hover:border-accent hover:bg-accent/10"><Cog size={17}/></button>
+        <button type="button" onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 rounded-lg border border-primary bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"><PackagePlus size={16}/> Add product</button>
+      </div>
     </header>
     {notice && <div role="status" className="mb-2 flex shrink-0 items-center justify-between rounded-lg border border-default-200 bg-default-50 px-3 py-2 text-xs">{notice}<button aria-label="Dismiss" onClick={() => setNotice("")} className="rounded-md border border-default-300 p-1 hover:border-accent"><X size={14}/></button></div>}
     <div data-has-selection={Boolean(selected)} className="product-selector-layout grid min-h-0 flex-1 gap-3">
@@ -586,5 +593,15 @@ export default function ProductManagement({ initialSection = "general" }: { init
       </div>
     </div>}
     {showCreate && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><form onSubmit={createDraft} className="w-full max-w-md rounded-2xl bg-background p-5 shadow-xl"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-bold">Quick-create a draft</h2><p className="text-sm text-default-500">Enter the name, supplier cost, and primary image.</p></div><button type="button" aria-label="Close" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 p-1 hover:border-accent"><X size={20}/></button></div><label className="mb-4 block"><span className={labelClass}>Product name</span><input className={inputClass} autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={200} required/></label><label className="mb-4 block"><span className={labelClass}>Supplier cost per item (bought price)</span><input className={inputClass} type="number" min="0" max="9999999999.99" step="0.01" value={newSupplierCost} onChange={(e) => setNewSupplierCost(e.target.value)} required/></label><label className="mb-5 block"><span className={labelClass}>Product image</span><input className={inputClass} type="file" accept="image/*" onChange={(e) => setNewImage(e.target.files?.[0] || null)} required/><span className="mt-1 block text-xs text-default-500">JPG, PNG, WebP, GIF or AVIF · max 10 MB</span></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 px-4 py-2 text-sm hover:border-accent">Cancel</button><button disabled={busy} className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Create hidden draft</button></div></form></div>}
+    <div aria-hidden={!settingsOpen} className={`fixed inset-0 z-[60] transition-opacity duration-300 ${settingsOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+      <aside id="product-settings-drawer" role="dialog" aria-modal={settingsOpen} aria-label="Product settings" inert={!settingsOpen} className={`absolute inset-y-0 right-0 flex w-[min(26rem,92vw)] flex-col border-l border-default-200 bg-background shadow-2xl transition-transform duration-300 ease-out ${settingsOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <div className="flex min-h-[60px] items-center gap-3 border-b border-default-200 px-4">
+          <button ref={settingsBack} type="button" aria-label="Back to products" onClick={() => { setSettingsOpen(false); settingsTrigger.current?.focus() }} className="flex size-9 items-center justify-center rounded-lg border border-default-300 transition-colors hover:border-accent hover:bg-accent/10"><ArrowLeft size={18}/></button>
+          <h2 className="text-sm font-semibold">Product settings</h2>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto" />
+      </aside>
+    </div>
   </main>
 }
