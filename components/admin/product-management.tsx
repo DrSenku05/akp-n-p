@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 type Section = "general" | "stock" | "heritage" | "publishing"
 type Product = {
   id: string; sku: string; name: string; description: string | null; category_id: string | null
-  subcategory_id: string | null; price: number; stock_quantity: number; reserved_stock: number
+  subcategory_id: string | null; price: number; supplier_cost: number | null; stock_quantity: number; reserved_stock: number
   available_stock: number; reorder_level: number; image_url: string | null; craft_origin: string | null
   is_featured: boolean; heritage_required: boolean; visibility: "draft" | "published" | "archived"
 }
@@ -46,6 +46,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [notice, setNotice] = useState("")
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState("")
+  const [newSupplierCost, setNewSupplierCost] = useState("")
   const [newImage, setNewImage] = useState<File | null>(null)
   const [movementType, setMovementType] = useState("restock")
   const [movementQty, setMovementQty] = useState("1")
@@ -63,7 +64,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
 
   const load = useCallback(async () => {
     const [p, c, i, h, admin] = await Promise.all([
-      supabase.from("products").select("id,sku,name,description,category_id,subcategory_id,price,stock_quantity,reserved_stock,available_stock,reorder_level,image_url,craft_origin,is_featured,heritage_required,visibility").order("name"),
+      supabase.from("products").select("id,sku,name,description,category_id,subcategory_id,price,supplier_cost,stock_quantity,reserved_stock,available_stock,reorder_level,image_url,craft_origin,is_featured,heritage_required,visibility").order("name"),
       supabase.from("product_categories").select("id,name,parent_category_id,archived_at").order("name"),
       supabase.from("product_images").select("id,product_id,image_url,is_primary,sort_order").order("sort_order"),
       supabase.from("native_heritage_stories").select("product_id,heritage_description,origin,traditional_craft,cover_image_url"),
@@ -114,6 +115,9 @@ export default function ProductManagement({ initialSection = "general" }: { init
 
   const selectedCategory = categories.find((c) => c.id === selected?.category_id) || null
   const selectedSubcategory = categories.find((c) => c.id === selected?.subcategory_id) || null
+  const ownerEarningPerUnit = selected?.supplier_cost == null ? null : Number(selected.price) - Number(selected.supplier_cost)
+  const ownerEarningFromStock = ownerEarningPerUnit == null || !selected ? null : ownerEarningPerUnit * selected.stock_quantity
+  const ownerEarningPercent = ownerEarningPerUnit == null || !selected || Number(selected.price) <= 0 ? null : ownerEarningPerUnit / Number(selected.price) * 100
   const publishChecklist = [
     { label: "Name", ready: !!selected?.name.trim() },
     { label: "Primary image", ready: !!selected?.image_url },
@@ -152,20 +156,20 @@ export default function ProductManagement({ initialSection = "general" }: { init
     if (!selected) return
     setBusy(true); setNotice("")
     const { error } = asDraft
-      ? await supabase.rpc("save_product_draft", { p_product_id: selected.id, p_name: draft.name, p_description: draft.description, p_category_id: draft.category_id, p_subcategory_id: draft.subcategory_id || null, p_price: Number(draft.price), p_image_url: draft.image_url })
-      : await supabase.from("products").update({ name: draft.name, description: draft.description, category_id: draft.category_id, subcategory_id: draft.subcategory_id || null, price: Number(draft.price), image_url: draft.image_url }).eq("id", selected.id)
+      ? await supabase.rpc("save_product_details_as_draft", { p_product_id: selected.id, p_name: draft.name, p_description: draft.description, p_category_id: draft.category_id, p_subcategory_id: draft.subcategory_id || null, p_price: Number(draft.price), p_supplier_cost: draft.supplier_cost, p_image_url: draft.image_url })
+      : await supabase.from("products").update({ name: draft.name, description: draft.description, category_id: draft.category_id, subcategory_id: draft.subcategory_id || null, price: Number(draft.price), supplier_cost: draft.supplier_cost, image_url: draft.image_url }).eq("id", selected.id)
     if (error) return fail(error.message)
     setNotice(asDraft ? "Product details saved as a draft." : "Product details saved."); setBusy(false); await load()
   }
   async function createDraft(event: React.FormEvent) {
-    event.preventDefault(); if (!newName.trim() || !newImage) return fail("A product image and name are required.")
+    event.preventDefault(); if (!newName.trim() || !newImage || newSupplierCost === "" || !Number.isFinite(Number(newSupplierCost)) || Number(newSupplierCost) < 0) return fail("Enter a product name, supplier cost, and image.")
     setBusy(true); setNotice("")
     try {
       const uploaded = await upload(newImage, "products")
-      const { data, error } = await supabase.rpc("create_product_draft", { p_name: newName.trim(), p_image_url: uploaded.url })
+      const { data, error } = await supabase.rpc("create_product_draft_with_cost", { p_name: newName.trim(), p_image_url: uploaded.url, p_supplier_cost: Number(newSupplierCost) })
       if (error) { await supabase.storage.from("product-images").remove([uploaded.path]); return fail(error.message) }
       const created = Array.isArray(data) ? data[0] : data
-      setShowCreate(false); setNewName(""); setNewImage(null); setNotice(`Draft created with SKU ${created?.sku || ""}.`)
+      setShowCreate(false); setNewName(""); setNewSupplierCost(""); setNewImage(null); setNotice(`Draft created with SKU ${created?.sku || ""}.`)
       await load(); if (created?.id) setSelectedId(created.id)
     } catch (error) { fail(error instanceof Error ? error.message : "Could not create draft.") }
     setBusy(false)
@@ -335,7 +339,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
                   <button type="button" disabled={!canPublish || busy || selected.visibility === "published"} onClick={() => void rpc("publish_product", { p_sku: selected.sku }, "Product published.")} className="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40">
                     Publish
                   </button>
-                  <button type="button" disabled={busy} onClick={() => void saveGeneral(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-default-400 bg-background px-3 py-1.5 text-xs font-semibold hover:border-accent disabled:opacity-50">
+                  <button type="button" disabled={busy || draft.supplier_cost == null} onClick={() => void saveGeneral(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-default-400 bg-background px-3 py-1.5 text-xs font-semibold hover:border-accent disabled:opacity-50">
                     Save as draft
                   </button>
                 </>
@@ -369,7 +373,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
                 )}
               </div>
 
-              {/* Top Overview: 3 Metric Cards */}
+              {/* Product and inventory overview */}
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className={cardClass}>
                   <span className={labelClass}>Price</span>
@@ -391,6 +395,10 @@ export default function ProductManagement({ initialSection = "general" }: { init
                   <p className={`text-2xl font-bold ${selected.available_stock <= Number(threshold) ? "text-danger" : "text-success"}`}>{selected.available_stock}</p>
                   <p className="text-xs text-default-500">{selected.available_stock <= Number(threshold) ? "At or below threshold" : "Ready for order"}</p>
                 </div>
+              </div>
+              <div className={`${cardClass} flex flex-wrap items-center justify-between gap-3`}>
+                <div><span className={labelClass}>Estimated owner earnings</span><p className="text-xs text-default-500">Current retail price minus supplier cost, multiplied by physical stock. Before promotions and other costs.</p></div>
+                {ownerEarningFromStock == null ? <p className="text-sm font-semibold text-default-500">Add supplier cost to calculate</p> : <div className="text-right"><p className={`text-2xl font-bold ${ownerEarningFromStock < 0 ? "text-danger" : "text-success"}`}>₱{ownerEarningFromStock.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-xs text-default-500">{selected.stock_quantity} units · ₱{ownerEarningPerUnit!.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each{ownerEarningPercent == null ? "" : ` · ${ownerEarningPercent.toFixed(1)}%`}</p></div>}
               </div>
 
               {/* Main Specifications & Categories */}
@@ -528,7 +536,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
           ) : (
             <>
           {section === "general" && <div className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-2"><label><span className={labelClass}>Product name</span><input className={inputClass} value={draft.name || ""} onChange={(e) => updateDraft("name", e.target.value)}/></label><label><span className={labelClass}>SKU · permanent</span><input className={`${inputClass} bg-default-100`} readOnly value={selected.sku}/></label><label className="md:col-span-2"><span className={labelClass}>Description</span><textarea className={inputClass} rows={4} value={draft.description || ""} onChange={(e) => updateDraft("description", e.target.value)}/></label>
+            <div className="grid gap-4 md:grid-cols-2"><label><span className={labelClass}>Product name</span><input className={inputClass} value={draft.name || ""} onChange={(e) => updateDraft("name", e.target.value)}/></label><label><span className={labelClass}>SKU · permanent</span><input className={`${inputClass} bg-default-100`} readOnly value={selected.sku}/></label><label><span className={labelClass}>Supplier cost per item (bought price)</span><input className={inputClass} type="number" min="0" max="9999999999.99" step="0.01" required value={draft.supplier_cost ?? ""} onChange={(e) => updateDraft("supplier_cost", e.target.value === "" ? null : Number(e.target.value))}/></label><label className="md:col-span-2"><span className={labelClass}>Description</span><textarea className={inputClass} rows={4} value={draft.description || ""} onChange={(e) => updateDraft("description", e.target.value)}/></label>
               <label><span className={labelClass}>Category</span><select className={inputClass} value={draft.category_id || ""} onChange={(e) => { updateDraft("category_id", e.target.value || null); updateDraft("subcategory_id", null) }}><option value="">Choose category</option>{topCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label><span className={labelClass}>Subcategory</span><select className={inputClass} value={draft.subcategory_id || ""} onChange={(e) => updateDraft("subcategory_id", e.target.value || null)}><option value="">None</option>{categories.filter((c) => c.parent_category_id === draft.category_id && !c.archived_at).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             </div>
             <div className={cardClass}>
@@ -570,6 +578,6 @@ export default function ProductManagement({ initialSection = "general" }: { init
         <img src={imagePreview.url} alt={imagePreview.alt} className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"/>
       </div>
     </div>}
-    {showCreate && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><form onSubmit={createDraft} className="w-full max-w-md rounded-2xl bg-background p-5 shadow-xl"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-bold">Quick-create a draft</h2><p className="text-sm text-default-500">Only an image and product name are needed.</p></div><button type="button" aria-label="Close" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 p-1 hover:border-accent"><X size={20}/></button></div><label className="mb-4 block"><span className={labelClass}>Product name</span><input className={inputClass} autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={200} required/></label><label className="mb-5 block"><span className={labelClass}>Product image</span><input className={inputClass} type="file" accept="image/*" onChange={(e) => setNewImage(e.target.files?.[0] || null)} required/><span className="mt-1 block text-xs text-default-500">JPG, PNG, WebP, GIF or AVIF · max 10 MB</span></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 px-4 py-2 text-sm hover:border-accent">Cancel</button><button disabled={busy} className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Create hidden draft</button></div></form></div>}
+    {showCreate && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><form onSubmit={createDraft} className="w-full max-w-md rounded-2xl bg-background p-5 shadow-xl"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-bold">Quick-create a draft</h2><p className="text-sm text-default-500">Enter the name, supplier cost, and primary image.</p></div><button type="button" aria-label="Close" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 p-1 hover:border-accent"><X size={20}/></button></div><label className="mb-4 block"><span className={labelClass}>Product name</span><input className={inputClass} autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={200} required/></label><label className="mb-4 block"><span className={labelClass}>Supplier cost per item (bought price)</span><input className={inputClass} type="number" min="0" max="9999999999.99" step="0.01" value={newSupplierCost} onChange={(e) => setNewSupplierCost(e.target.value)} required/></label><label className="mb-5 block"><span className={labelClass}>Product image</span><input className={inputClass} type="file" accept="image/*" onChange={(e) => setNewImage(e.target.files?.[0] || null)} required/><span className="mt-1 block text-xs text-default-500">JPG, PNG, WebP, GIF or AVIF · max 10 MB</span></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 px-4 py-2 text-sm hover:border-accent">Cancel</button><button disabled={busy} className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Create hidden draft</button></div></form></div>}
   </main>
 }
