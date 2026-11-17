@@ -88,7 +88,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
       tabIndex={open ? 0 : -1}
       aria-label="Close admin navigation"
       onClick={onClose}
-      className={`absolute inset-0 h-full w-full bg-black/30 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`}
+      className={`absolute inset-0 h-full w-full border-0 bg-black/30 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0"}`}
     />
     <aside
       role="dialog"
@@ -108,7 +108,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
           href="/"
           onClick={onClose}
           aria-current={pathname === "/" ? "page" : undefined}
-          className={`mb-3 flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${pathname === "/" ? "border-accent/50 bg-accent/15 font-semibold text-accent" : "border-default-200 text-foreground hover:border-accent/50 hover:bg-accent/10"}`}
+          className={`mb-3 flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${pathname === "/" ? "border-accent bg-accent font-semibold text-accent-foreground" : "border-default-200 text-foreground hover:border-accent hover:bg-accent hover:text-accent-foreground"}`}
         >
           <LayoutDashboard size={17} strokeWidth={1.8} aria-hidden="true" />
           Dashboard
@@ -128,7 +128,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
                 else next.add(section.label)
                 return next
               })}
-              className={`flex min-h-10 w-full items-center gap-3 rounded-lg border px-3 text-left text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-primary ${section === activeSection ? "border-accent/50 bg-accent/15 text-accent" : "border-default-200 text-default-500 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
+              className={`flex min-h-10 w-full items-center gap-3 rounded-lg border px-3 text-left text-xs font-semibold uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-primary ${section === activeSection ? "border-accent bg-accent text-accent-foreground" : "border-default-200 text-foreground hover:border-accent hover:bg-accent hover:text-accent-foreground"}`}
             >
               <SectionIcon size={16} strokeWidth={1.8} aria-hidden="true" />
               <span className="flex-1">{section.label}</span>
@@ -151,7 +151,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
                       href={link.href}
                       onClick={onClose}
                       aria-current={active ? "page" : undefined}
-                      className={`flex min-h-10 items-center gap-3 rounded-lg border py-2 pl-10 pr-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-accent/50 bg-accent/15 font-semibold text-accent" : "border-default-200 text-foreground/80 hover:border-accent/50 hover:bg-accent/10 hover:text-foreground"}`}
+                      className={`flex min-h-10 items-center gap-3 rounded-lg border py-2 pl-10 pr-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-accent bg-accent font-semibold text-accent-foreground" : "border-default-200 text-foreground hover:border-accent hover:bg-accent hover:text-accent-foreground"}`}
                     >
                       <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
                       {link.label}

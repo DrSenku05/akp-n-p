@@ -185,7 +185,7 @@ button:not(:disabled):not([aria-disabled="true"]):hover {
 	border-color: var(--accent);
 }
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):not([class*="button--"]):not(.product-selector-row):hover {
+button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-"]):not([class*="button--"]):not(.product-selector-row):hover {
 	background-color: var(--admin-button-hover);
 	color: var(--admin-button-secondary-foreground);
 }
@@ -195,7 +195,7 @@ button[class*="bg-success"]:not(:disabled):hover { background-color: var(--succe
 button[class*="bg-warning"]:not(:disabled):hover { background-color: var(--warning-hover); }
 button[class*="bg-danger"]:not(:disabled):hover { background-color: var(--danger-hover); }
 
-button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-primary"]):not([class*="bg-success"]):not([class*="bg-warning"]):not([class*="bg-danger"]):not([class*="bg-accent"]):not([class*="button--"]):not(.product-selector-row):active {
+button:not(:disabled):not([aria-disabled="true"]):not([class*="bg-"]):not([class*="button--"]):not(.product-selector-row):active {
 	background-color: var(--admin-button-pressed);
 }
 
