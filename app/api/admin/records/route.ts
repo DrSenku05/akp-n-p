@@ -179,15 +179,18 @@ export async function POST(request: NextRequest) {
       if (reopened !== true) return fail("This returned order changed before it could be reopened.", 409)
       return NextResponse.json({ ok: true })
     }
+    if (action === "confirm order & start preparation") {
+      const { data: confirmed, error: confirmationError } = await supabase.rpc("confirm_order_start_preparation", {
+        p_order_id: order.id,
+        p_gcash_verified: value("GCash Verified").toLowerCase() === "true",
+      })
+      if (confirmationError) return fail(confirmationError.message, confirmationError.code === "42501" ? 403 : 409)
+      if (confirmed !== true) return fail("The order changed before it could be confirmed. Refresh and try again.", 409)
+      return NextResponse.json({ ok: true })
+    }
     let status = ""
-    if (action.includes("accept")) {
-      if (current !== "pending") return fail("Only pending orders can start preparation.", 409)
-      if (order.payment_method?.toLowerCase().includes("gcash") && order.payment_status !== "paid") return fail("Confirm the GCash payment before accepting this order.", 409)
-      status = "accepted"
-    } else if (action.includes("start preparation")) {
-      if (current !== "accepted") return fail("Accept the order before starting preparation.", 409)
-      if (order.payment_method?.toLowerCase().includes("gcash") && order.payment_status !== "paid") return fail("Confirm the GCash payment before preparation.", 409)
-      status = "processing"
+    if (action.includes("accept") || action.includes("start preparation")) {
+      return fail("Use Confirm Order & Start Preparation from the order details.", 409)
     } else if (action.includes("ready for pickup") || action.includes("ready for driver")) {
       if (current !== "processing") return fail("The order must be preparing before it can be ready for pickup.", 409)
       status = "shipped"
@@ -499,12 +502,12 @@ export async function POST(request: NextRequest) {
   } else if (module === "payments") {
     const paymentId = row[9]
     if (!paymentId) return fail("Payment identifier is missing. Refresh the payment list and try again.")
-    const { data: payment, error: lookupError } = await supabase.from("payments").select("id,method,status").eq("id", paymentId).maybeSingle()
+    const { data: payment, error: lookupError } = await supabase.from("payments").select("id,order_id,method,status").eq("id", paymentId).maybeSingle()
     if (lookupError) return fail(lookupError.message)
     if (!payment) return fail("Payment record was not found.", 404)
     if (payment.status.toLowerCase() !== "pending") return fail("Only pending payments can be changed.", 409)
     const method = payment.method.trim().toLowerCase().replaceAll("_", " ")
-    const isCod = ["cod", "cash on delivery"].includes(method)
+    const isCod = ["cod", "cash on delivery", "cash"].includes(method)
     const isGcash = ["gcash", "wallet", "e-wallet"].includes(method)
     let status = ""
     if (action.includes("reject payment")) {
@@ -513,10 +516,12 @@ export async function POST(request: NextRequest) {
       if (!decisionReason || decisionReason.length > 500) return fail("Enter a payment rejection reason of 1 to 500 characters.")
       status = "rejected"
     } else if (action.includes("confirm payment")) {
-      if (!isGcash) return fail("This action is only for GCash payments.")
-      status = "verified"
+      return fail("Verify GCash and start preparation together from the linked order details.", 409)
     } else if (action.includes("cash collected")) {
       if (!isCod) return fail("Cash collection can only be recorded for COD payments.")
+      const { data: linkedOrder, error: linkedOrderError } = await supabase.from("orders").select("fulfillment_method").eq("id", payment.order_id).maybeSingle()
+      if (linkedOrderError) return fail(linkedOrderError.message)
+      if (!linkedOrder || !["pickup", "walk_in", "walk-in"].includes(linkedOrder.fulfillment_method.toLowerCase())) return fail("Delivery COD is collected by the assigned driver, not from Payment Management.", 409)
       status = "verified"
     } else return fail("Unsupported payment action.")
     result = await supabase.from("payments").update({ status, decision_reason: status === "rejected" ? value("Decision Reason") : null, verified_by: claims.sub, verified_at: new Date().toISOString() }).eq("id", payment.id).eq("status", "pending").select("id")

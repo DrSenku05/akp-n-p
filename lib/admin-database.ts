@@ -50,10 +50,9 @@ const orderStatusLabel = (status: string, fulfillment: string, deliveryStatus: s
   if (["delivered", "completed"].includes(status)) return "Completed"
   return title(status)
 }
-const orderActions = (status: string, fulfillment: string, deliveryStatus: string | null, returnInspectedAt: Date | null) => {
+const orderActions = (status: string, fulfillment: string, deliveryStatus: string | null, returnInspectedAt: Date | null, paymentStatus: string | null) => {
   if (deliveryStatus === "returned") return returnInspectedAt ? "View · Return to Driver Pool · Cancel" : "View · Inspect Return"
-  if (status === "pending") return "View · Accept Order · Cancel"
-  if (status === "accepted") return "View · Start Preparation · Cancel"
+  if (["pending", "accepted"].includes(status)) return ["rejected", "failed", "refunded"].includes((paymentStatus ?? "").toLowerCase()) ? "View · Cancel" : "View · Confirm Order & Start Preparation · Cancel"
   if (["processing", "preparing", "confirmed"].includes(status)) return `View · ${["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Ready for Pickup" : "Ready for Driver"} · Cancel`
   if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) return ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "View · Complete Pickup" : "View"
   return "View"
@@ -210,7 +209,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         const method = o.method ? paymentMethodLabel(o.method) : "—"
         const pin = o.latitude !== null && o.longitude !== null ? `${o.latitude},${o.longitude}` : ""
         const driverInfo = o.driver_name ? `${o.driver_name}${o.delivery_claimed_at ? ` · ${dateTimeLabel(o.delivery_claimed_at)}` : ""}` : o.status === "shipped" && !["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Available for drivers" : "—"
-        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment, o.delivery_status), dateTimeLabel(o.created_at), orderActions(o.status, fulfillment, o.delivery_status, o.return_inspected_at), o.address ?? "Not provided", o.items ?? "[]", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number, driverInfo, o.delivery_status ?? "—", o.id, o.activity ?? "[]", o.phone ?? "—", o.email ?? "—", money(o.subtotal), money(o.delivery_fee), o.return_inspected_at ? dateTimeLabel(o.return_inspected_at) : "", o.payment_id ?? "", o.payment_amount ? money(o.payment_amount) : "—", o.receipt_url ?? "", o.payment_history ?? "[]"]
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment, o.delivery_status), dateTimeLabel(o.created_at), orderActions(o.status, fulfillment, o.delivery_status, o.return_inspected_at, o.payment), o.address ?? "Not provided", o.items ?? "[]", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number, driverInfo, o.delivery_status ?? "—", o.id, o.activity ?? "[]", o.phone ?? "—", o.email ?? "—", money(o.subtotal), money(o.delivery_fee), o.return_inspected_at ? dateTimeLabel(o.return_inspected_at) : "", o.payment_id ?? "", o.payment_amount ? money(o.payment_amount) : "—", o.receipt_url ?? "", o.payment_history ?? "[]"]
       }) }
     }
 
@@ -339,7 +338,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       return { error: false, rows: payments.map((p) => {
         const method = paymentMethodLabel(p.method)
         const status = paymentStatusLabel(p.status)
-        const actions = `${status !== "Pending" ? "View Details" : method === "COD" ? "Mark Cash Collected" : method === "Online payment (GCash)" ? "Confirm Payment · Reject Payment" : "View Details"}${p.receipt_url ? " · View Receipt" : ""}`
+        const actions = `${status !== "Pending" ? "View Details" : method === "COD" ? "Mark Cash Collected" : method === "Online payment (GCash)" ? "Reject Payment" : "View Details"}${p.receipt_url ? " · View Receipt" : ""}`
         return [`PAY-${p.id.slice(0, 8).toUpperCase()}`, p.order_number, p.customer ?? "Unknown", money(p.amount), method, p.reference ?? "—", status, dateLabel(p.created_at), actions, p.id, p.receipt_url ?? ""]
       }) }
     }
