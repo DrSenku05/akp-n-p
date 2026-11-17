@@ -180,7 +180,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         ) order_history on true
         where coalesce(c.email, '') not like '%.demo@example.com'
           and c.name not like 'Demo Customer - %'
-        group by c.id, c.name, c.email, c.phone, c.status, address_book.addresses, address_book.address_pin
+        group by c.id, c.name, c.email, c.phone, c.status, address_book.addresses, address_book.address_pin, order_history.items
         order by c.name
       `
       return { error: false, rows: customers.map((c) => [`CUS-${c.id.slice(0, 8).toUpperCase()}`, c.name, c.email ?? "—", c.phone ?? "—", String(c.orders), money(c.spent), title(c.status), "View profile", c.id, c.addresses ?? "No saved addresses", c.address_pin ?? "", c.order_history]) }
