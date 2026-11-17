@@ -194,9 +194,9 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           from public.payments pay where pay.order_id = o.id
         ) payment_history on true
         left join lateral (
-          select coalesce(json_agg(json_build_object('event_type', recent.event_type, 'description', recent.description, 'actor_name', recent.actor_name, 'reason', recent.reason, 'created_at', recent.created_at) order by recent.created_at, recent.id)::text, '[]') as activity
+          select coalesce(json_agg(json_build_object('event_type', recent.event_type, 'description', recent.description, 'actor_name', recent.actor_name, 'reason', recent.reason, 'new_state', recent.new_state, 'created_at', recent.created_at) order by recent.created_at, recent.id)::text, '[]') as activity
           from (
-            select a.id, a.event_type, a.description, a.actor_name, a.reason, a.created_at
+            select a.id, a.event_type, a.description, a.actor_name, a.reason, a.new_state, a.created_at
             from public.order_activity a where a.order_id = o.id
             order by a.created_at desc, a.id desc limit 50
           ) recent
