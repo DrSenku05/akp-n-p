@@ -1,4 +1,4 @@
--- Limit sent announcements to authenticated users matching their audience.
+-- Limit sent announcements to customers, drivers, and staff by audience.
 -- Run after akp_admin_schema.sql, akp_customer_orders.sql, and akp_driver_app.sql.
 
 begin;
@@ -15,11 +15,18 @@ alter table public.announcements
 
 revoke all on public.announcements from anon;
 grant select (id, title, message, audience, status, sent_at, created_at, kind)
+  on public.announcements to anon;
+grant select (id, title, message, audience, status, sent_at, created_at, kind)
   on public.announcements to authenticated;
 
 drop policy if exists customers_read_sent_announcements on public.announcements;
 drop policy if exists driver_read_announcements on public.announcements;
 drop policy if exists announcements_read_matching_audience on public.announcements;
+drop policy if exists customers_read_public_sent_announcements on public.announcements;
+create policy customers_read_public_sent_announcements on public.announcements
+  for select to anon
+  using (status = 'sent' and audience in ('all', 'customers'));
+
 create policy announcements_read_matching_audience on public.announcements
   for select to authenticated
   using (

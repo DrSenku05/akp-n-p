@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic"
 
 export default async function AdminModuleRoute({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  if (slug === "inventory") redirect("/products?section=stock")
+  if (slug === "payments") redirect("/orders?section=payments")
+  if (slug === "inventory") redirect("/orders?section=inventory")
   if (slug === "heritage-showcase") redirect("/products?section=heritage")
   const preview = await getAdminDatabasePreview(slug)
   return <ModulePage slug={slug} databaseRows={preview?.rows} databaseAnnouncements={preview?.announcements} assignableOrders={preview?.assignableOrders} unassignableOrders={preview?.unassignableOrders} databaseError={preview?.error} />

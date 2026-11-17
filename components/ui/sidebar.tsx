@@ -17,21 +17,19 @@ import {
   Shapes,
   Truck,
   UsersRound,
-  WalletCards,
   X,
 } from "lucide-react"
 
 const sections = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, links: [] },
   { label: "Operations", href: "/orders", icon: ClipboardList, links: [
-    { label: "Orders", href: "/orders", icon: ClipboardList },
+    { label: "Order Operations", href: "/orders", icon: ClipboardList },
     { label: "Delivery Personnel", href: "/delivery-personnel", icon: Truck },
     { label: "Return & Refund", href: "/returns-refunds", icon: RotateCcw },
   ] },
   { label: "Customers", href: "/customers", icon: UsersRound, links: [
     { label: "Customers", href: "/customers", icon: UsersRound },
     { label: "Feedback", href: "/feedback", icon: MessageSquareText },
-    { label: "Payments", href: "/payments", icon: WalletCards },
   ] },
   { label: "Catalog & Marketing", href: "/products", icon: Shapes, links: [
     { label: "Products", href: "/products", icon: Package },

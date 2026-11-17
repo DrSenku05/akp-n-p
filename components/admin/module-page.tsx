@@ -70,19 +70,36 @@ const titleCase = (slug: string) => slug.split("-").map((part) => part.charAt(0)
 
 function statusColor(value: string) { const s = value.toLowerCase(); if (["active", "successful", "verified", "paid", "completed", "delivered", "ready for pickup", "normal", "available", "approved", "published", "sent"].some((x) => s.includes(x))) return "success" as const; if (["pending", "low stock", "open", "review", "processing", "preparing", "picked up", "out for delivery", "arrived", "attempted", "on delivery"].some((x) => s.includes(x))) return "warning" as const; if (["failed", "rejected", "cancelled", "out of stock", "suspended", "inactive"].some((x) => s.includes(x))) return "danger" as const; return "default" as const }
 
-function parseOrderItems(value: string): { name: string; quantity: string }[] {
+function parseOrderItems(value: string): { name: string; sku: string; quantity: string; unitPrice: string; lineTotal: string }[] {
   try {
     const parsed: unknown = JSON.parse(value)
-    if (Array.isArray(parsed)) return parsed.flatMap((item): { name: string; quantity: string }[] => {
+    if (Array.isArray(parsed)) return parsed.flatMap((item): { name: string; sku: string; quantity: string; unitPrice: string; lineTotal: string }[] => {
       if (typeof item !== "object" || item === null || !("name" in item) || !("quantity" in item)) return []
       if (typeof item.name !== "string" || (typeof item.quantity !== "number" && typeof item.quantity !== "string")) return []
-      return [{ name: item.name, quantity: String(item.quantity) }]
+      return [{ name: item.name, sku: typeof item.sku === "string" ? item.sku : "—", quantity: String(item.quantity), unitPrice: typeof item.unit_price === "string" || typeof item.unit_price === "number" ? String(item.unit_price) : "—", lineTotal: typeof item.line_total === "string" || typeof item.line_total === "number" ? String(item.line_total) : "—" }]
     })
   } catch {
     const legacyItem = /^(.*)\s×\s(\d+)$/.exec(value)
-    return legacyItem ? [{ name: legacyItem[1], quantity: legacyItem[2] }] : []
+    return legacyItem ? [{ name: legacyItem[1], sku: "—", quantity: legacyItem[2], unitPrice: "—", lineTotal: "—" }] : []
   }
   return []
+}
+
+function linkedPaymentActionRow(order: string[]) {
+  const paymentId = order[25] ?? ""
+  return [
+    paymentId ? `PAY-${paymentId.slice(0, 8).toUpperCase()}` : "",
+    order[0] ?? "",
+    order[1] ?? "Unknown",
+    order[26] || "—",
+    order[5] || "—",
+    order[12] || "—",
+    order[6] || "Pending",
+    order[8] || "—",
+    "",
+    paymentId,
+    order[27] || "",
+  ]
 }
 
 function parseAssignedDeliveryOrders(value: string | undefined): { orderNumber: string; customer: string; deliveryStatus: string }[] {
@@ -123,7 +140,7 @@ function getDisplayStats(slug: string, stats: ModuleConfig["stats"], rows: strin
   return stats
 }
 
-type DialogState = { title: string; kind: "view" | "form" | "confirm"; row?: string[]; rowIndex?: number; bulkRows?: string[][]; action?: string; values?: Record<string, string>; message?: string; table?: "main" | "announcements"; fields?: string[]; extraFields?: [string, string][] }
+type DialogState = { title: string; kind: "view" | "form" | "confirm"; row?: string[]; rowIndex?: number; bulkRows?: string[][]; action?: string; values?: Record<string, string>; message?: string; table?: "main" | "announcements"; module?: string; fields?: string[]; extraFields?: [string, string][] }
 type ReportDimension = { key: string; label: string; attributes?: { key: string; label: string }[] }
 type ReportDimensionMember = { id: string; label: string; attributes?: Record<string, string> }
 type ReportMeasure = { key: string; label: string; format: "count" | "currency" | "number" }
@@ -219,6 +236,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
   const config = modules[slug] ?? extras[slug] ?? { title: titleCase(slug), subtitle: `Manage ${titleCase(slug).toLowerCase()} for AKP Native Products`, columns: ["Name", "Details", "Status", "Actions"], rows: [], search: "Search..." }
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState("All")
+  const [orderQueue, setOrderQueue] = useState("All Orders")
   const [generatedReport, setGeneratedReport] = useState<string | null>(null)
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [reportBusy, setReportBusy] = useState(false)
@@ -234,7 +252,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
   const [productImagePreview, setProductImagePreview] = useState("")
   const previewObjectUrl = useRef("")
   const [saving, setSaving] = useState(false)
-  const [autoAssignBusy, setAutoAssignBusy] = useState(false)
   const [notice, setNotice] = useState("")
   const [dateRange, setDateRange] = useState("This month")
   const [customStart, setCustomStart] = useState("")
@@ -430,7 +447,19 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     ? Array.from(new Set([...(databaseCategories ?? []), ...rows.map((row) => row[3]?.trim())].filter((category): category is string => Boolean(category) && category !== "—" && category !== "Uncategorized"))).sort((a, b) => a.localeCompare(b))
     : undefined
   const filterOptions = categoryFilterOptions ?? config.filterOptions ?? Array.from(new Set(rows.flatMap((row) => row.filter((cell) => ["Active", "Suspended", "Pending", "Processing", "Shipped", "Delivered", "Cancelled", "Normal", "Low Stock", "Out of Stock", "Verified", "Refunded", "Failed", "Open", "Approved", "Rejected", "Successful"].includes(cell)))))
-  const filteredRows = useMemo(() => rows.filter((row) => (slug === "orders" ? row.slice(0, config.columns.length) : row).join(" ").toLowerCase().includes(query.toLowerCase()) && (filter === "All" || (slug === "products" ? row[3] === filter : slug === "users" ? row[6] === filter : row.some((cell) => cell.toLowerCase().includes(filter.toLowerCase()))))), [rows, filter, query, slug, config.columns.length])
+  const isOrderInQueue = (row: string[], queue: string) => {
+    const status = (row[7] ?? "").toLowerCase()
+    const payment = (row[6] ?? "").toLowerCase()
+    const method = (row[5] ?? "").toLowerCase()
+    const delivery = (row[17] ?? "").toLowerCase()
+    if (queue === "Payment Review") return status === "pending" && payment === "pending" && method.includes("gcash")
+    if (queue === "Preparation") return ["accepted · waiting for preparation", "preparing"].includes(status) || status === "pending" && (!method.includes("gcash") || payment === "paid")
+    if (queue === "Ready for Pickup") return status === "ready for driver" || status === "ready for pickup"
+    if (queue === "Delivery") return ["claimed · awaiting pickup", "picked up", "out for delivery", "at destination"].includes(status)
+    if (queue === "Exceptions") return ["attempted", "failed", "returned"].includes(delivery) || status.includes("cancel") || payment === "rejected"
+    return true
+  }
+  const filteredRows = useMemo(() => rows.filter((row) => (slug === "orders" ? isOrderInQueue(row, orderQueue) : true) && (slug === "orders" ? row.slice(0, config.columns.length) : row).join(" ").toLowerCase().includes(query.toLowerCase()) && (filter === "All" || (slug === "products" ? row[3] === filter : slug === "users" ? row[6] === filter : row.some((cell) => cell.toLowerCase().includes(filter.toLowerCase()))))), [rows, filter, query, slug, config.columns.length, orderQueue])
   const selectedRows = rows.filter((row) => selectedIds.includes(row[0]))
   const roleAnnouncementRows = useMemo(() => {
     const source = slug === "promotions" ? announcementRows : filteredRows
@@ -441,7 +470,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     if (!bulkAction || !selectedRows.length) return
     setDialog({ title: `${bulkAction} ${selectedRows.length} selected records?`, kind: "confirm", row: [String(selectedRows.length)], bulkRows: selectedRows, action: bulkAction, message: `This will attempt “${bulkAction}” on ${selectedRows.length} selected records. Each record is checked independently; some may be skipped if its current status does not allow this action.` })
   }
-  const openForm = (title: string, row?: string[], rowIndex?: number, action?: string, customFields?: string[], message?: string) => {
+  const openForm = (title: string, row?: string[], rowIndex?: number, action?: string, customFields?: string[], message?: string, requestModule?: string) => {
     setInvalidNumericFields([])
     if (previewObjectUrl.current) URL.revokeObjectURL(previewObjectUrl.current)
     previewObjectUrl.current = ""
@@ -457,7 +486,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     if (slug === "returns-refunds" && action === "Record Refund") {
       values["Refund Amount"] = (row?.[5] ?? "").replace(/[₱,\s]/g, "")
     }
-    setDialog({ title, kind: "form", row, rowIndex, action, values, message })
+    setDialog({ title, kind: "form", row, rowIndex, action, values, message, module: requestModule })
   }
   const exportRows = (format: "csv" | "pdf" | "sql" = "csv") => {
     if (format === "pdf") {
@@ -485,13 +514,49 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     const targetRows = table === "main" ? rows : announcementRows
     const index = targetRows.findIndex((candidate) => slug === "promotions" ? candidate[6] === row[6] : candidate[0] === row[0])
     const lower = action.toLowerCase()
+    if (slug === "orders" && ["confirm payment", "reject payment", "mark cash collected", "view receipt"].includes(lower)) {
+      const paymentId = row[25]
+      if (!paymentId) { setNotice("This order has no linked payment record. Refresh the order list and try again."); return }
+      const paymentRow = linkedPaymentActionRow(row)
+      if (lower === "view receipt") {
+        if (!paymentRow[10]) { setNotice("No payment screenshot was attached to this transfer."); return }
+        window.open(`/api/admin/payment-proof?path=${encodeURIComponent(paymentRow[10])}`, "_blank", "noopener,noreferrer")
+        return
+      }
+      if (lower === "reject payment") {
+        openForm(`Reject GCash payment for ${row[0]}`, paymentRow, -1, action, ["Decision Reason"], "Record why the GCash payment was rejected. This does not cancel the order or issue a refund.", "payments")
+        return
+      }
+      setDialog({
+        title: `${action}: ${row[0]}`,
+        kind: "confirm",
+        row: paymentRow,
+        rowIndex: -1,
+        action,
+        message: confirmMessage(action, "payments"),
+        module: "payments",
+      })
+      return
+    }
     if (slug === "payments" && lower === "view receipt") {
       if (!row[10]) { setNotice("No payment screenshot was attached to this transfer."); return }
       window.open(`/api/admin/payment-proof?path=${encodeURIComponent(row[10])}`, "_blank", "noopener,noreferrer")
       return
     }
+    if (slug === "payments" && lower === "reject payment") {
+      openForm(`Reject GCash payment: ${row[0]}`, row, index, action, ["Decision Reason"], "Record why the GCash payment was rejected. This does not cancel the order or issue a refund.")
+      return
+    }
     if (slug === "returns-refunds" && lower === "record refund") {
       openForm(`Record completed GCash refund: ${row[0]}`, row, index, "Record Refund", ["Refund Amount", "GCash Transaction Reference"], "Only use this after sending the refund outside the app. This records the completed transfer; it does not send money.")
+      return
+    }
+    if (slug === "orders" && lower === "cancel") {
+      openForm(`Cancel order ${row[0]}`, row, index, "Cancel", ["Cancellation Reason"], "A cancellation reason is required and will be kept in the order activity history.")
+      return
+    }
+    if (slug === "orders" && lower === "inspect return") {
+      openForm(`Inspect returned order ${row[0]}`, row, index, "Inspect Return", ["Usable Items", "Damaged Items", "Missing Items", "Inspection Notes"], "Count every ordered unit as usable, damaged, or missing. This inspection records findings only and does not restock inventory.")
       return
     }
     if (/^(view|review|track|details|view details|view receipt)$/.test(lower)) {
@@ -504,7 +569,10 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
         ["GCash transaction reference", row[9] || "—"],
         ["Refund recorded at", row[10] && row[10] !== "Never" ? row[10] : "—"],
       )
-      if (slug === "orders") extraFields.push(["Delivery address", row[10] || "Pickup at store / no address provided"], ["Ordered products", row[11] || "No item details available"], ["GCash reference", row[12] || "Not applicable"])
+      if (slug === "orders") {
+        extraFields.push(["Ordered products", row[11] || "No item details available"], ["Payment method", row[5] || "—"], ["Payment reference", row[12] || "Not applicable"])
+        if (row[2] === "Delivery") extraFields.push(["Delivery address", row[10] || "Not provided"], ["Driver assignment", row[16] || "—"], ["Delivery progress", row[17] || "—"])
+      }
       if (slug === "payments") {
         if (row[4]?.toLowerCase().includes("gcash")) extraFields.push(["GCash transaction reference", row[5] || "Not provided"], ["Receipt screenshot", row[10] ? "Attached · previewed in the expanded payment details" : "Not attached"])
         extraFields.push(["Verification rule", row[4]?.toLowerCase().includes("gcash") ? "Compare the exact amount and reference against the incoming transaction in the platform's GCash account. A reference or screenshot alone is not confirmation." : "Mark paid only after cash has physically been collected."])
@@ -559,10 +627,10 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
         return
       }
       const action = dialog.kind === "form"
-        ? dialog.action === "Record Movement" ? "record-movement" : ["assign", "unassign"].includes(dialog.action?.toLowerCase() ?? "") ? dialog.action?.toLowerCase() : slug === "returns-refunds" ? dialog.action ?? "edit" : slug === "heritage-showcase" ? dialog.row ? "edit" : "add-to-showcase" : dialog.row ? "edit" : "create"
+        ? dialog.action === "Record Movement" ? "record-movement" : ["assign", "unassign"].includes(dialog.action?.toLowerCase() ?? "") ? dialog.action?.toLowerCase() : slug === "orders" ? dialog.action?.toLowerCase() ?? "" : slug === "returns-refunds" ? dialog.action ?? "edit" : slug === "heritage-showcase" ? dialog.row ? "edit" : "add-to-showcase" : dialog.row ? "edit" : "create"
         : dialog.action ?? ""
       const announcementDraft = dialog.kind === "form" && ["Announcement", "New Announcement", "Send Notification"].includes(dialog.action ?? "")
-      const requestModule = slug === "promotions" && announcementDraft ? "notifications" : slug
+      const requestModule = dialog.module ?? (slug === "promotions" && announcementDraft ? "notifications" : slug)
       try {
         setSaving(true)
         if (dialog.bulkRows) {
@@ -780,7 +848,8 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
         let status = ""
         if (action.includes("approve")) status = "Approved"
         else if (action.includes("reject")) status = "Rejected"
-        else if (action.includes("accept") || action.includes("start preparing") || action.includes("process")) status = "Preparing"
+        else if (action.includes("accept")) status = "Accepted · Waiting for Preparation"
+        else if (action.includes("start preparation") || action.includes("start preparing") || action.includes("process")) status = "Preparing"
         else if (action.includes("ready for pickup")) status = "Ready for Pickup"
         else if (action.includes("out for delivery") || action.includes("ship")) status = "Out for Delivery"
         else if (action.includes("complete")) status = "Completed"
@@ -800,7 +869,9 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
         }
         if (dialog.rowIndex !== undefined && dialog.table !== "announcements" && (action.includes("process") || action.includes("preparing") || action.includes("ship") || action.includes("pickup") || action.includes("delivery") || action.includes("complete") || action.includes("payment") || action.includes("cash collected") || action.includes("approve") || action.includes("reject") || action.includes("cancel"))) {
           const actionsColumn = config.columns.indexOf("Actions")
-          const nextActions = slug === "orders" && (action.includes("preparing") || action.includes("process"))
+          const nextActions = slug === "orders" && action.includes("accept")
+            ? "View · Start Preparation · Cancel"
+            : slug === "orders" && (action.includes("preparation") || action.includes("preparing") || action.includes("process"))
             ? `View · ${dialog.row[2] === "Walk-in" ? "Ready for Pickup" : "Out for Delivery"} · Cancel`
             : slug === "orders" && (action.includes("pickup") || action.includes("delivery")) ? "View · Complete Order" : "View"
           if (actionsColumn >= 0) setRows((existing) => existing.map((item, index) => index === dialog.rowIndex ? item.map((cell, column) => column === actionsColumn ? nextActions : cell) : item))
@@ -1009,46 +1080,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     }
     openForm("Unassign a delivery", undefined, undefined, "Unassign", ["Assigned Order"])
   }
-  const autoAssignOrders = async () => {
-    if (!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy) return
-    const assignedOrdersColumn = config.columns.indexOf("Assigned Orders")
-    const drivers = availablePersonnel.map((row, index) => ({
-      row,
-      index,
-      assigned: row[assignedOrdersColumn] && row[assignedOrdersColumn] !== "—" ? row[assignedOrdersColumn].split(",").length : 0,
-    }))
-    let succeeded = 0
-    const failures: string[] = []
-    setAutoAssignBusy(true)
-    try {
-      for (const order of assignableOrders) {
-        drivers.sort((a, b) => a.assigned - b.assigned || a.index - b.index)
-        const driver = drivers[0]
-        try {
-          const response = await fetch("/api/admin/records", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ module: slug, action: "assign", row: driver.row, values: { "Delivery Order": `${order.orderNumber} · ${order.customer}` } }),
-          })
-          const result = await response.json() as { error?: string }
-          if (!response.ok) {
-            failures.push(`${order.orderNumber}: ${result.error || "Assignment failed"}`)
-            if ([401, 403, 503].includes(response.status)) break
-            continue
-          }
-          driver.assigned += 1
-          succeeded += 1
-        } catch (error) {
-          failures.push(`${order.orderNumber}: ${error instanceof Error ? error.message : "Assignment failed"}`)
-          break
-        }
-      }
-      setNotice(`Auto-assigned ${succeeded} of ${assignableOrders.length} orders.${failures.length ? ` Issues: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? `; and ${failures.length - 3} more` : ""}` : ""}`)
-      if (succeeded) router.refresh()
-    } finally {
-      setAutoAssignBusy(false)
-    }
-  }
   return <div className="mx-auto max-w-[1540px] space-y-5">
     <div className="flex flex-wrap items-center gap-2 text-xs text-default-500"><Leaf size={13} className="text-accent" /><span>{secondary}</span><span className="text-default-300">/</span><span className="font-medium text-foreground">{config.title}</span></div>
     {isDatabasePreview && databaseError && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">Could not load records from Supabase. Check the server database connection.</div>}
@@ -1059,9 +1090,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
         {slug === "products" && <Button size="sm" variant="outline" onPress={() => location.assign("/heritage-showcase")}>Heritage Showcase</Button>}
         {slug === "promotions" && <Button size="sm" variant="primary" onPress={() => triggerTopAction("New Promotion")}><Plus size={15}/>New Promotion</Button>}
         {slug === "delivery-personnel" && <>
-          <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={autoAssignOrders}><PackagePlus size={15}/>{autoAssignBusy ? "Auto-assigning…" : "Auto-assign"}</Button>
-          <Button size="sm" variant="primary" isDisabled={!isDatabasePreview || !assignableOrders.length || !availablePersonnel.length || autoAssignBusy} onPress={openManualAssign}><Plus size={15}/>Assign</Button>
-          <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !unassignableOrders.length || autoAssignBusy} onPress={openManualUnassign}><RotateCcw size={15}/>Unassign</Button>
+          <Button size="sm" variant="outline" isDisabled={!isDatabasePreview || !unassignableOrders.length} onPress={openManualUnassign}><RotateCcw size={15}/>Unassign</Button>
         </>}
         {config.action && !config.action.toLowerCase().includes("export") && !["reports", "promotions", "notifications", "delivery-personnel"].includes(slug) && <Button size="sm" variant="primary" onPress={() => triggerTopAction(config.action!)}><Plus size={15} />{config.action}</Button>}
       </div>
@@ -1091,6 +1120,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     {slug === "promotions" && <div className="grid gap-3 xl:grid-cols-2"><Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-3 p-4"><h2 className="text-sm font-semibold">Product Promotions</h2><DataTable compact config={{ ...config, columns: ["Promotion", "Product", "Discount", "Valid Until", "Status", "Actions"] }} rows={rows} selectable={isDatabasePreview} selectedIds={selectedIds} onToggle={toggleSelected} onToggleAll={(checked) => setSelectedIds((current) => checked ? Array.from(new Set([...current, ...rows.map((row) => row[0])])).slice(0, 100) : current.filter((id) => !rows.some((row) => row[0] === id)))} onAction={(action, row, index) => openAction(action, row, index)} /></Card.Content></Card><Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-3 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold">Announcements</h2><p className="mt-1 text-xs text-default-500">Promotions still notify customers automatically.</p></div><Button size="sm" variant="primary" onPress={() => triggerTopAction("New Announcement")}><Plus size={14}/>New Announcement</Button></div><AnnouncementFolders selected={announcementFolder} onSelect={setAnnouncementFolder} /><DataTable compact config={{ ...config, columns: ["Title", "Target", "Description", "Sent", "Actions"] }} rows={roleAnnouncementRows.map((row) => [row[0], row[1], row[8], row[2], row[3], row[4], row[6], row[7], row[8]])} onAction={(action, row, index) => openAction(action, row, index, "announcements")} /></Card.Content></Card></div>}
     {slug === "notifications" && <Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-4 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Admin activity</h2><p className="mt-1 text-xs text-default-500">Orders, payments, and other new system changes. Updates automatically.</p></div><Bell size={17} className="text-accent" /></div><AdminNotificationsFeed /></Card.Content></Card>}
     {slug === "audit-logs" && <Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-4 p-4"><div><h2 className="text-sm font-semibold">Audit receipts by user</h2><p className="mt-1 text-xs text-default-500">Each user folder contains insert, update, and delete receipts with the values recorded in the database.</p></div><AuditLogFolders /></Card.Content></Card>}
+    {slug === "orders" && <section aria-label="Order workflow queues" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">{["Payment Review", "Preparation", "Ready for Pickup", "Delivery", "Exceptions", "All Orders"].map((queue) => { const count = queue === "All Orders" ? rows.length : rows.filter((row) => isOrderInQueue(row, queue)).length; return <button key={queue} type="button" aria-pressed={orderQueue === queue} onClick={() => setOrderQueue(queue)} className="rounded-xl border border-default-200 bg-content1 p-3 text-left hover:border-default-300 hover:bg-default-50"><span className="block text-xs font-medium">{queue}</span><span className="mt-1 block text-xl font-semibold tabular-nums">{count}</span><span className="mt-1 block text-[10px] text-default-500">{queue === "All Orders" ? "complete history" : "orders needing attention"}</span></button> })}</section>}
     {slug !== "reports" && slug !== "promotions" && slug !== "settings" && slug !== "backup-restore" && slug !== "notifications" && slug !== "audit-logs" && <Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-4 p-4"><div className="flex flex-wrap items-center gap-2"><div className="min-w-[230px] flex-1"><Input aria-label={config.search || "Search records"} placeholder={config.search || "Search records..."} value={query} onChange={(e) => setQuery(e.target.value)} /></div>{config.filter && <select aria-label={config.filter} className="h-9 min-w-36 rounded-md border border-default-200 bg-background px-3 text-xs" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="All">{config.filter}</option>{filterOptions.map((option) => <option key={option}>{option}</option>)}</select>}<Button isIconOnly variant="outline" size="sm" aria-label="Clear search and filters" onPress={() => { setQuery(""); setFilter("All"); setNotice("Search and filters cleared.") }}><Filter size={15} /></Button></div>{isDatabasePreview && bulkActions[slug] && <div className="flex flex-wrap items-center gap-2 rounded-md border border-default-200 bg-default-50/60 p-2"><span className="px-1 text-xs text-default-600">{selectedIds.length} selected</span><select aria-label="Bulk action" value={bulkAction} onChange={(event) => setBulkAction(event.target.value)} className="h-9 min-w-44 rounded-md border border-default-200 bg-background px-3 text-xs"><option value="">Choose bulk action</option>{bulkActions[slug].map((action) => <option key={action}>{action}</option>)}</select><Button size="sm" variant="primary" isDisabled={!selectedIds.length || !bulkAction || selectedIds.length > 100 || saving} onPress={startBulkAction}>Apply to selected</Button><Button size="sm" variant="ghost" isDisabled={!selectedIds.length} onPress={() => setSelectedIds([])}>Clear selection</Button><span className="text-[11px] text-default-500">Select up to 100 · actions still enforce each record’s rules</span></div>}{slug === "users" ? <UserAccountGroups rows={filteredRows} busy={saving} onAction={(action, row) => openAction(action, row, rows.findIndex((candidate) => candidate[0] === row[0]))} /> : <DataTable config={config} rows={filteredRows} selectable={isDatabasePreview && Boolean(bulkActions[slug])} selectedIds={selectedIds} onToggle={toggleSelected} onToggleAll={(checked) => setSelectedIds((current) => checked ? Array.from(new Set([...current, ...filteredRows.map((row) => row[0])])).slice(0, 100) : current.filter((id) => !filteredRows.some((row) => row[0] === id)))} onAction={(action, row, index) => openAction(action, row, index)} />}</Card.Content></Card>}
     {config.note && !["inventory", "customers", "products", "reports", "promotions", "notifications", "audit-logs", "heritage-showcase"].includes(slug) && <div className="flex items-start gap-2 rounded-md border border-default-200 bg-default-50 px-3 py-2.5 text-xs leading-5 text-default-500"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-[#55745e]" />{config.note}</div>}
     <Modal.Backdrop isOpen={Boolean(dialog)} onOpenChange={(isOpen) => { if (!isOpen) setDialog(null) }}>
@@ -1397,6 +1427,7 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
 function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAction }: { config: ModuleConfig; rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
+  const [selectedOrder, setSelectedOrder] = useState<string[] | null>(null)
   const groupedOrders = new Map<string, { name: string; orders: { row: string[]; index: number }[] }>()
   rows.forEach((row, index) => {
     const key = row[15] || row[1] || row[0]
@@ -1407,7 +1438,7 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
 
   if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No orders found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
 
-  return <div className="space-y-3">
+  return <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"><div className="space-y-3">
     {[...groupedOrders.entries()].map(([key, group]) => {
       const customerExpanded = expandedCustomers.has(key)
       const customerPanelId = `customer-orders-${encodeURIComponent(key)}`
@@ -1480,6 +1511,7 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default-100 pt-3">
               <div className="flex flex-wrap gap-1">
                 {(row[9] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action)).map((action) => <Button key={action} size="sm" variant="ghost" className={`h-8 min-w-0 px-2 text-xs ${isDestructive(action) ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
+                <Button size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs" onPress={() => setSelectedOrder(row)}>Open details panel</Button>
               </div>
             </div>
           </div>
@@ -1493,11 +1525,43 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
     })}
     <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} {rows.length === 1 ? "order" : "orders"} across {groupedOrders.size} {groupedOrders.size === 1 ? "customer" : "customers"}</div>
   </div>
+  <aside aria-label="Selected order details" className="sticky top-4 max-h-[calc(100dvh-2rem)] min-h-64 overflow-y-auto rounded-xl border border-default-200 bg-content1 p-4">
+    {selectedOrder ? (() => {
+      const items = parseOrderItems(selectedOrder[11] ?? "")
+      const paymentPending = (selectedOrder[6] ?? "").toLowerCase() === "pending"
+      const paymentIsGcash = (selectedOrder[5] ?? "").toLowerCase().includes("gcash")
+      const paymentIsCod = (selectedOrder[5] ?? "").toLowerCase() === "cod"
+      const hasPayment = Boolean(selectedOrder[25])
+      const receiptPath = selectedOrder[27] ?? ""
+      let events: { event_type?: string; description?: string; actor_name?: string; reason?: string; created_at?: string }[] = []
+      try { const parsed: unknown = JSON.parse(selectedOrder[19] ?? "[]"); if (Array.isArray(parsed)) events = parsed } catch {}
+      return <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Order details</p><h2 className="mt-1 text-lg font-semibold">{selectedOrder[0]}</h2></div><Button size="sm" variant="outline" onPress={() => setSelectedOrder(null)}>Close</Button></div>
+        <section className="grid grid-cols-2 gap-2">{[["Customer", selectedOrder[1]], ["Order type", selectedOrder[2]], ["Payment", selectedOrder[6]], ["Fulfillment", selectedOrder[7]], ["Created", selectedOrder[8]], ["Driver", selectedOrder[16]], ["Phone", selectedOrder[20]], ["Email", selectedOrder[21]]].filter(([label]) => selectedOrder[2] === "Delivery" || label !== "Driver").map(([label, value]) => <div key={label} className="rounded-lg border border-default-200 bg-background p-3"><p className="text-[10px] text-default-500">{label}</p><p className="mt-1 break-words text-xs font-medium">{value || "—"}</p></div>)}</section>
+        <section aria-label="Order payment" className="space-y-3 rounded-lg border border-default-200 bg-background p-3">
+          <div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-semibold uppercase tracking-wide">Payment</h3><p className="mt-1 text-xs">{selectedOrder[5]} · {selectedOrder[6]}</p></div><p className="shrink-0 text-sm font-semibold">{selectedOrder[26] || selectedOrder[4]}</p></div>
+          {paymentIsGcash && <p className="break-all text-xs text-default-600">GCash reference: {selectedOrder[12] || "Not provided"}</p>}
+          {paymentIsGcash && receiptPath && <div className="space-y-2 rounded-lg border border-default-200 bg-default-50/70 p-2"><p className="text-[11px] font-medium">Customer payment receipt</p><Image src={`/api/admin/payment-proof?path=${encodeURIComponent(receiptPath)}`} alt={`Payment receipt for ${selectedOrder[0]}`} width={960} height={720} unoptimized className="max-h-56 w-auto max-w-full rounded-md object-contain"/><button type="button" onClick={() => onAction?.("View Receipt", selectedOrder, -1)} className="text-xs font-medium text-accent hover:underline">Open full receipt</button></div>}
+          {paymentPending && hasPayment && <div className="flex flex-wrap gap-2 border-t border-default-100 pt-3">
+            {paymentIsGcash && <><Button size="sm" variant="outline" onPress={() => onAction?.("Confirm Payment", selectedOrder, -1)}>Confirm GCash payment</Button><Button size="sm" variant="ghost" className="text-danger" onPress={() => onAction?.("Reject Payment", selectedOrder, -1)}>Reject payment</Button></>}
+            {paymentIsCod && selectedOrder[2] === "Walk-in" && <Button size="sm" variant="outline" onPress={() => onAction?.("Mark Cash Collected", selectedOrder, -1)}>Mark cash collected</Button>}
+          </div>}
+          {paymentPending && paymentIsCod && selectedOrder[2] === "Delivery" && <p className="border-t border-default-100 pt-3 text-[11px] text-default-500">The assigned driver records COD collection when completing delivery.</p>}
+          {!hasPayment && <p className="text-[11px] text-default-500">No linked payment record is available for review.</p>}
+        </section>
+        <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide">Ordered items</h3>{items.map((item, itemIndex) => <div key={itemIndex} className="flex items-start justify-between gap-3 rounded-lg border border-default-200 bg-background p-3 text-xs"><div className="min-w-0"><p className="font-medium">{item.name}</p><p className="mt-1 text-[10px] text-default-500">{item.sku} · {item.quantity} × ₱{item.unitPrice}</p></div><span className="shrink-0 font-medium">₱{item.lineTotal}</span></div>)}</section>
+        <section className="space-y-1 rounded-lg border border-default-200 bg-background p-3 text-xs"><div className="flex justify-between"><span>Subtotal</span><span>₱{selectedOrder[22]}</span></div><div className="flex justify-between"><span>Delivery fee</span><span>₱{selectedOrder[23]}</span></div><div className="flex justify-between border-t border-default-200 pt-2 font-semibold"><span>Total</span><span>{selectedOrder[4]}</span></div>{selectedOrder[2] === "Delivery" && <p className="border-t border-default-200 pt-2 text-default-600">{selectedOrder[10]}</p>}</section>
+        {selectedOrder[2] === "Delivery" && <section className="space-y-2 rounded-lg border border-default-200 bg-background p-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Driver and delivery</h3><p className="text-xs">{selectedOrder[16]} · {selectedOrder[17]}</p></section>}
+        <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide">Order activity</h3>{events.length ? [...events].reverse().map((event, index) => <div key={index} className="border-l-2 border-accent/50 pl-3"><p className="text-xs font-medium">{event.description || event.event_type}</p><p className="mt-1 text-[10px] text-default-500">{event.actor_name || "System"} · {event.created_at ? new Date(event.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "Time unavailable"}</p>{event.reason && <p className="mt-1 text-xs text-default-600">Reason: {event.reason}</p>}</div>) : <p className="text-xs text-default-500">No activity recorded yet.</p>}</section>
+      </div>
+    })() : <div className="flex min-h-56 flex-col items-center justify-center text-center"><p className="text-sm font-semibold">Select an order</p><p className="mt-1 text-xs text-default-500">Choose “Open details panel” from an expanded order to keep its details here beside the list.</p></div>}
+  </aside>
+  </div>
 }
 
 function numericFieldKind(field: string): "integer" | "decimal" | null {
   const name = field.toLowerCase()
-  if (["quantity", "stock", "reorder", "phone", "contact", "account number"].some((term) => name.includes(term))) return "integer"
+  if (["quantity", "stock", "reorder", "phone", "contact", "account number", "items"].some((term) => name.includes(term))) return "integer"
   if (["price", "amount", "discount", "latitude", "longitude"].some((term) => name.includes(term))) return "decimal"
   return null
 }
@@ -1532,6 +1596,7 @@ function isDestructive(action?: string) {
 
 function confirmMessage(action: string, slug: string) {
   const normalized = action.toLowerCase()
+  if (slug === "orders" && normalized === "return to driver pool") return "The order has been inspected. Return it to the available driver pool for a new delivery attempt? Inventory will not be changed."
   if (slug === "heritage-showcase" && normalized.includes("archive")) return "Archive this native product for now? It will be hidden from the customer app and can be published again later."
   if (slug === "heritage-showcase" && normalized.includes("publish")) return "Publish this native product and its heritage description to the customer app?"
   if (slug === "users" && normalized.includes("suspend")) return "Suspend this account? New sign-ins and token refreshes will be blocked until it is reactivated."
@@ -1552,7 +1617,8 @@ function confirmMessage(action: string, slug: string) {
   if (normalized.includes("confirm payment")) return "Before confirming, independently check the platform's official GCash account. Match the exact amount and transaction reference against the incoming transaction. A customer-entered reference or screenshot alone is not proof of payment."
   if (normalized.includes("cash collected")) return "Confirm that the full COD amount was physically collected in cash. This will mark the payment as paid."
   if (normalized.includes("verify")) return "Confirm that you inspected the payment in the provider account. Never rely only on a customer screenshot or reference number."
-  if (normalized.includes("accept") || normalized.includes("start preparing")) return "Accept this order and begin preparing it. Stock will be deducted when the acceptance is saved."
+  if (normalized.includes("accept")) return "Accept this order. Reserved stock will be deducted now; preparation starts as a separate step."
+  if (normalized.includes("start preparation") || normalized.includes("start preparing")) return "Begin preparing this accepted order."
   if (normalized.includes("ready for pickup")) return "Confirm this walk-in order is packed and ready for the customer to collect at the store."
   if (normalized.includes("out for delivery")) return "Confirm this delivery order has been handed off and is on its way to the provided address."
   if (normalized.includes("complete")) return "Mark this order completed after pickup or delivery has been fulfilled. COD must be recorded as collected separately."

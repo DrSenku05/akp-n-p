@@ -5,7 +5,7 @@
 begin;
 
 grant select (
-  sku, name, description, category_id, price, stock_quantity,
+  id, sku, name, description, category_id, price, stock_quantity,
   reorder_level, image_url, craft_origin, is_featured, visibility
 ) on table public.products to anon;
 

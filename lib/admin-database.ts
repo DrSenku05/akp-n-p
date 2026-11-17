@@ -30,17 +30,32 @@ const money = (amount: string | number) => `₱${Number(amount).toLocaleString("
 const dateLabel = (value: Date | string | null) => value ? new Date(value).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }) : "—"
 const dateTimeLabel = (value: Date | string | null) => value ? new Date(value).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }) : "Never"
 const title = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
-const orderStatusLabel = (status: string, fulfillment: string) => {
+const orderStatusLabel = (status: string, fulfillment: string, deliveryStatus: string | null) => {
   if (status === "pending") return "Pending"
+  if (status === "accepted") return "Accepted · Waiting for Preparation"
   if (["processing", "preparing", "confirmed"].includes(status)) return "Preparing"
-  if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) return ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Ready for Pickup" : "Out for Delivery"
+  if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) {
+    if (["pickup", "walk_in", "walk-in"].includes(fulfillment)) return "Ready for Pickup"
+    return ({
+      ready_for_pickup: "Ready for Driver",
+      assigned: "Claimed · Awaiting Pickup",
+      picked_up: "Picked Up",
+      out_for_delivery: "Out for Delivery",
+      arrived: "At Destination",
+      attempted: "Delivery Attempted",
+      failed: "Failed · Return Pending",
+      returned: "Returned to Store",
+    } as Record<string, string>)[deliveryStatus ?? ""] ?? "Ready for Driver"
+  }
   if (["delivered", "completed"].includes(status)) return "Completed"
   return title(status)
 }
-const orderActions = (status: string, fulfillment: string) => {
+const orderActions = (status: string, fulfillment: string, deliveryStatus: string | null, returnInspectedAt: Date | null) => {
+  if (deliveryStatus === "returned") return returnInspectedAt ? "View · Return to Driver Pool · Cancel" : "View · Inspect Return"
   if (status === "pending") return "View · Accept Order · Cancel"
-  if (["processing", "preparing", "confirmed"].includes(status)) return `View · ${["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Ready for Pickup" : "Out for Delivery"} · Cancel`
-  if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) return "View · Complete Order"
+  if (status === "accepted") return "View · Start Preparation · Cancel"
+  if (["processing", "preparing", "confirmed"].includes(status)) return `View · ${["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Ready for Pickup" : "Ready for Driver"} · Cancel`
+  if (["shipped", "ready_for_pickup", "out_for_delivery"].includes(status)) return ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "View · Complete Pickup" : "View"
   return "View"
 }
 const paymentMethodLabel = (method: string) => {
@@ -140,31 +155,41 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "orders") {
-      const orders = await prisma.$queryRaw<{ order_number: string; customer_id: string | null; customer: string | null; item_count: number; items: string | null; total: string; method: string | null; payment: string | null; reference: string | null; fulfillment: string; status: string; address: string | null; latitude: number | null; longitude: number | null; created_at: Date }[]>`
-        select o.order_number, o.customer_id::text as customer_id, c.name as customer, coalesce(items.item_count, 0)::int as item_count,
-          items.items as items, o.total_amount::text as total,
+      const orders = await prisma.$queryRaw<{ id: string; order_number: string; customer_id: string | null; customer: string | null; phone: string | null; email: string | null; item_count: number; items: string | null; total: string; subtotal: string; delivery_fee: string; method: string | null; payment: string | null; reference: string | null; payment_id: string | null; payment_amount: string | null; receipt_url: string | null; fulfillment: string; status: string; delivery_status: string | null; driver_name: string | null; delivery_claimed_at: Date | null; return_inspected_at: Date | null; address: string | null; latitude: number | null; longitude: number | null; created_at: Date; activity: string | null }[]>`
+        select o.id::text as id, o.order_number, o.customer_id::text as customer_id, c.name as customer, c.phone, c.email, coalesce(items.item_count, 0)::int as item_count,
+          items.items as items, o.total_amount::text as total, o.subtotal::text as subtotal, o.delivery_fee::text as delivery_fee,
           coalesce(nullif(o.payment_method, ''), p.method) as method,
           coalesce(p.status, o.payment_status) as payment,
-          p.reference, o.fulfillment_method as fulfillment, o.status,
+          p.reference, o.fulfillment_method as fulfillment, o.status, o.delivery_status,
+          d.name as driver_name, o.delivery_claimed_at, o.return_inspected_at,
           nullif(concat_ws(', ', nullif(trim(concat_ws(' ', a.address_line, a.barangay)), ''),
             case when nullif(trim(coalesce(a.landmark, o.delivery_address->>'landmark')), '') is not null
               then 'Landmark: ' || trim(coalesce(a.landmark, o.delivery_address->>'landmark')) end,
             a.city, a.province, a.postal_code), '') as address,
           a.latitude, a.longitude,
-          o.created_at
+          o.created_at, history.activity
         from public.orders o
         left join public.customers c on c.id = o.customer_id
+        left join public.delivery_personnel d on d.id = o.delivery_personnel_id
         left join public.customer_addresses a on a.id = o.delivery_address_id
         left join lateral (
           select count(*)::int as item_count,
-            coalesce(json_agg(json_build_object('name', oi.product_name, 'quantity', oi.quantity) order by oi.created_at)::text, '[]') as items
+            coalesce(json_agg(json_build_object('name', oi.product_name, 'sku', oi.sku, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'line_total', oi.line_total) order by oi.created_at)::text, '[]') as items
           from public.order_items oi where oi.order_id = o.id
         ) items on true
         left join lateral (
-          select pay.method, pay.status, pay.reference
+          select pay.id::text as id, pay.method, pay.status, pay.reference, pay.amount::text as amount, pay.receipt_url
           from public.payments pay where pay.order_id = o.id
-          order by pay.created_at desc limit 1
+          order by pay.created_at desc, pay.id desc limit 1
         ) p on true
+        left join lateral (
+          select coalesce(json_agg(json_build_object('event_type', recent.event_type, 'description', recent.description, 'actor_name', recent.actor_name, 'reason', recent.reason, 'created_at', recent.created_at) order by recent.created_at, recent.id)::text, '[]') as activity
+          from (
+            select a.id, a.event_type, a.description, a.actor_name, a.reason, a.created_at
+            from public.order_activity a where a.order_id = o.id
+            order by a.created_at desc, a.id desc limit 50
+          ) recent
+        ) history on true
         where o.order_number not like 'DEMO-ORD-%'
         order by o.created_at desc, o.order_number
       `
@@ -172,7 +197,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         const fulfillment = o.fulfillment?.toLowerCase() ?? "delivery"
         const method = o.method ? paymentMethodLabel(o.method) : "—"
         const pin = o.latitude !== null && o.longitude !== null ? `${o.latitude},${o.longitude}` : ""
-        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment), dateLabel(o.created_at), orderActions(o.status, fulfillment), o.address ?? "Not provided", o.items ?? "[]", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number]
+        const driverInfo = o.driver_name ? `${o.driver_name}${o.delivery_claimed_at ? ` · ${dateTimeLabel(o.delivery_claimed_at)}` : ""}` : o.status === "shipped" && !["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Available for drivers" : "—"
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment, o.delivery_status), dateTimeLabel(o.created_at), orderActions(o.status, fulfillment, o.delivery_status, o.return_inspected_at), o.address ?? "Not provided", o.items ?? "[]", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number, driverInfo, o.delivery_status ?? "—", o.id, o.activity ?? "[]", o.phone ?? "—", o.email ?? "—", money(o.subtotal), money(o.delivery_fee), o.return_inspected_at ? dateTimeLabel(o.return_inspected_at) : "", o.payment_id ?? "", o.payment_amount ? money(o.payment_amount) : "—", o.receipt_url ?? ""]
       }) }
     }
 
@@ -195,7 +221,9 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
           left join public.customers c on c.id = o.customer_id
           where o.delivery_personnel_id is null
             and o.fulfillment_method = 'delivery'
-            and o.status in ('pending', 'processing', 'shipped')
+            and o.status = 'shipped'
+            and o.delivery_status = 'ready_for_pickup'
+            and (lower(coalesce(o.payment_method, '')) in ('cod', 'cash on delivery') or (lower(coalesce(o.payment_method, '')) like '%gcash%' and o.payment_status = 'paid'))
             and o.order_number not like 'DEMO-ORD-%'
           order by o.created_at desc
         `,

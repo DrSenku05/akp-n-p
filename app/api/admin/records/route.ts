@@ -143,32 +143,72 @@ export async function POST(request: NextRequest) {
   } else if (module === "orders") {
     const orderNumber = row[0]?.replace(/^#/, "")
     if (!orderNumber) return fail("Order number is required.")
-    const { data: order, error: lookupError } = await supabase.from("orders").select("id,status,fulfillment_method").eq("order_number", orderNumber).maybeSingle()
+    const { data: order, error: lookupError } = await supabase.from("orders").select("id,status,fulfillment_method,payment_method,payment_status,delivery_personnel_id,delivery_status,return_inspected_at").eq("order_number", orderNumber).maybeSingle()
     if (lookupError) return fail(lookupError.message)
     if (!order) return fail("Order was not found.", 404)
     const current = order.status.toLowerCase()
     const fulfillment = order.fulfillment_method.toLowerCase()
     const isWalkIn = ["pickup", "walk_in", "walk-in"].includes(fulfillment)
+    if (action === "inspect return") {
+      if (order.status !== "shipped" || order.delivery_status !== "returned") return fail("Only returned deliveries can be inspected.", 409)
+      const counts = ["Usable Items", "Damaged Items", "Missing Items"].map((field) => value(field))
+      if (counts.some((count) => !/^\d+$/.test(count) || !Number.isSafeInteger(Number(count)))) return fail("Enter whole-number counts of zero or greater for usable, damaged, and missing items.")
+      const notes = value("Inspection Notes")
+      if (!notes || notes.length > 1000) return fail("Add inspection notes of 1 to 1,000 characters.")
+      const { data: items, error: itemsError } = await supabase.from("order_items").select("quantity").eq("order_id", order.id)
+      if (itemsError) return fail(itemsError.message)
+      const expected = (items ?? []).reduce((sum, item) => sum + item.quantity, 0)
+      if (counts.reduce((sum, count) => sum + Number(count), 0) !== expected) return fail(`Inspection counts must account for all ${expected} ordered units.`)
+      const { data: inspected, error: inspectionError } = await supabase.from("orders").update({
+        return_inspected_at: new Date().toISOString(),
+        return_inspected_by: claims.sub,
+        return_inspection_notes: notes,
+        return_usable_items: Number(counts[0]),
+        return_damaged_items: Number(counts[1]),
+        return_missing_items: Number(counts[2]),
+      }).eq("id", order.id).eq("status", "shipped").eq("delivery_status", "returned").select("id")
+      if (inspectionError) return fail(inspectionError.message)
+      if (!inspected?.length) return fail("This returned order changed during inspection. Refresh and try again.", 409)
+      return NextResponse.json({ ok: true })
+    }
+    if (action === "return to driver pool") {
+      if (admin.role !== "owner") return fail("Only an owner can return an inspected delivery to the driver pool.", 403)
+      if (order.status !== "shipped" || order.delivery_status !== "returned" || !order.return_inspected_at) return fail("Inspect the returned order before retrying delivery.", 409)
+      const { data: reopened, error: reopenError } = await supabase.rpc("requeue_returned_delivery", { p_order_id: order.id })
+      if (reopenError) return fail(reopenError.message)
+      if (reopened !== true) return fail("This returned order changed before it could be reopened.", 409)
+      return NextResponse.json({ ok: true })
+    }
     let status = ""
-    if (action.includes("accept") || action.includes("start preparing")) {
+    if (action.includes("accept")) {
       if (current !== "pending") return fail("Only pending orders can start preparation.", 409)
+      if (order.payment_method?.toLowerCase().includes("gcash") && order.payment_status !== "paid") return fail("Confirm the GCash payment before accepting this order.", 409)
+      status = "accepted"
+    } else if (action.includes("start preparation")) {
+      if (current !== "accepted") return fail("Accept the order before starting preparation.", 409)
+      if (order.payment_method?.toLowerCase().includes("gcash") && order.payment_status !== "paid") return fail("Confirm the GCash payment before preparation.", 409)
       status = "processing"
-    } else if (action.includes("ready for pickup")) {
-      if (!isWalkIn) return fail("Only walk-in orders can be marked ready for pickup.")
+    } else if (action.includes("ready for pickup") || action.includes("ready for driver")) {
       if (current !== "processing") return fail("The order must be preparing before it can be ready for pickup.", 409)
       status = "shipped"
     } else if (action.includes("out for delivery")) {
-      if (isWalkIn) return fail("Walk-in orders do not go out for delivery.")
-      if (current !== "processing") return fail("The order must be preparing before it can go out for delivery.", 409)
-      status = "shipped"
+      return fail("Drivers update delivery progress after claiming a ready order.", 409)
     } else if (action.includes("complete")) {
+      if (!isWalkIn) return fail("The assigned driver records delivery completion.", 409)
       if (current !== "shipped") return fail("The order must be ready for pickup or out for delivery before completion.", 409)
       status = "delivered"
     } else if (action.includes("cancel")) {
-      if (!["pending", "processing"].includes(current)) return fail("Only pending or preparing orders can be cancelled.", 409)
+      const returnedAndInspected = current === "shipped" && order.delivery_status === "returned" && Boolean(order.return_inspected_at)
+      if (!["pending", "accepted", "processing"].includes(current) && !returnedAndInspected) return fail("Only orders before pickup, or inspected returned orders, can be cancelled.", 409)
+      if (returnedAndInspected && admin.role !== "owner") return fail("Only an owner can resolve a returned delivery by cancelling it.", 403)
+      const reason = value("Cancellation Reason")
+      if (!reason || reason.length > 500) return fail("Enter a cancellation reason of 1 to 500 characters.")
       status = "cancelled"
     } else return fail("Unsupported order action.")
-    result = await supabase.from("orders").update({ status }).eq("id", order.id).eq("status", current).select("id")
+    const patch: Record<string, string> = { status }
+    if (status === "shipped" && !isWalkIn) patch.delivery_status = "ready_for_pickup"
+    if (status === "cancelled") patch.cancellation_reason = value("Cancellation Reason")
+    result = await supabase.from("orders").update(patch).eq("id", order.id).eq("status", current).select("id")
     if (result.error) return fail(result.error.message)
     if (Array.isArray(result.data) && result.data.length === 0) return fail("Order status changed while this action was being processed. Refresh and try again.", 409)
   } else if (module === "customers") {
@@ -220,18 +260,19 @@ export async function POST(request: NextRequest) {
       if (!driver) return fail("Delivery driver was not found.", 404)
       if (driver.availability !== "available") return fail("Only available drivers can receive a new assignment.", 409)
 
-      const { data: order, error: orderError } = await supabase.from("orders").select("id,status,fulfillment_method,delivery_personnel_id").eq("order_number", orderNumber).maybeSingle()
+      const { data: order, error: orderError } = await supabase.from("orders").select("id,status,fulfillment_method,delivery_personnel_id,delivery_status,payment_method,payment_status").eq("order_number", orderNumber).maybeSingle()
       if (orderError) return fail(orderError.message)
       if (!order) return fail("Delivery order was not found.", 404)
       if (order.fulfillment_method !== "delivery") return fail("Only delivery orders can be assigned to a driver.", 409)
-      if (!(["pending", "processing", "shipped"] as string[]).includes(order.status)) return fail("Only open orders can be assigned to a driver.", 409)
+      if (order.status !== "shipped" || order.delivery_status !== "ready_for_pickup") return fail("Only prepared deliveries waiting for pickup can be assigned.", 409)
       if (order.delivery_personnel_id) return fail("This order is already assigned. Refresh the list and try again.", 409)
 
       const { data: assigned, error: assignError } = await supabase.from("orders")
-        .update({ delivery_personnel_id: driver.id, delivery_status: "assigned" })
+        .update({ delivery_personnel_id: driver.id, delivery_status: "assigned", delivery_claimed_at: new Date().toISOString() })
         .eq("id", order.id)
         .is("delivery_personnel_id", null)
-        .in("status", ["pending", "processing", "shipped"])
+        .eq("status", "shipped")
+        .eq("delivery_status", "ready_for_pickup")
         .select("id")
       if (assignError) return fail(assignError.message.includes("delivery_status") ? "Run the driver database setup before assigning orders." : assignError.message, assignError.message.includes("delivery_status") ? 503 : 400)
       if (!assigned?.length) return fail("This order changed while you were assigning it. Refresh and try again.", 409)
@@ -468,6 +509,8 @@ export async function POST(request: NextRequest) {
     let status = ""
     if (action.includes("reject payment")) {
       if (!isGcash) return fail("Only GCash payments can be rejected here.")
+      const decisionReason = value("Decision Reason")
+      if (!decisionReason || decisionReason.length > 500) return fail("Enter a payment rejection reason of 1 to 500 characters.")
       status = "rejected"
     } else if (action.includes("confirm payment")) {
       if (!isGcash) return fail("This action is only for GCash payments.")
@@ -476,7 +519,7 @@ export async function POST(request: NextRequest) {
       if (!isCod) return fail("Cash collection can only be recorded for COD payments.")
       status = "verified"
     } else return fail("Unsupported payment action.")
-    result = await supabase.from("payments").update({ status, verified_by: claims.sub, verified_at: new Date().toISOString() }).eq("id", payment.id).eq("status", "pending").select("id")
+    result = await supabase.from("payments").update({ status, decision_reason: status === "rejected" ? value("Decision Reason") : null, verified_by: claims.sub, verified_at: new Date().toISOString() }).eq("id", payment.id).eq("status", "pending").select("id")
     if (result.error) return fail(result.error.message)
     if (Array.isArray(result.data) && result.data.length === 0) return fail("Payment status changed while this action was being processed. Refresh and try again.", 409)
   } else if (module === "feedback") {
