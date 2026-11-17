@@ -207,6 +207,28 @@ button[aria-disabled="true"] {
 [class*="divide-default-"] { --tw-divide-color: var(--admin-border-strong); }
 hr { border-color: var(--admin-border-strong); }
 
+.akp-admin-canvas :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]), select, textarea):not(:disabled) {
+	background-color: var(--field-background);
+	border-color: var(--admin-border-strong);
+	color: var(--field-foreground);
+	transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.akp-admin-canvas :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]), select, textarea):not(:disabled)::placeholder {
+	color: var(--field-placeholder);
+	opacity: 1;
+}
+
+.akp-admin-canvas :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]), select, textarea):not(:disabled):hover {
+	border-color: var(--accent);
+}
+
+.akp-admin-canvas :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]), select, textarea):focus-visible {
+	border-color: var(--accent);
+	outline: 2px solid color-mix(in oklch, var(--accent) 30%, transparent);
+	outline-offset: 1px;
+}
+
 .dark .akp-admin-canvas .card:not(.card--transparent) {
 	box-shadow: 0 5px 20px rgb(0 0 0 / 12%);
 }
