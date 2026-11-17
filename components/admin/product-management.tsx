@@ -57,6 +57,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const [movementReason, setMovementReason] = useState("")
   const [history, setHistory] = useState<Movement[]>([])
   const [threshold, setThreshold] = useState("10")
+  const [canEditThreshold, setCanEditThreshold] = useState(false)
   const [skuPrefix, setSkuPrefix] = useState("AKP-PRD-")
   const [skuDigits, setSkuDigits] = useState("8")
   const [categoryName, setCategoryName] = useState("")
@@ -105,7 +106,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
   useEffect(() => { setSelectedImageIds([]) }, [selectedId])
   useEffect(() => {
     void fetch("/api/admin/inventory-settings").then(async (r) => r.ok ? r.json() : null).then((data) => {
-      if (data) setThreshold(String(data.threshold))
+      if (data) { setThreshold(String(data.threshold)); setCanEditThreshold(data.canEdit) }
     }).catch(() => undefined)
   }, [])
 
@@ -292,6 +293,11 @@ export default function ProductManagement({ initialSection = "general" }: { init
     })
     if (paths.length) await supabase.storage.from("product-images").remove(paths)
     setBusy(false); setNotice("Product deleted. Historical order and inventory snapshots remain; its SKU stays reserved."); await load()
+  }
+  async function saveThreshold() {
+    const response = await fetch("/api/admin/inventory-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: Number(threshold) }) })
+    const body = await response.json()
+    setNotice(response.ok ? "Low-stock threshold saved." : body.error || "Could not save threshold.")
   }
   async function saveSkuFormat() {
     const { error } = await supabase.rpc("set_product_sku_format", { p_prefix: skuPrefix, p_minimum_digits: Number(skuDigits) })
@@ -592,6 +598,10 @@ export default function ProductManagement({ initialSection = "general" }: { init
           <h2 className="text-sm font-semibold">Product settings</h2>
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <section className={`${cardClass} space-y-3`}>
+            <div><h3 className="font-semibold">Global low-stock threshold</h3><p className="text-xs text-default-500">One threshold applies to all products. Items at or below this available quantity are flagged.</p></div>
+            <div className="flex items-end gap-2"><label className="flex-1"><span className={labelClass}>Available units</span><input className={inputClass} type="number" min="0" max="100000" step="1" disabled={!canEditThreshold} value={threshold} onChange={(e) => setThreshold(e.target.value)}/></label>{canEditThreshold && <button type="button" onClick={() => void saveThreshold()} className="rounded-lg border border-default-400 px-4 py-2 text-sm font-semibold hover:border-accent">Save threshold</button>}</div>
+          </section>
           {role === "owner" && <section className={`${cardClass} space-y-3`}>
             <div><h3 className="font-semibold">SKU formatting</h3><p className="text-xs text-default-500">Changes apply to newly created products. Existing SKUs remain unchanged.</p></div>
             <label><span className={labelClass}>SKU prefix</span><input className={inputClass} value={skuPrefix} maxLength={24} onChange={(e) => setSkuPrefix(e.target.value)}/></label>

@@ -13,8 +13,8 @@
 	--default-foreground: var(--foreground);
 	--accent: oklch(0.45 0.09 151);
 	--accent-foreground: oklch(0.985 0.008 84);
-	--border: oklch(0.76 0.022 79 / 92%);
-	--separator: oklch(0.81 0.018 79 / 86%);
+	--border: oklch(0.58 0.022 78);
+	--separator: oklch(0.68 0.018 79);
 	--admin-border-strong: oklch(0.58 0.022 78);
 	--admin-button-surface: color-mix(in oklch, var(--background) 82%, var(--accent) 18%);
 	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 80%, var(--accent) 20%);
@@ -35,8 +35,8 @@
 	--default-foreground: var(--foreground);
 	--accent: oklch(0.74 0.12 78);
 	--accent-foreground: oklch(0.22 0.025 70);
-	--border: oklch(0.48 0.025 78 / 94%);
-	--separator: oklch(0.43 0.022 78 / 90%);
+	--border: oklch(0.60 0.022 78);
+	--separator: oklch(0.54 0.022 78);
 	--admin-border-strong: oklch(0.60 0.022 78);
 	--admin-button-surface: color-mix(in oklch, var(--background) 82%, var(--accent) 18%);
 	--admin-button-hover: color-mix(in oklch, var(--admin-button-surface) 78%, var(--accent) 22%);
@@ -154,7 +154,7 @@ button[aria-disabled="true"] {
 
 .akp-admin-canvas .card:not(.card--transparent) {
 	border-radius: 1rem;
-	border-color: color-mix(in oklch, var(--accent) 12%, var(--border));
+	border-color: var(--admin-border-strong);
 	box-shadow: 0 3px 14px color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
