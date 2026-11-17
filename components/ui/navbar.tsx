@@ -56,7 +56,7 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
   return <>
     {signingOut && <div className="fixed inset-0 z-[100] grid place-items-center bg-background px-4 text-foreground" role="status" aria-live="polite"><div className="flex flex-col items-center gap-3 text-center"><LoaderCircle size={30} className="animate-spin text-primary" aria-hidden="true" /><p className="text-sm text-default-600">Signing you out…</p></div></div>}
     {signOutError && <p role="alert" className="fixed right-4 top-4 z-[101] max-w-sm rounded-lg bg-danger px-4 py-3 text-sm text-white shadow-lg">{signOutError}</p>}
-    <header inert={inert} className="relative z-10 flex min-h-[66px] shrink-0 items-center gap-3 border-t-2 border-amber-600 bg-background px-3 text-foreground shadow-sm shadow-black/10 sm:gap-4 sm:px-5 md:px-8">
+    <header inert={inert} className="relative z-10 flex min-h-[66px] shrink-0 items-center gap-3 border-t-2 border-accent bg-background px-3 text-foreground shadow-sm shadow-black/10 sm:gap-4 sm:px-5 md:px-8">
     <button type="button" aria-label="Open admin navigation" onClick={onOpenMenu} className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-default-300 bg-transparent text-foreground transition hover:border-primary hover:bg-default-100 focus-visible:outline-2 focus-visible:outline-primary">
       <Menu size={21} strokeWidth={1.8} aria-hidden="true" />
     </button>

@@ -97,7 +97,7 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
       inert={!open}
       className={`absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-default-200 bg-background/95 shadow-2xl transition-transform duration-200 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
     >
-      <div className="flex min-h-[66px] items-center justify-between border-t-2 border-amber-600 bg-[#211e18] px-5 text-stone-50">
+      <div className="flex min-h-[66px] items-center justify-between border-t-2 border-accent bg-[#211e18] px-5 text-stone-50">
         <span className="text-sm font-bold tracking-wide">Admin navigation</span>
         <button ref={closeButton} type="button" aria-label="Close navigation" onClick={onClose} className="flex size-9 items-center justify-center rounded-lg text-stone-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-300">
           <X size={19} aria-hidden="true" />
