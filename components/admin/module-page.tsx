@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Archive, Bell, ChevronDown, CircleAlert, Download, Filter, Folder, ImagePlus, Leaf, MapPin, Plus, RotateCcw, ShieldCheck, Trash2, Pencil, PackagePlus, Smartphone, Upload } from "lucide-react"
+import { Archive, Bell, ChevronDown, CircleAlert, ClipboardList, Download, Filter, Folder, ImagePlus, Leaf, Plus, RotateCcw, ShieldCheck, Trash2, Pencil, PackagePlus, Smartphone, Upload } from "lucide-react"
 import { Button, Card, Chip, Input, Modal } from "@heroui/react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -43,7 +43,7 @@ function parseInventoryMovements(value: string | undefined): InventoryMovement[]
 }
 
 const modules: Record<string, ModuleConfig> = {
-  orders: { title: "Order Management", subtitle: "Review customer orders, payment details, and pickup or delivery progress", action: "Export Orders", stats: [["Awaiting Action", "0"], ["Preparing", "0"], ["In Fulfillment", "0"], ["Completed", "0"]], search: "Search order ID or customer...", filter: "Order status", filterOptions: ["Pending", "Preparing", "Ready for Pickup", "Out for Delivery", "Completed", "Cancelled"], columns: ["Order ID", "Customer", "Order Type", "Items", "Total", "Payment Method", "Payment Status", "Order Status", "Date", "Actions"], rows: [["#ORD-0041", "Maria Santos", "Delivery", "3", "₱1,200", "GCash", "Pending", "Pending", "Aug 14", "View · Accept Order · Cancel"], ["#ORD-0040", "Jose Reyes", "Walk-in", "2", "₱840", "COD", "Pending", "Preparing", "Aug 14", "View · Ready for Pickup · Cancel"], ["#ORD-0039", "Ana Cruz", "Delivery", "5", "₱2,100", "GCash", "Paid", "Out for Delivery", "Aug 13", "View · Complete Order"]], note: "GCash references are not proof of payment. Confirm funds manually in the platform's GCash account. Walk-in orders progress to Ready for Pickup; delivery orders progress to Out for Delivery." },
+  orders: { title: "Orders & Payments", subtitle: "Review each order, payment, and fulfillment status together", action: "Export Orders", stats: [["Awaiting Action", "0"], ["Preparing", "0"], ["In Fulfillment", "0"], ["Completed", "0"]], search: "Search order ID or customer...", filter: "Order status", filterOptions: ["Pending", "Preparing", "Ready for Pickup", "Out for Delivery", "Completed", "Cancelled"], columns: ["Order ID", "Customer", "Order Type", "Items", "Total", "Payment Method", "Payment Status", "Order Status", "Date", "Actions"], rows: [["#ORD-0041", "Maria Santos", "Delivery", "3", "₱1,200", "GCash", "Pending", "Pending", "Aug 14", "View · Accept Order · Cancel"], ["#ORD-0040", "Jose Reyes", "Walk-in", "2", "₱840", "COD", "Pending", "Preparing", "Aug 14", "View · Ready for Pickup · Cancel"], ["#ORD-0039", "Ana Cruz", "Delivery", "5", "₱2,100", "GCash", "Paid", "Out for Delivery", "Aug 13", "View · Complete Order"]], note: "GCash references are not proof of payment. Confirm funds manually in the platform's GCash account. Walk-in orders progress to Ready for Pickup; delivery orders progress to Out for Delivery." },
   inventory: { title: "Inventory Management", subtitle: "Track stock levels, movements, and product availability", action: "Record Movement", stats: [["Total SKUs", "42"], ["Low Stock Items", "5", "At or below the store-wide warning threshold"], ["Out of Stock", "2"], ["Last Updated", "Today", "Aug 14, 2026"]], search: "Search by product name or SKU...", filter: "Filter by Status", columns: ["SKU", "Product Name", "Current Stock", "Movement History", "Status", "Actions"], rows: [["SKU-001", "Woven Abaca Bag", "12", "2 activities", "Normal", "", "[{\"movement_type\":\"restock\",\"quantity_delta\":20,\"reason\":\"Supplier delivery\",\"created_at\":\"2026-08-12T09:00:00.000Z\"},{\"movement_type\":\"sale\",\"quantity_delta\":-8,\"reason\":\"Customer orders\",\"created_at\":\"2026-08-13T10:30:00.000Z\"}]"], ["SKU-002", "Native Rattan Basket", "8", "1 activity", "Low Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-3,\"reason\":\"Store sale\",\"created_at\":\"2026-08-10T09:00:00.000Z\"}]"], ["SKU-003", "Handwoven Table Runner", "25", "1 activity", "Normal", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-5,\"reason\":\"Customer order\",\"created_at\":\"2026-08-14T08:30:00.000Z\"}]"], ["SKU-004", "Bamboo Jewelry Set", "2", "1 activity", "Low Stock", "", "[{\"movement_type\":\"damage\",\"quantity_delta\":-4,\"reason\":\"Damaged during inspection\",\"created_at\":\"2026-08-13T08:00:00.000Z\"}]"], ["SKU-005", "Native Buri Hat", "0", "1 activity", "Out of Stock", "", "[{\"movement_type\":\"sale\",\"quantity_delta\":-6,\"reason\":\"Customer order\",\"created_at\":\"2026-08-11T09:00:00.000Z\"}]"]], note: "Movement history records restocking, sales, damage, and manual adjustments. Low-stock warnings use one store-wide threshold configured in Settings." },
   customers: { title: "Customer Management", subtitle: "Manage customer accounts, information, and transaction records", action: "Export Customers", search: "Search by name, email, or phone...", filter: "Filter by Status", columns: ["Customer ID", "Name", "Email", "Phone", "Total Orders", "Total Spent", "Status", "Actions"], rows: [["CUS-001", "Maria Santos", "maria@email.com", "09XX-XXX-XXX", "6", "₱5,400", "Active", "View · Suspend"], ["CUS-002", "Jose Reyes", "jose@email.com", "09XX-XXX-XXX", "3", "₱2,100", "Active", "View · Suspend"], ["CUS-003", "Ana Cruz", "ana@email.com", "09XX-XXX-XXX", "10", "₱9,800", "Active", "View · Suspend"], ["CUS-004", "Pedro Lim", "pedro@email.com", "09XX-XXX-XXX", "1", "₱560", "Suspended", "View · Reactivate"]], note: "Customer details include profile information, address book, order history, and feedback records." },
   "delivery-personnel": { title: "Delivery Personnel Management", subtitle: "Manage delivery staff availability and order assignments", stats: [["Total Personnel", "8"], ["Available", "5"], ["On Delivery", "3"], ["Deliveries Today", "11"]], search: "Search personnel...", columns: ["Personnel ID", "Name", "Contact", "Assigned Orders", "Availability", "Actions"], rows: [["DEL-001", "Ramon Dela Cruz", "09XX-XXX-XXX", "#ORD-0041, #ORD-0039", "On Delivery", "View · Unassign"], ["DEL-002", "Julio Marcos", "09XX-XXX-XXX", "#ORD-0040", "On Delivery", "View · Unassign"], ["DEL-003", "Benito Aquino", "09XX-XXX-XXX", "—", "Available", "View · Suspend"], ["DEL-004", "Carlos Ramos", "09XX-XXX-XXX", "—", "Off Duty", "View · Suspend"]], note: "Use Assign for a specific driver and order, or Auto-assign to balance open deliveries across available personnel." },
@@ -100,6 +100,38 @@ function linkedPaymentActionRow(order: string[]) {
     paymentId,
     order[27] || "",
   ]
+}
+
+type OrderPayment = { id: string; method: string; status: string; amount: string; reference: string | null; receipt_url: string | null; created_at: string }
+
+function parseOrderPayments(value: string | undefined): OrderPayment[] {
+  if (!value) return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((payment): payment is OrderPayment =>
+      typeof payment === "object" && payment !== null &&
+      typeof payment.id === "string" && typeof payment.method === "string" &&
+      typeof payment.status === "string" && typeof payment.amount === "string" &&
+      typeof payment.created_at === "string" &&
+      (payment.reference === null || typeof payment.reference === "string") &&
+      (payment.receipt_url === null || typeof payment.receipt_url === "string")
+    )
+  } catch {
+    return []
+  }
+}
+
+function orderRowForPayment(order: string[], payment: OrderPayment) {
+  const row = [...order]
+  row[5] = payment.method
+  row[6] = payment.status
+  row[8] = payment.created_at
+  row[12] = payment.reference ?? "—"
+  row[25] = payment.id
+  row[26] = payment.amount
+  row[27] = payment.receipt_url ?? ""
+  return row
 }
 
 function parseAssignedDeliveryOrders(value: string | undefined): { orderNumber: string; customer: string; deliveryStatus: string }[] {
@@ -561,7 +593,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     }
     if (/^(view|review|track|details|view details|view receipt)$/.test(lower)) {
       const extraFields: [string, string][] = []
-      if (slug === "customers") extraFields.push(["Saved addresses", row[9] || "No saved addresses"], ["Order history", "See linked transactions in Order Management."], ["Feedback", "See verified reviews in Customer Feedback."])
+      if (slug === "customers") extraFields.push(["Saved addresses", row[9] || "No saved addresses"], ["Order history", "See linked transactions in Orders & Payments."], ["Feedback", "See verified reviews in Customer Feedback."])
       if (slug === "returns-refunds" && decisionNotes[row[0]]) extraFields.push(["Decision notes", decisionNotes[row[0]]])
       if (slug === "returns-refunds") extraFields.push(
         ["Refund status", row[10] && row[10] !== "Never" ? "Refund recorded" : "Not recorded"],
@@ -1203,7 +1235,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
 }
 
 function DataTable({ config, rows, compact = false, selectable = false, selectedIds = [], onToggle, onToggleAll, onAction }: { config: ModuleConfig; rows: string[][]; compact?: boolean; selectable?: boolean; selectedIds?: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
-  if (config.title === "Order Management") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
+  if (config.title === "Orders & Payments") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
   if (config.title === "Inventory Management") return <InventoryDirectory config={config} rows={rows} onAction={onAction} />
   if (config.title === "Delivery Personnel Management") return <PersonnelDirectory config={config} rows={rows} onAction={onAction} />
   if (config.title === "Customer Management") return <CustomerDirectory rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onToggleAll={onToggleAll} onAction={onAction} />
@@ -1425,137 +1457,79 @@ function PersonnelDirectory({ config, rows, onAction }: { config: ModuleConfig; 
 }
 
 function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAction }: { config: ModuleConfig; rows: string[][]; selectable: boolean; selectedIds: string[]; onToggle?: (row: string[], checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
-  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
-  const [selectedOrder, setSelectedOrder] = useState<string[] | null>(null)
-  const groupedOrders = new Map<string, { name: string; orders: { row: string[]; index: number }[] }>()
-  rows.forEach((row, index) => {
-    const key = row[15] || row[1] || row[0]
-    const group = groupedOrders.get(key) ?? { name: row[1] || "Unknown customer", orders: [] }
-    group.orders.push({ row, index })
-    groupedOrders.set(key, group)
-  })
+  const [selectedOrderId, setSelectedOrderId] = useState("")
+  const selectedIndex = rows.findIndex((row) => row[18] === selectedOrderId || row[0] === selectedOrderId)
+  const selectedOrder = selectedIndex >= 0 ? rows[selectedIndex] : null
 
   if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No orders found</p><p className="text-xs text-default-500">Try adjusting your search or filters.</p></div>
 
-  return <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]"><div className="space-y-3">
-    {[...groupedOrders.entries()].map(([key, group]) => {
-      const customerExpanded = expandedCustomers.has(key)
-      const customerPanelId = `customer-orders-${encodeURIComponent(key)}`
-      return <section key={key} className="group rounded-xl border border-default-200 bg-content1/60">
-      <button type="button" aria-expanded={customerExpanded} aria-controls={customerPanelId} onClick={() => setExpandedCustomers((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next })} className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-4 py-4 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><Folder size={18} aria-hidden="true" /></span>
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{group.name}</span><span className="mt-1 block text-xs text-default-500">{group.orders.length} {group.orders.length === 1 ? "order" : "orders"}</span></span>
-        <ChevronDown size={17} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${customerExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
-      </button>
-      <div id={customerPanelId} aria-hidden={!customerExpanded} inert={!customerExpanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${customerExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
-        <div className="min-h-0 overflow-hidden">
-        <div className="max-h-80 space-y-2 overflow-y-auto overscroll-contain border-t border-default-200 p-3 pr-2 sm:p-4 sm:pr-3">
-        {group.orders.map(({ row, index }) => {
-          const orderExpanded = expandedOrders.has(row[0])
-          const orderPanelId = `order-details-${encodeURIComponent(row[0])}`
-          const orderedItems = parseOrderItems(row[11] ?? "")
-          const [latitude, longitude] = (row[14] ?? "").split(",").map(Number)
-          const hasMapPin = Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
-          const mapParams = new URLSearchParams({ q: `${latitude},${longitude}`, z: "16", output: "embed" })
-          const mapUrl = `https://maps.google.com/maps?${mapParams.toString()}`
-          const mapLink = `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`
-          return <section key={row[0]} className="group/order rounded-lg border border-default-200 bg-background/70">
-          <div className="flex items-center gap-3 px-3 sm:px-4">
-            {selectable && <label aria-label={`Select order ${row[0]}`} className="flex size-8 shrink-0 cursor-pointer items-center justify-center"><input type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} /></label>}
-            <button type="button" aria-expanded={orderExpanded} aria-controls={orderPanelId} onClick={() => setExpandedOrders((current) => { const next = new Set(current); if (next.has(row[0])) next.delete(row[0]); else next.add(row[0]); return next })} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-3 text-left transition hover:bg-default-50/70 focus-visible:outline-2 focus-visible:outline-primary">
-            <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{row[0]}</span><span className="mt-1 block text-[11px] text-default-500">{row[2]} · {row[3]} {row[3] === "1" ? "item" : "items"}</span></span>
-            <span className="hidden text-xs font-semibold sm:block">{row[4]}</span>
-            <Chip size="sm" variant="soft" color={statusColor(row[7])}>{row[7]}</Chip>
-            <ChevronDown size={15} className={`shrink-0 text-default-500 transition-transform duration-300 motion-reduce:transition-none ${orderExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
+  return <div className="grid min-h-[36rem] gap-3 xl:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.6fr)]">
+    <aside className="flex min-h-0 flex-col rounded-xl border border-default-200 bg-content1 p-3" aria-label="Orders list">
+      {selectable && <label className="mb-2 inline-flex items-center gap-2 px-2 text-xs text-default-500"><input type="checkbox" checked={selectedIds.length === rows.length && rows.length > 0} onChange={(event) => rows.forEach((row) => onToggle?.(row, event.target.checked))} />Select visible orders</label>}
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+        {rows.map((row, index) => {
+          const selected = selectedOrderId === (row[18] || row[0])
+          return <div key={row[18] || row[0]} className={`flex items-center gap-2 rounded-lg p-2 ${selected ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-default-50"}`}>
+            {selectable && <input aria-label={`Select ${row[0]}`} type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} />}
+            <button type="button" aria-current={selected ? "true" : undefined} onClick={() => setSelectedOrderId(row[18] || row[0])} className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-1 text-left focus-visible:outline-2 focus-visible:outline-primary">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><ClipboardList size={18} aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{row[0]}</span><span className="mt-1 block truncate text-[11px] text-default-500">{row[1]} · {row[2]} · {row[3]} {row[3] === "1" ? "item" : "items"}</span><span className="mt-1 block text-xs font-medium">{row[4]}</span></span>
+              <span className="flex shrink-0 flex-col items-end gap-1"><Chip size="sm" variant="soft" color={statusColor(row[7])}>{row[7]}</Chip><span className="text-[10px] text-default-500">Pay: {row[6]}</span></span>
             </button>
           </div>
-          <div id={orderPanelId} aria-hidden={!orderExpanded} inert={!orderExpanded} className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${orderExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
-          <div className="min-h-0 overflow-hidden">
-          <div className="space-y-4 border-t border-default-100 p-3 sm:p-4">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {config.columns.map((heading, columnIndex) => {
-                if (["Customer", "Order ID", "Actions", "Items"].includes(heading)) return null
-                const value = row[columnIndex] || "—"
-                return <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
-                  <p className="text-[11px] text-default-500">{heading}</p>
-                  {["Order Status", "Payment Status"].includes(heading) ? <div className="mt-1"><Chip size="sm" variant="soft" color={statusColor(value)}>{value}</Chip></div> : <p className="mt-1 break-words text-xs font-medium">{value}</p>}
-                </div>
-              })}
-              {[
-                ["Delivery address", row[10] || "Pickup at store / no address provided"],
-                ["GCash reference", row[12] || "Not applicable"],
-              ].map(([heading, value]) => <div key={heading} className="min-w-0 rounded-lg bg-default-50/70 p-3">
-                <p className="text-[11px] text-default-500">{heading}</p>
-                <p className="mt-1 break-words text-xs font-medium">{value}</p>
-              </div>)}
-            </div>
-            <section aria-label="Ordered products" className="overflow-hidden rounded-xl border border-default-200 bg-background/80">
-              <h3 className="border-b border-dashed border-default-300 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Ordered products</h3>
-              <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 border-b border-default-100 bg-default-50/70 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-default-500">
-                <span>Product</span><span className="text-right">Qty</span>
-              </div>
-              {orderedItems.length ? <ul className="max-h-60 divide-y divide-dashed divide-default-200 overflow-y-auto overscroll-contain">
-                {orderedItems.map((item, itemIndex) => <li key={`${item.name}-${itemIndex}`} className="grid h-12 grid-cols-[minmax(0,1fr)_5rem] items-center gap-3 px-4 text-xs">
-                  <span className="truncate font-medium">{item.name}</span><span className="text-right tabular-nums text-default-600">{item.quantity}</span>
-                </li>)}
-              </ul> : <p className="px-4 py-3 text-xs text-default-500">No item details available.</p>}
+        })}
+      </div>
+      <div className="mt-3 border-t border-default-200 pt-3 text-xs text-default-500">{rows.length} {rows.length === 1 ? "order" : "orders"}</div>
+    </aside>
+    <section className="flex min-h-[36rem] min-w-0 flex-col overflow-hidden rounded-xl border border-default-200 bg-content1 p-3 md:p-4" aria-label="Selected order and payment details">
+      {!selectedOrder ? <div className="grid flex-1 place-items-center text-center"><div><ClipboardList className="mx-auto mb-3 text-default-400" size={36}/><p className="font-semibold">Select an order to view details</p><p className="mt-1 text-sm text-default-500">The order and its payment records stay together in this panel.</p></div></div> : (() => {
+        const row = selectedOrder
+        const orderItems = parseOrderItems(row[11] ?? "")
+        const payments = parseOrderPayments(row[28])
+        const paymentRows = payments.length ? payments : row[25] ? [{ id: row[25], method: row[5], status: row[6], amount: row[26], reference: row[12], receipt_url: row[27] || null, created_at: row[8] }] : []
+        const paymentIndex = selectedIndex
+        let events: { event_type?: string; description?: string; actor_name?: string; reason?: string; created_at?: string }[] = []
+        try { const parsed: unknown = JSON.parse(row[19] ?? "[]"); if (Array.isArray(parsed)) events = parsed } catch {}
+        const [latitude, longitude] = (row[14] ?? "").split(",").map(Number)
+        const hasMapPin = Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+        const mapLink = hasMapPin ? `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}` : ""
+        const mapUrl = hasMapPin ? `https://maps.google.com/maps?${new URLSearchParams({ q: `${latitude},${longitude}`, z: "16", output: "embed" })}` : ""
+        return <div key={row[18] || row[0]} className="product-panel-enter flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-default-200 pb-3">
+            <div><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-primary">Order</p><h2 className="mt-0.5 text-base font-bold">{row[0]}</h2><p className="text-xs text-default-500">{row[1]} · {row[2]} · {row[8]}</p></div>
+            <div className="flex flex-wrap items-center gap-2"><Chip size="sm" variant="soft" color={statusColor(row[7])}>{row[7]}</Chip>{(row[9] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action)).map((action) => <Button key={action} size="sm" variant={isDestructive(action) ? "ghost" : "outline"} className={`text-xs ${isDestructive(action) ? "text-danger" : ""}`} onPress={() => onAction?.(action, row, paymentIndex)}>{action}</Button>)}</div>
+          </div>
+          <div className="space-y-4 py-3">
+            <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{[["Order status", row[7]], ["Fulfillment", row[2]], ["Customer", row[1]], ["Phone", row[20]], ["Email", row[21]], ["Driver", row[16]], ["Delivery progress", row[17]], ["Created", row[8]]].filter(([label]) => row[2] === "Delivery" || label !== "Driver").map(([label, value]) => <div key={label} className="rounded-lg border border-default-200 bg-background p-3"><p className="text-[10px] text-default-500">{label}</p><p className="mt-1 break-words text-xs font-medium">{value || "—"}</p></div>)}</section>
+            <section className="space-y-3 rounded-xl border border-default-200 bg-background p-3" aria-label="Payments for this order">
+              <div className="flex items-center justify-between gap-2"><div><h3 className="text-xs font-semibold uppercase tracking-wide">Payments</h3><p className="mt-1 text-[11px] text-default-500">Linked directly to {row[0]}</p></div><span className="text-xs text-default-500">{paymentRows.length} {paymentRows.length === 1 ? "record" : "records"}</span></div>
+              {paymentRows.length ? paymentRows.map((payment) => {
+                const actionRow = orderRowForPayment(row, payment)
+                const method = payment.method.toLowerCase()
+                const isGcash = method.includes("gcash")
+                const isCod = method === "cod" || method.includes("cash on delivery")
+                const pending = payment.status.toLowerCase() === "pending"
+                const paymentLabel = payment.status === "verified" ? "Paid" : payment.status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+                return <article key={payment.id} className="rounded-lg border border-default-200 bg-default-50/50 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold">{isGcash ? "GCash" : isCod ? "Cash on Delivery" : payment.method}</p><p className="mt-1 text-[11px] text-default-500">{payment.created_at} · {payment.reference || "No reference"}</p></div><div className="flex items-center gap-2"><Chip size="sm" variant="soft" color={statusColor(paymentLabel)}>{paymentLabel}</Chip><span className="text-sm font-semibold">₱{payment.amount}</span></div></div>
+                  {isGcash && payment.receipt_url && <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-default-200 pt-3"><Image src={`/api/admin/payment-proof?path=${encodeURIComponent(payment.receipt_url)}`} alt={`Payment receipt for ${row[0]}`} width={480} height={320} unoptimized className="max-h-28 w-auto max-w-40 rounded-md border border-default-200 object-contain"/><Button size="sm" variant="ghost" className="text-xs" onPress={() => onAction?.("View Receipt", actionRow, paymentIndex)}>Open receipt</Button></div>}
+                  {pending && <div className="mt-3 flex flex-wrap gap-2 border-t border-default-200 pt-3">{isGcash && <><Button size="sm" variant="outline" onPress={() => onAction?.("Confirm Payment", actionRow, paymentIndex)}>Confirm GCash payment</Button><Button size="sm" variant="ghost" className="text-danger" onPress={() => onAction?.("Reject Payment", actionRow, paymentIndex)}>Reject payment</Button></>}{isCod && row[2] === "Walk-in" && <Button size="sm" variant="outline" onPress={() => onAction?.("Mark Cash Collected", actionRow, paymentIndex)}>Mark cash collected</Button>}{isCod && row[2] === "Delivery" && <p className="self-center text-[11px] text-default-500">The assigned driver records COD collection when completing delivery.</p>}</div>}
+                </article>
+              }) : <p className="rounded-lg border border-dashed border-default-300 p-3 text-xs text-default-500">No linked payment records.</p>}
+              <p className="text-[10px] text-default-500">Verify GCash funds in the payment account before confirming. COD delivery collection is recorded by the assigned driver.</p>
             </section>
-            {hasMapPin && <section aria-label="Delivery pinpoint map" className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-xs font-semibold"><MapPin size={14} className="text-accent" />Delivery location</h3>
-                <a href={mapLink} target="_blank" rel="noreferrer" className="text-xs font-medium text-accent hover:underline">Open map</a>
-              </div>
-              <iframe title={`Delivery location for order ${row[0]}`} src={mapUrl} className="h-56 w-full rounded-lg border border-default-200" loading="lazy" referrerPolicy="no-referrer" />
-            </section>}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default-100 pt-3">
-              <div className="flex flex-wrap gap-1">
-                {(row[9] ?? "").split(" · ").map((action) => action.trim()).filter((action) => action && !/^view$/i.test(action)).map((action) => <Button key={action} size="sm" variant="ghost" className={`h-8 min-w-0 px-2 text-xs ${isDestructive(action) ? "text-danger" : "text-accent"}`} onPress={() => onAction?.(action, row, index)}>{action}</Button>)}
-                <Button size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs" onPress={() => setSelectedOrder(row)}>Open details panel</Button>
-              </div>
-            </div>
+            <section className="overflow-hidden rounded-xl border border-default-200 bg-background" aria-label="Ordered products">
+              <h3 className="border-b border-dashed border-default-300 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Ordered products</h3>
+              <div className="grid grid-cols-[minmax(0,1fr)_5rem_6rem] gap-3 border-b border-default-100 bg-default-50/70 px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-default-500"><span>Product</span><span className="text-right">Qty</span><span className="text-right">Total</span></div>
+              {orderItems.length ? <ul className="divide-y divide-dashed divide-default-200">{orderItems.map((item, index) => <li key={`${item.sku}-${index}`} className="grid min-h-12 grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-3 px-4 py-2 text-xs"><span className="min-w-0"><span className="block truncate font-medium">{item.name}</span><span className="block truncate text-[10px] text-default-500">{item.sku} · ₱{item.unitPrice} each</span></span><span className="text-right tabular-nums">{item.quantity}</span><span className="text-right font-medium">₱{item.lineTotal}</span></li>)}</ul> : <p className="px-4 py-3 text-xs text-default-500">No item details available.</p>}
+              <div className="space-y-1 border-t border-default-200 p-3 text-xs"><div className="flex justify-between"><span>Subtotal</span><span>₱{row[22]}</span></div><div className="flex justify-between"><span>Delivery fee</span><span>₱{row[23]}</span></div><div className="flex justify-between border-t border-default-200 pt-2 font-semibold"><span>Total</span><span>{row[4]}</span></div></div>
+            </section>
+            {row[2] === "Delivery" && <section className="space-y-2 rounded-xl border border-default-200 bg-background p-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Delivery details</h3><p className="text-xs">{row[10]}</p><p className="text-xs text-default-500">{row[16]} · {row[17]}</p>{hasMapPin && <div className="space-y-2"><a href={mapLink} target="_blank" rel="noreferrer" className="text-xs font-medium text-accent hover:underline">Open delivery location</a><iframe title={`Delivery location for ${row[0]}`} src={mapUrl} className="h-48 w-full rounded-lg border border-default-200" loading="lazy" referrerPolicy="no-referrer" /></div>}</section>}
+            <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide">Order activity</h3>{events.length ? [...events].reverse().map((event, index) => <div key={index} className="border-l-2 border-accent/50 pl-3"><p className="text-xs font-medium">{event.description || event.event_type}</p><p className="mt-1 text-[10px] text-default-500">{event.actor_name || "System"} · {event.created_at ? new Date(event.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "Time unavailable"}</p>{event.reason && <p className="mt-1 text-xs text-default-600">Reason: {event.reason}</p>}</div>) : <p className="text-xs text-default-500">No activity recorded yet.</p>}</section>
           </div>
-          </div>
-          </div>
-        </section>})}
         </div>
-        </div>
-      </div>
-      </section>
-    })}
-    <div className="border-t border-default-100 pt-3 text-[11px] text-default-500">Showing {rows.length} {rows.length === 1 ? "order" : "orders"} across {groupedOrders.size} {groupedOrders.size === 1 ? "customer" : "customers"}</div>
-  </div>
-  <aside aria-label="Selected order details" className="sticky top-4 max-h-[calc(100dvh-2rem)] min-h-64 overflow-y-auto rounded-xl border border-default-200 bg-content1 p-4">
-    {selectedOrder ? (() => {
-      const items = parseOrderItems(selectedOrder[11] ?? "")
-      const paymentPending = (selectedOrder[6] ?? "").toLowerCase() === "pending"
-      const paymentIsGcash = (selectedOrder[5] ?? "").toLowerCase().includes("gcash")
-      const paymentIsCod = (selectedOrder[5] ?? "").toLowerCase() === "cod"
-      const hasPayment = Boolean(selectedOrder[25])
-      const receiptPath = selectedOrder[27] ?? ""
-      let events: { event_type?: string; description?: string; actor_name?: string; reason?: string; created_at?: string }[] = []
-      try { const parsed: unknown = JSON.parse(selectedOrder[19] ?? "[]"); if (Array.isArray(parsed)) events = parsed } catch {}
-      return <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Order details</p><h2 className="mt-1 text-lg font-semibold">{selectedOrder[0]}</h2></div><Button size="sm" variant="outline" onPress={() => setSelectedOrder(null)}>Close</Button></div>
-        <section className="grid grid-cols-2 gap-2">{[["Customer", selectedOrder[1]], ["Order type", selectedOrder[2]], ["Payment", selectedOrder[6]], ["Fulfillment", selectedOrder[7]], ["Created", selectedOrder[8]], ["Driver", selectedOrder[16]], ["Phone", selectedOrder[20]], ["Email", selectedOrder[21]]].filter(([label]) => selectedOrder[2] === "Delivery" || label !== "Driver").map(([label, value]) => <div key={label} className="rounded-lg border border-default-200 bg-background p-3"><p className="text-[10px] text-default-500">{label}</p><p className="mt-1 break-words text-xs font-medium">{value || "—"}</p></div>)}</section>
-        <section aria-label="Order payment" className="space-y-3 rounded-lg border border-default-200 bg-background p-3">
-          <div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-semibold uppercase tracking-wide">Payment</h3><p className="mt-1 text-xs">{selectedOrder[5]} · {selectedOrder[6]}</p></div><p className="shrink-0 text-sm font-semibold">{selectedOrder[26] || selectedOrder[4]}</p></div>
-          {paymentIsGcash && <p className="break-all text-xs text-default-600">GCash reference: {selectedOrder[12] || "Not provided"}</p>}
-          {paymentIsGcash && receiptPath && <div className="space-y-2 rounded-lg border border-default-200 bg-default-50/70 p-2"><p className="text-[11px] font-medium">Customer payment receipt</p><Image src={`/api/admin/payment-proof?path=${encodeURIComponent(receiptPath)}`} alt={`Payment receipt for ${selectedOrder[0]}`} width={960} height={720} unoptimized className="max-h-56 w-auto max-w-full rounded-md object-contain"/><button type="button" onClick={() => onAction?.("View Receipt", selectedOrder, -1)} className="text-xs font-medium text-accent hover:underline">Open full receipt</button></div>}
-          {paymentPending && hasPayment && <div className="flex flex-wrap gap-2 border-t border-default-100 pt-3">
-            {paymentIsGcash && <><Button size="sm" variant="outline" onPress={() => onAction?.("Confirm Payment", selectedOrder, -1)}>Confirm GCash payment</Button><Button size="sm" variant="ghost" className="text-danger" onPress={() => onAction?.("Reject Payment", selectedOrder, -1)}>Reject payment</Button></>}
-            {paymentIsCod && selectedOrder[2] === "Walk-in" && <Button size="sm" variant="outline" onPress={() => onAction?.("Mark Cash Collected", selectedOrder, -1)}>Mark cash collected</Button>}
-          </div>}
-          {paymentPending && paymentIsCod && selectedOrder[2] === "Delivery" && <p className="border-t border-default-100 pt-3 text-[11px] text-default-500">The assigned driver records COD collection when completing delivery.</p>}
-          {!hasPayment && <p className="text-[11px] text-default-500">No linked payment record is available for review.</p>}
-        </section>
-        <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide">Ordered items</h3>{items.map((item, itemIndex) => <div key={itemIndex} className="flex items-start justify-between gap-3 rounded-lg border border-default-200 bg-background p-3 text-xs"><div className="min-w-0"><p className="font-medium">{item.name}</p><p className="mt-1 text-[10px] text-default-500">{item.sku} · {item.quantity} × ₱{item.unitPrice}</p></div><span className="shrink-0 font-medium">₱{item.lineTotal}</span></div>)}</section>
-        <section className="space-y-1 rounded-lg border border-default-200 bg-background p-3 text-xs"><div className="flex justify-between"><span>Subtotal</span><span>₱{selectedOrder[22]}</span></div><div className="flex justify-between"><span>Delivery fee</span><span>₱{selectedOrder[23]}</span></div><div className="flex justify-between border-t border-default-200 pt-2 font-semibold"><span>Total</span><span>{selectedOrder[4]}</span></div>{selectedOrder[2] === "Delivery" && <p className="border-t border-default-200 pt-2 text-default-600">{selectedOrder[10]}</p>}</section>
-        {selectedOrder[2] === "Delivery" && <section className="space-y-2 rounded-lg border border-default-200 bg-background p-3"><h3 className="text-xs font-semibold uppercase tracking-wide">Driver and delivery</h3><p className="text-xs">{selectedOrder[16]} · {selectedOrder[17]}</p></section>}
-        <section className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wide">Order activity</h3>{events.length ? [...events].reverse().map((event, index) => <div key={index} className="border-l-2 border-accent/50 pl-3"><p className="text-xs font-medium">{event.description || event.event_type}</p><p className="mt-1 text-[10px] text-default-500">{event.actor_name || "System"} · {event.created_at ? new Date(event.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "Time unavailable"}</p>{event.reason && <p className="mt-1 text-xs text-default-600">Reason: {event.reason}</p>}</div>) : <p className="text-xs text-default-500">No activity recorded yet.</p>}</section>
-      </div>
-    })() : <div className="flex min-h-56 flex-col items-center justify-center text-center"><p className="text-sm font-semibold">Select an order</p><p className="mt-1 text-xs text-default-500">Choose “Open details panel” from an expanded order to keep its details here beside the list.</p></div>}
-  </aside>
+      })()}
+    </section>
   </div>
 }
 

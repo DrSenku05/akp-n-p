@@ -23,7 +23,7 @@ import {
 const sections = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, links: [] },
   { label: "Operations", href: "/orders", icon: ClipboardList, links: [
-    { label: "Order Operations", href: "/orders", icon: ClipboardList },
+    { label: "Orders & Payments", href: "/orders", icon: ClipboardList },
     { label: "Delivery Personnel", href: "/delivery-personnel", icon: Truck },
     { label: "Return & Refund", href: "/returns-refunds", icon: RotateCcw },
   ] },
