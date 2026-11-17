@@ -276,7 +276,7 @@ export async function saveDatabaseBackup(client: Client, options: { backupName: 
       `insert into public.database_backups
         (id, backup_name, backup_data, file_name, file_size, sha256, format_version, schema_scope, description, metadata, created_by)
        values ($1, $2, $3, $4, $5, $6, 1, array['public']::text[], $7,
-        jsonb_build_object('encoding', 'base64', 'dumpFormat', 'plain-sql', 'tableScope', $9::text[], 'postgresqlVersion', current_setting('server_version'), 'source', $10), $8)
+        jsonb_build_object('encoding', 'base64', 'dumpFormat', 'plain-sql', 'tableScope', $9::text[], 'postgresqlVersion', current_setting('server_version'), 'source', $10::text), $8)
        returning id, backup_name, file_name, file_size::text, sha256, format_version, schema_scope, description, created_at`,
       [id, options.backupName, backupData, fileName, sql.byteLength, digest, options.description || null, options.userId, [...BACKUP_TABLES], options.source],
     )
