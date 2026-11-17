@@ -15,9 +15,29 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
-const fail = (error: unknown) => error instanceof BackupError
-  ? NextResponse.json({ error: error.message }, { status: error.status })
-  : NextResponse.json({ error: "The database backup operation failed." }, { status: 500 })
+const fail = (error: unknown) => {
+  if (error instanceof BackupError) {
+    return NextResponse.json({ error: error.message }, { status: error.status })
+  }
+
+  const code = error && typeof error === "object" && "code" in error && typeof error.code === "string"
+    ? error.code
+    : ""
+  console.error("Unexpected database backup failure", {
+    name: error instanceof Error ? error.name : "UnknownError",
+    code: /^[A-Z0-9_]{2,10}$/.test(code) ? code : undefined,
+  })
+
+  const isNetworkError = ["ENETUNREACH", "EHOSTUNREACH", "ETIMEDOUT", "EAI_AGAIN", "ENOTFOUND"].includes(code)
+  const isSqlState = /^[0-9A-Z]{5}$/.test(code)
+  const message = isNetworkError
+    ? `Could not reach PostgreSQL (${code}). For a Supabase project on Vercel, set the server-only DIRECT_URL to the Session pooler connection string (port 5432), then redeploy.`
+    : isSqlState
+      ? `PostgreSQL rejected the backup operation (SQLSTATE ${code}). Check the Vercel Function log for the matching failure.`
+      : "The database backup failed unexpectedly. Check the Vercel Function log for the matching failure."
+
+  return NextResponse.json({ error: message }, { status: 500 })
+}
 
 export async function GET() {
   try {
