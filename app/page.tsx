@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowDownToLine, ArrowRight, Leaf, Smartphone } from "lucide-react"
 import ProductSlideshow from "@/components/public/product-slideshow"
+import ProductPreview from "@/components/public/product-preview"
 
 export const metadata: Metadata = {
   title: "AKP Native Products Trading",
@@ -39,6 +40,8 @@ export default function Home() {
 
       <ProductSlideshow />
     </section>
+
+    <ProductPreview />
 
     <section id="our-story" className="border-y border-default-200 bg-content1/65">
       <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 md:grid-cols-[.8fr_1.2fr] md:items-center md:py-20 lg:px-12">
