@@ -56,6 +56,8 @@ export default function ProductManagement({ initialSection = "general" }: { init
   const settingsBack = useRef<HTMLButtonElement>(null)
   const [newName, setNewName] = useState("")
   const [newSupplierCost, setNewSupplierCost] = useState("")
+  const [newRetailPrice, setNewRetailPrice] = useState("0")
+  const [newOpeningStock, setNewOpeningStock] = useState("0")
   const [newImage, setNewImage] = useState<File | null>(null)
   const [movementType, setMovementType] = useState("restock")
   const [movementQty, setMovementQty] = useState("1")
@@ -199,16 +201,19 @@ export default function ProductManagement({ initialSection = "general" }: { init
     setNotice("Retail price and supplier cost saved."); setBusy(false); await load()
   }
   async function createDraft(event: React.FormEvent) {
-    event.preventDefault(); if (!newName.trim() || !newImage || newSupplierCost === "" || !Number.isFinite(Number(newSupplierCost)) || Number(newSupplierCost) < 0) return fail("Enter a product name, supplier cost, and image.")
+    event.preventDefault()
+    if (!newName.trim() || !newImage || newSupplierCost === "" || !Number.isFinite(Number(newSupplierCost)) || Number(newSupplierCost) < 0) return fail("Enter a product name, valid supplier cost, and image.")
+    if (newRetailPrice === "" || !Number.isFinite(Number(newRetailPrice)) || Number(newRetailPrice) < 0) return fail("Enter a valid retail price of zero or greater.")
+    if (newOpeningStock === "" || !Number.isInteger(Number(newOpeningStock)) || Number(newOpeningStock) < 0) return fail("Enter opening stock as a whole number of zero or greater.")
     setBusy(true); setNotice("")
     let stage = "uploading the product image"
     try {
       const uploaded = await upload(newImage, "products")
       stage = "creating the product draft"
-      const { data, error } = await supabase.rpc("create_product_draft_with_cost", { p_name: newName.trim(), p_image_url: uploaded.url, p_supplier_cost: Number(newSupplierCost) })
+      const { data, error } = await supabase.rpc("create_product_draft_with_inventory", { p_name: newName.trim(), p_image_url: uploaded.url, p_supplier_cost: Number(newSupplierCost), p_retail_price: Number(newRetailPrice), p_opening_stock: Number(newOpeningStock) })
       if (error) { await supabase.storage.from("product-images").remove([uploaded.path]); return fail(error.message) }
       const created = Array.isArray(data) ? data[0] : data
-      setShowCreate(false); setNewName(""); setNewSupplierCost(""); setNewImage(null); setNotice(`Draft created with SKU ${created?.sku || ""}.`)
+      setShowCreate(false); setNewName(""); setNewSupplierCost(""); setNewRetailPrice("0"); setNewOpeningStock("0"); setNewImage(null); setNotice(`Draft created with SKU ${created?.sku || ""}.`)
       await load(); if (created?.id) setSelectedId(created.id)
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Unknown error."
@@ -677,7 +682,7 @@ export default function ProductManagement({ initialSection = "general" }: { init
         <img src={imagePreview.url} alt={imagePreview.alt} className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"/>
       </div>
     </div>}
-    {showCreate && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><form onSubmit={createDraft} className="w-full max-w-md rounded-2xl bg-background p-5 shadow-xl"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-bold">Quick-create a draft</h2><p className="text-sm text-default-500">Enter the name, supplier cost, and primary image.</p></div><button type="button" aria-label="Close" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 p-1 hover:border-accent"><X size={20}/></button></div><label className="mb-4 block"><span className={labelClass}>Product name</span><input className={inputClass} autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={200} required/></label><label className="mb-4 block"><span className={labelClass}>Supplier cost per item (bought price)</span><input className={inputClass} type="number" min="0" max="9999999999.99" step="0.01" value={newSupplierCost} onChange={(e) => setNewSupplierCost(e.target.value)} required/></label><label className="mb-5 block"><span className={labelClass}>Product image</span><input className={inputClass} type="file" accept="image/*" onChange={(e) => setNewImage(e.target.files?.[0] || null)} required/><span className="mt-1 block text-xs text-default-500">JPG, PNG, WebP, GIF or AVIF · max 10 MB</span></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 px-4 py-2 text-sm hover:border-accent">Cancel</button><button disabled={busy} className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Create hidden draft</button></div></form></div>}
+    {showCreate && <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><form onSubmit={createDraft} className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-background p-5 shadow-xl"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-bold">Quick-create a draft</h2><p className="text-sm text-default-500">Enter pricing, opening stock, and the primary image.</p></div><button type="button" aria-label="Close" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 p-1 hover:border-accent"><X size={20}/></button></div><label className="mb-4 block"><span className={labelClass}>Product name</span><input className={inputClass} autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={200} required/></label><label className="mb-4 block"><span className={labelClass}>Supplier cost per item (bought price)</span><input className={inputClass} type="number" min="0" max="9999999999.99" step="0.01" value={newSupplierCost} onChange={(e) => setNewSupplierCost(e.target.value)} required/></label><label className="mb-4 block"><span className={labelClass}>Retail price</span><input className={inputClass} type="number" min="0" max="9999999999.99" step="0.01" value={newRetailPrice} onChange={(e) => setNewRetailPrice(e.target.value)} required/></label><label className="mb-4 block"><span className={labelClass}>Opening stock</span><input className={inputClass} type="number" min="0" max="2147483647" step="1" value={newOpeningStock} onChange={(e) => setNewOpeningStock(e.target.value)} required/><span className="mt-1 block text-xs text-default-500">Recorded as an opening restock movement in inventory history.</span></label><label className="mb-5 block"><span className={labelClass}>Product image</span><input className={inputClass} type="file" accept="image/*" onChange={(e) => setNewImage(e.target.files?.[0] || null)} required/><span className="mt-1 block text-xs text-default-500">JPG, PNG, WebP, GIF or AVIF · max 10 MB</span></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setShowCreate(false)} className="rounded-lg border border-default-400 px-4 py-2 text-sm hover:border-accent">Cancel</button><button disabled={busy} className="rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Create hidden draft</button></div></form></div>}
     <div aria-hidden={!settingsOpen} className={`fixed inset-0 z-[60] transition-opacity duration-300 ${settingsOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}>
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
       <aside id="product-settings-drawer" role="dialog" aria-modal={settingsOpen} aria-label="Product settings" inert={!settingsOpen} className={`absolute inset-y-0 right-0 flex w-[min(26rem,92vw)] flex-col border-l border-default-200 bg-background shadow-2xl transition-transform duration-300 ease-out ${settingsOpen ? "translate-x-0" : "translate-x-full"}`}>
