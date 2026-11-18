@@ -187,7 +187,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "orders") {
-      const orders = await prisma.$queryRaw<{ id: string; order_number: string; customer_id: string | null; customer: string | null; phone: string | null; email: string | null; item_count: number; items: string | null; total: string; subtotal: string; delivery_fee: string; method: string | null; payment: string | null; reference: string | null; payment_id: string | null; payment_amount: string | null; receipt_url: string | null; payment_history: string | null; fulfillment: string; status: string; delivery_status: string | null; driver_name: string | null; delivery_claimed_at: Date | null; return_inspected_at: Date | null; address: string | null; latitude: number | null; longitude: number | null; created_at: Date; activity: string | null }[]>`
+      const orders = await prisma.$queryRaw<{ id: string; order_number: string; customer_id: string | null; customer: string | null; phone: string | null; email: string | null; item_count: number; items: string | null; total: string; subtotal: string; delivery_fee: string; method: string | null; payment: string | null; reference: string | null; payment_id: string | null; payment_amount: string | null; receipt_url: string | null; payment_history: string | null; fulfillment: string; status: string; delivery_status: string | null; driver_name: string | null; delivery_claimed_at: Date | null; return_inspected_at: Date | null; address: string | null; latitude: number | null; longitude: number | null; created_at: Date; activity: string | null; cod_collected_at: Date | null }[]>`
         select o.id::text as id, o.order_number, o.customer_id::text as customer_id, c.name as customer, c.phone, c.email, coalesce(items.item_count, 0)::int as item_count,
           items.items as items, o.total_amount::text as total, o.subtotal::text as subtotal, o.delivery_fee::text as delivery_fee,
           coalesce(nullif(o.payment_method, ''), p.method) as method,
@@ -201,7 +201,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
               then 'Landmark: ' || trim(coalesce(a.landmark, o.delivery_address->>'landmark')) end,
             a.city, a.province, a.postal_code), '') as address,
           a.latitude, a.longitude,
-          o.created_at, history.activity
+          o.created_at, history.activity, o.cod_collected_at
         from public.orders o
         left join public.customers c on c.id = o.customer_id
         left join public.delivery_personnel d on d.id = o.delivery_personnel_id
@@ -244,7 +244,7 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         const method = o.method ? paymentMethodLabel(o.method) : "—"
         const pin = o.latitude !== null && o.longitude !== null ? `${o.latitude},${o.longitude}` : ""
         const driverInfo = o.driver_name ? `${o.driver_name}${o.delivery_claimed_at ? ` · ${dateTimeLabel(o.delivery_claimed_at)}` : ""}` : o.status === "shipped" && !["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Available for drivers" : "—"
-        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment, o.delivery_status), dateTimeLabel(o.created_at), orderActions(o.status, fulfillment, o.delivery_status, o.return_inspected_at, o.payment), o.address ?? "Not provided", o.items ?? "[]", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number, driverInfo, o.delivery_status ?? "—", o.id, o.activity ?? "[]", o.phone ?? "—", o.email ?? "—", money(o.subtotal), money(o.delivery_fee), o.return_inspected_at ? dateTimeLabel(o.return_inspected_at) : "", o.payment_id ?? "", o.payment_amount ? money(o.payment_amount) : "—", o.receipt_url ?? "", o.payment_history ?? "[]"]
+        return [o.order_number, o.customer ?? "Unknown", ["pickup", "walk_in", "walk-in"].includes(fulfillment) ? "Walk-in" : "Delivery", String(o.item_count), money(o.total), method, paymentStatusLabel(o.payment ?? "pending"), orderStatusLabel(o.status, fulfillment, o.delivery_status), dateTimeLabel(o.created_at), orderActions(o.status, fulfillment, o.delivery_status, o.return_inspected_at, o.payment), o.address ?? "Not provided", o.items ?? "[]", method === "Online payment (GCash)" ? o.reference ?? "Not provided" : "—", o.fulfillment, pin, o.customer_id ?? o.order_number, driverInfo, o.delivery_status ?? "—", o.id, o.activity ?? "[]", o.phone ?? "—", o.email ?? "—", money(o.subtotal), money(o.delivery_fee), o.return_inspected_at ? dateTimeLabel(o.return_inspected_at) : "", o.payment_id ?? "", o.payment_amount ? money(o.payment_amount) : "—", o.receipt_url ?? "", o.payment_history ?? "[]", o.cod_collected_at ? dateTimeLabel(o.cod_collected_at) : ""]
       }) }
     }
 

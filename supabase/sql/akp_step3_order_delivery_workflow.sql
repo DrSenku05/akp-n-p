@@ -753,20 +753,21 @@ begin
     if not exists (select 1 from storage.objects so where so.bucket_id = 'delivery-proofs' and so.name = v_proof_path) then
       raise exception 'Delivery proof photo was not uploaded.' using errcode = 'check_violation';
     end if;
-    if lower(coalesce(v_order.payment_method, '')) in ('cod', 'cash on delivery')
+    if lower(pg_catalog.replace(pg_catalog.btrim(coalesce(v_order.payment_method, '')), '_', ' ')) in ('cod', 'cash on delivery', 'cash')
       and p_cod_collected and v_order.cod_collected_at is null then
       perform pg_catalog.set_config('akp.cod_collection_order', v_order.id::text, true);
       update public.orders set cod_collected_at = pg_catalog.now(), cod_collected_by = v_driver_id where id = v_order.id;
-      update public.payments set status = 'verified'
-      where order_id = v_order.id
-        and lower(coalesce(method, '')) in ('cod', 'cash on delivery')
-        and status = 'pending';
-      if not found then
+      if not exists (
+        select 1 from public.payments p
+        where p.order_id = v_order.id
+          and lower(pg_catalog.replace(pg_catalog.btrim(coalesce(p.method, '')), '_', ' ')) in ('cod', 'cash on delivery', 'cash')
+          and p.status = 'pending'
+      ) then
         perform pg_catalog.set_config('akp.cod_collection_order', '', true);
         raise exception 'No pending COD payment record was found; delivery was not completed.' using errcode = 'P0002';
       end if;
       perform pg_catalog.set_config('akp.cod_collection_order', '', true);
-    elsif p_cod_collected and lower(coalesce(v_order.payment_method, '')) not in ('cod', 'cash on delivery') then
+    elsif p_cod_collected and lower(pg_catalog.replace(pg_catalog.btrim(coalesce(v_order.payment_method, '')), '_', ' ')) not in ('cod', 'cash on delivery', 'cash') then
       raise exception 'Cash collection can only be recorded for COD orders.' using errcode = '22023';
     end if;
   elsif p_cod_collected then

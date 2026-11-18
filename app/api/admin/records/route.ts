@@ -149,6 +149,14 @@ export async function POST(request: NextRequest) {
     const current = order.status.toLowerCase()
     const fulfillment = order.fulfillment_method.toLowerCase()
     const isWalkIn = ["pickup", "walk_in", "walk-in"].includes(fulfillment)
+    if (action === "confirm cod cash received") {
+      const { data: confirmed, error: confirmationError } = await supabase.rpc("confirm_delivery_cod_payment", {
+        p_order_id: order.id,
+      })
+      if (confirmationError) return fail(confirmationError.message, confirmationError.code === "42501" ? 403 : 409)
+      if (confirmed !== true) return fail("The COD payment changed before cash receipt could be confirmed. Refresh and try again.", 409)
+      return NextResponse.json({ ok: true })
+    }
     if (action === "inspect return") {
       if (order.status !== "shipped" || order.delivery_status !== "returned") return fail("Only returned deliveries can be inspected.", 409)
       const counts = ["Usable Items", "Damaged Items", "Missing Items"].map((field) => value(field))

@@ -564,6 +564,18 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
       })
       return
     }
+    if (slug === "orders" && lower === "confirm cod cash received") {
+      setDialog({
+        title: `Confirm cash received from driver: ${row[0]}`,
+        kind: "confirm",
+        row,
+        rowIndex: index,
+        action,
+        message: "Confirm only after you have physically received the full COD amount from the assigned driver. This marks the linked COD payment as Paid and records the receipt in order activity.",
+        module: "orders",
+      })
+      return
+    }
     if (slug === "orders" && ["confirm payment", "reject payment", "mark cash collected", "view receipt"].includes(lower)) {
       const paymentId = row[25]
       if (!paymentId) { setNotice("This order has no linked payment record. Refresh the order list and try again."); return }
@@ -1559,6 +1571,7 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
         try { const parsed: unknown = JSON.parse(row[19] ?? "[]"); if (Array.isArray(parsed)) events = parsed } catch {}
         const paymentSubmission = [...events].reverse().find((event) => event.event_type === "payment_submitted" && event.new_state)
         const latestPaymentActivity = [...events].reverse().find((event) => ["payment_submitted", "payment_decision"].includes(event.event_type ?? "") && event.new_state)
+        const codReceiptActivity = [...events].reverse().find((event) => event.event_type === "cod_cash_received")
         const paymentRows = payments.length ? payments : row[25]
           ? [{ id: row[25], method: row[5], status: row[6], amount: row[26], reference: row[12], receipt_url: row[27] || null, created_at: row[8] }]
           : latestPaymentActivity?.new_state
@@ -1585,17 +1598,25 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
                 const actionRow = orderRowForPayment(row, payment)
                 const method = payment.method.toLowerCase()
                 const isGcash = method.includes("gcash")
-                const isCod = method === "cod" || method.includes("cash on delivery")
+                const isCod = ["cod", "cash on delivery", "cash"].includes(method.replaceAll("_", " ").trim())
                 const pending = payment.status.toLowerCase() === "pending"
                 const paymentLabel = activityOnly ? `${payment.status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())} · Record missing` : payment.status === "verified" ? "Paid" : payment.status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
                 return <article key={payment.id} className="rounded-lg border border-default-200 bg-default-50/50 p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold">{isGcash ? "GCash" : isCod ? "Cash on Delivery" : payment.method}</p><p className="mt-1 text-[11px] text-default-500">{payment.created_at} · {payment.reference ? `Transaction reference: ${payment.reference}` : "No reference"}</p></div><div className="flex items-center gap-2"><Chip size="sm" variant="soft" color={statusColor(paymentLabel)}>{paymentLabel}</Chip><span className="text-sm font-semibold">₱{payment.amount}</span></div></div>
                   {activityOnly && <p className="mt-3 rounded-md bg-warning/10 p-2 text-[11px] text-warning">The submission is in the order activity log, but its linked payment record is missing. Refresh or restore the payment record before making a payment decision.</p>}
                   {!activityOnly && isGcash && payment.receipt_url && <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-default-200 pt-3"><Image src={`/api/admin/payment-proof?path=${encodeURIComponent(payment.receipt_url)}`} alt={`Payment receipt for ${row[0]}`} width={480} height={320} unoptimized className="max-h-28 w-auto max-w-40 rounded-md border border-default-200 object-contain"/><Button size="sm" variant="ghost" className="text-xs" onPress={() => onAction?.("View Receipt", actionRow, paymentIndex)}>Open receipt</Button></div>}
-                  {!activityOnly && pending && <div className="mt-3 flex flex-wrap gap-2 border-t border-default-200 pt-3">{isGcash && <Button size="sm" variant="ghost" className="text-danger" onPress={() => onAction?.("Reject Payment", actionRow, paymentIndex)}>Reject payment</Button>}{isCod && row[2] === "Walk-in" && <Button size="sm" variant="outline" onPress={() => onAction?.("Mark Cash Collected", actionRow, paymentIndex)}>Mark cash collected</Button>}{isCod && row[2] === "Delivery" && <p className="self-center text-[11px] text-default-500">The assigned driver records COD collection when completing delivery.</p>}</div>}
+                  {!activityOnly && isCod && row[2] === "Delivery" && <div className="mt-3 space-y-2 border-t border-default-200 pt-3">
+                    <p className="text-[11px] text-default-600">{row[29] ? `Driver confirmed cash collected · ${row[29]}.` : "Waiting for the assigned driver to confirm cash collection in the Driver App."}</p>
+                    {codReceiptActivity
+                      ? <p className="text-[11px] text-success">Admin confirmed cash received{codReceiptActivity.actor_name ? ` · ${codReceiptActivity.actor_name}` : ""}{codReceiptActivity.created_at ? ` · ${new Date(codReceiptActivity.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}` : ""}.</p>
+                      : pending && row[29] && row[7]?.toLowerCase() === "completed"
+                        ? <Button size="sm" variant="outline" onPress={() => onAction?.("Confirm COD Cash Received", row, paymentIndex)}>Confirm cash received from driver</Button>
+                        : null}
+                  </div>}
+                  {!activityOnly && pending && <div className="mt-3 flex flex-wrap gap-2 border-t border-default-200 pt-3">{isGcash && <Button size="sm" variant="ghost" className="text-danger" onPress={() => onAction?.("Reject Payment", actionRow, paymentIndex)}>Reject payment</Button>}{isCod && row[2] === "Walk-in" && <Button size="sm" variant="outline" onPress={() => onAction?.("Mark Cash Collected", actionRow, paymentIndex)}>Mark cash collected</Button>}</div>}
                 </article>
               }) : <p className="rounded-lg border border-dashed border-default-300 p-3 text-xs text-default-500">No linked payment records.</p>}
-              <p className="text-[10px] text-default-500">Verify GCash funds in the payment account before confirming. COD delivery collection is recorded by the assigned driver.</p>
+              <p className="text-[10px] text-default-500">Verify GCash funds in the payment account before confirming. For delivery COD, the driver confirms collection first; the admin confirms receipt here after receiving the cash.</p>
             </section>
             <section className="overflow-hidden rounded-xl border border-default-200 bg-background" aria-label="Ordered products">
               <h3 className="border-b border-dashed border-default-300 px-4 py-3 text-xs font-semibold uppercase tracking-wide">Ordered products</h3>
