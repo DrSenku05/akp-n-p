@@ -303,12 +303,19 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
     }
 
     if (slug === "remittance") {
-      const deliveries = await prisma.$queryRaw<{ order_number: string; driver: string | null; customer: string | null; payment_method: string | null; total: string; delivery_fee: string; delivered_at: Date | null; cod_collected_at: Date | null }[]>`
+      const deliveries = await prisma.$queryRaw<{ order_number: string; driver: string | null; customer: string | null; payment_method: string | null; total: string; delivery_fee: string; delivered_at: Date | null; cod_collected_at: Date | null; cod_payment_status: string | null }[]>`
         select o.order_number, d.name as driver, c.name as customer, o.payment_method,
-          o.total_amount::text as total, o.delivery_fee::text as delivery_fee, o.delivered_at, o.cod_collected_at
+          o.total_amount::text as total, o.delivery_fee::text as delivery_fee, o.delivered_at, o.cod_collected_at,
+          cod_payment.status as cod_payment_status
         from public.orders o
         left join public.delivery_personnel d on d.id = o.delivery_personnel_id
         left join public.customers c on c.id = o.customer_id
+        left join lateral (
+          select p.status from public.payments p
+          where p.order_id = o.id
+            and lower(replace(btrim(coalesce(p.method, '')), '_', ' ')) in ('cod', 'cash on delivery', 'cash')
+          order by p.created_at desc, p.id desc limit 1
+        ) cod_payment on true
         where o.fulfillment_method = 'delivery'
           and o.delivery_status = 'delivered'
           and o.status = 'delivered'
@@ -317,8 +324,8 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
       `
       const moneyValue = (value: string) => `₱${Number(value).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`
       return { error: false, rows: deliveries.map((delivery) => {
-        const isCod = ["cod", "cash on delivery"].includes((delivery.payment_method ?? "").trim().toLowerCase().replaceAll("_", " "))
-        return [delivery.order_number, delivery.driver ?? "Unassigned", delivery.customer ?? "Unknown", delivery.payment_method ? paymentMethodLabel(delivery.payment_method) : "—", isCod ? delivery.cod_collected_at ? moneyValue(delivery.total) : "Not recorded" : "—", moneyValue(delivery.delivery_fee), dateTimeLabel(delivery.delivered_at), isCod && delivery.cod_collected_at ? dateTimeLabel(delivery.cod_collected_at) : "—"]
+        const isCod = ["cod", "cash on delivery", "cash"].includes((delivery.payment_method ?? "").trim().toLowerCase().replaceAll("_", " "))
+        return [delivery.order_number, delivery.driver ?? "Unassigned", delivery.customer ?? "Unknown", delivery.payment_method ? paymentMethodLabel(delivery.payment_method) : "—", isCod ? delivery.cod_collected_at ? moneyValue(delivery.total) : "Not recorded" : "—", moneyValue(delivery.delivery_fee), dateTimeLabel(delivery.delivered_at), isCod && delivery.cod_collected_at ? dateTimeLabel(delivery.cod_collected_at) : "—", isCod ? delivery.cod_payment_status ?? "Missing" : "Not applicable"]
       }) }
     }
 

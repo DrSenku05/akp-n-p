@@ -576,6 +576,18 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
       })
       return
     }
+    if (slug === "remittance" && lower === "confirm cash received from driver") {
+      setDialog({
+        title: `Confirm cash received from driver: ${row[0]}`,
+        kind: "confirm",
+        row,
+        rowIndex: index,
+        action: "Confirm COD Cash Received",
+        message: `Confirm only after physically receiving ${row[4]} from ${row[1]}. This marks the linked COD payment as Paid and records the receipt in order activity.`,
+        module: "orders",
+      })
+      return
+    }
     if (slug === "orders" && ["confirm payment", "reject payment", "mark cash collected", "view receipt"].includes(lower)) {
       const paymentId = row[25]
       if (!paymentId) { setNotice("This order has no linked payment record. Refresh the order list and try again."); return }
@@ -683,7 +695,8 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     let uploadedImagePath = ""
     if (isDatabasePreview) {
       const writable = ["products", "inventory", "orders", "customers", "delivery-personnel", "returns-refunds", "payments", "feedback", "promotions", "notifications", "heritage-showcase", "users"]
-      if (!writable.includes(slug)) {
+      const remittanceCashConfirmation = slug === "remittance" && dialog.module === "orders" && dialog.action?.toLowerCase() === "confirm cod cash received"
+      if (!writable.includes(slug) && !remittanceCashConfirmation) {
         setNotice("This module is read-only because its schema has no safe edit operation configured.")
         setDialog(null)
         return
@@ -1272,10 +1285,55 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
 
 function DataTable({ config, rows, compact = false, selectable = false, selectedIds = [], onToggle, onToggleAll, onAction }: { config: ModuleConfig; rows: string[][]; compact?: boolean; selectable?: boolean; selectedIds?: string[]; onToggle?: (row: string[], checked: boolean) => void; onToggleAll?: (checked: boolean) => void; onAction?: (action: string, row: string[], index: number) => void }) {
   if (config.title === "Orders & Payments") return <OrderDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onAction={onAction} />
+  if (config.title === "Delivery Remittance") return <RemittanceDirectory rows={rows} onAction={onAction} />
   if (config.title === "Inventory Management") return <InventoryDirectory config={config} rows={rows} onAction={onAction} />
   if (config.title === "Delivery Personnel Management") return <PersonnelDirectory config={config} rows={rows} onAction={onAction} />
   if (config.title === "Customer Management") return <CustomerDirectory rows={rows} />
   return <RecordDirectory config={config} rows={rows} selectable={selectable} selectedIds={selectedIds} onToggle={onToggle} onToggleAll={onToggleAll} onAction={onAction} />
+}
+
+function RemittanceDirectory({ rows, onAction }: { rows: string[][]; onAction?: (action: string, row: string[], index: number) => void }) {
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState("")
+  const selectedIndex = Math.max(0, rows.findIndex((row) => row[0] === selectedOrderNumber))
+  const selected = rows[selectedIndex] ?? null
+
+  if (!rows.length) return <div className="flex flex-col items-center gap-2 py-14 text-center"><CircleAlert size={22} className="text-default-400" /><p className="text-sm font-medium">No completed deliveries found</p><p className="text-xs text-default-500">Completed delivery remittances will appear here.</p></div>
+
+  return <div className="grid min-h-[32rem] gap-3 xl:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.6fr)]">
+    <aside className="flex min-h-0 flex-col rounded-xl border border-default-200 bg-content1 p-3" aria-label="Completed delivery remittances">
+      <div className="mb-2 px-2"><h2 className="text-xs font-semibold uppercase tracking-wide">Completed deliveries</h2><p className="mt-1 text-[11px] text-default-500">Select an order to review its COD handover and driver earnings.</p></div>
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+        {rows.map((row) => {
+          const isSelected = (selected?.[0] ?? rows[0]?.[0]) === row[0]
+          const isCod = /cod|cash/i.test(row[3] ?? "")
+          const collected = row[4] !== "—" && row[4] !== "Not recorded"
+          const payStatus = row[8] === "verified" ? "Paid" : (row[8] ?? "Unknown").replaceAll("_", " ")
+          return <button key={row[0]} type="button" aria-pressed={isSelected} onClick={() => setSelectedOrderNumber(row[0])} className={`flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary ${isSelected ? "border-accent/40 bg-accent/10" : "border-transparent bg-content1 hover:bg-default-50"}`}>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><ClipboardList size={17} aria-hidden="true" /></span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{row[0]}</span><span className="mt-1 block truncate text-[11px] text-default-500">{row[1]} · {row[2]}</span><span className="mt-1 block text-xs font-medium">{isCod ? collected ? row[4] : "COD not recorded" : "Prepaid delivery"}</span></span>
+            <span className="flex shrink-0 flex-col items-end gap-1"><Chip size="sm" variant="soft" color={statusColor(payStatus)}>{payStatus}</Chip><span className="text-[10px] text-default-500">Driver {row[5]}</span></span>
+          </button>
+        })}
+      </div>
+      <div className="mt-3 border-t border-default-200 pt-3 text-xs text-default-500">{rows.length} {rows.length === 1 ? "delivery" : "deliveries"}</div>
+    </aside>
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-default-200 bg-content1 p-3 md:p-4" aria-label="Selected remittance details">
+      {selected ? <div key={selected[0]} className="product-panel-enter min-w-0 space-y-4 overflow-y-auto">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-default-200 pb-3">
+          <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-primary">Delivery remittance</p><h2 className="mt-0.5 break-words text-base font-bold">{selected[0]}</h2><p className="mt-1 text-xs text-default-500">Delivered {selected[6]}</p></div>
+          <Chip size="sm" variant="soft" color={statusColor(selected[8] === "verified" ? "Paid" : selected[8] ?? "Unknown")}>{selected[8] === "verified" ? "Paid" : (selected[8] ?? "Unknown").replaceAll("_", " ")}</Chip>
+        </div>
+        <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Order details">
+          {[ ["Order", selected[0]], ["Driver", selected[1]], ["Customer", selected[2]], ["Payment method", selected[3]], ["Payment status", selected[8] === "verified" ? "Paid" : selected[8] ?? "Unknown"], ["Delivered", selected[6]] ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg border border-default-200 bg-background p-3"><p className="text-[10px] text-default-500">{label}</p><p className="mt-1 break-words text-xs font-medium">{value || "—"}</p></div>)}
+        </section>
+        <section className="space-y-3 rounded-xl border border-default-200 bg-background p-3" aria-label="Cash and driver earnings">
+          <h3 className="text-xs font-semibold uppercase tracking-wide">Cash and driver earnings</h3>
+          <div className="grid gap-2 sm:grid-cols-3"><div className="rounded-lg bg-default-50/70 p-3"><p className="text-[10px] text-default-500">COD cash collected</p><p className="mt-1 text-sm font-semibold tabular-nums">{selected[4]}</p></div><div className="rounded-lg bg-default-50/70 p-3"><p className="text-[10px] text-default-500">Driver earnings</p><p className="mt-1 text-sm font-semibold tabular-nums">{selected[5]}</p></div><div className="rounded-lg bg-default-50/70 p-3"><p className="text-[10px] text-default-500">Driver collection</p><p className="mt-1 break-words text-xs font-medium">{selected[7]}</p></div></div>
+          {selected[4] !== "—" && selected[4] !== "Not recorded" && selected[8] === "pending" ? <div className="flex flex-wrap items-center justify-between gap-3 border-t border-default-200 pt-3"><p className="max-w-xl text-xs leading-5 text-default-600">The driver recorded collecting the COD cash. Confirm here after you have physically received it from the driver.</p><Button size="sm" variant="primary" onPress={() => onAction?.("Confirm cash received from driver", selected, selectedIndex)}>Confirm cash received from the driver</Button></div> : selected[4] !== "—" && selected[4] !== "Not recorded" && selected[8] === "verified" ? <p className="border-t border-default-200 pt-3 text-xs text-success">Admin confirmed receipt of the driver’s COD remittance.</p> : null}
+        </section>
+      </div> : null}
+    </section>
+  </div>
 }
 
 type CustomerOrderHistory = {
