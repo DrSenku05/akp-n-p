@@ -51,6 +51,7 @@ function PresenceHeartbeat() {
 export default function AdminFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  if (pathname === "/") return <>{children}</>
   if (authPaths.includes(pathname)) return <div className="min-h-dvh bg-background">{children}</div>
   const isProducts = pathname === "/products"
   return (

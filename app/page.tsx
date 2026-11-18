@@ -1,106 +1,76 @@
-import { ArrowUpRight, Bell, Boxes, CircleDollarSign, Package, ShoppingBag } from "lucide-react"
-import { Card, Chip } from "@heroui/react"
-import Link from "next/link"
+import type { Metadata } from "next"
 import Image from "next/image"
-import { getAdminDashboardPreview } from "@/lib/admin-database"
+import Link from "next/link"
+import { ArrowDownToLine, ArrowRight, Leaf, Smartphone } from "lucide-react"
 
-export const dynamic = "force-dynamic"
-
-const metricStyles = [
-  { icon: ShoppingBag, color: "text-success", tint: "bg-success/10" },
-  { icon: Boxes, color: "text-warning", tint: "bg-warning/10" },
-  { icon: CircleDollarSign, color: "text-accent", tint: "bg-accent/10" },
-  { icon: Package, color: "text-danger", tint: "bg-danger/10" },
-]
-
-function SectionTitle({ title, action }: { title: string; action?: React.ReactNode }) {
-  return <div className="flex items-center justify-between gap-3"><h2 className="text-base font-semibold">{title}</h2>{action}</div>
+export const metadata: Metadata = {
+  title: "AKP Native Products Trading",
+  description: "Discover native products and heritage stories from AKP Native Products Trading.",
 }
 
-export default async function Home() {
-  const preview = await getAdminDashboardPreview()
-  const metricValues = [
-    ["Orders today", String(preview.metrics.ordersToday)],
-    ["Pending orders", String(preview.metrics.pendingOrders)],
-    ["Verified revenue this month", preview.metrics.revenueMonth],
-    ["Low stock items", String(preview.metrics.lowStock)],
-  ] as const
-  const attention = [
-    { count: preview.metrics.pendingOrders, label: "Orders to fulfill", detail: "Review pending customer orders.", href: "/orders", tone: "warning", icon: Boxes },
-    { count: preview.metrics.lowStock, label: "Products need restocking", detail: "Check stock levels and reorder.", href: "/products?section=stock", tone: "danger", icon: Package },
-    { count: preview.metrics.openReturns, label: "Returns to review", detail: "Respond to open return requests.", href: "/returns-refunds", tone: "accent", icon: ArrowUpRight },
-    { count: preview.metrics.flaggedFeedback, label: "Feedback flagged", detail: "Review items needing moderation.", href: "/feedback", tone: "success", icon: Bell },
-  ].filter((item) => item.count > 0)
-  const today = new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date())
+const customerAppDownload = "https://github.com/DrSenku05/akp-n-p/releases/download/customer-app-v1.0.0-code3/AKP-Customer-v1.0.0-code3.apk"
 
-  return <div className="relative isolate -mx-4 -my-5 min-h-full px-4 py-5 text-foreground md:-mx-7 md:-my-6 md:px-7 md:py-6">
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <Image src="/images/banig-badian.jpg" alt="" fill sizes="100vw" className="scale-105 object-cover opacity-70 blur-lg" />
-      <div className="absolute inset-0 bg-background/45 dark:bg-black/50" />
-    </div>
-    <div className="relative z-10 mx-auto max-w-[1540px] space-y-6">
-    {preview.error && <div role="alert" className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">Could not load dashboard records from Supabase. Check the server database connection.</div>}
-    <header className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="text-xs font-medium text-default-500">{today}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
-        <p className="mt-1 text-sm text-default-500">A quick view of your store’s daily operations.</p>
-      </div>
-      <div className="flex gap-2">
-        <Link href="/reports" className="inline-flex h-9 items-center gap-2 rounded-lg border border-default-200 bg-content1 px-3 text-xs font-medium transition hover:bg-default-50"><ArrowUpRight size={15} />Reports</Link>
-        <Link href="/orders" className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition hover:opacity-90"><ShoppingBag size={15} />Orders</Link>
-      </div>
+export default function Home() {
+  return <main className="min-h-dvh overflow-hidden bg-background text-foreground">
+    <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-12">
+      <Link href="/" aria-label="AKP Native Products Trading home" className="flex min-w-0 items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-accent/20 bg-accent/10 font-serif text-sm font-bold tracking-wide text-accent">AKP</span>
+        <span className="min-w-0"><span className="block truncate text-sm font-semibold tracking-tight">AKP Native Products Trading</span><span className="mt-0.5 block text-[10px] uppercase tracking-[.18em] text-default-500">Native craft · Living heritage</span></span>
+      </Link>
+      <nav aria-label="Main navigation" className="flex items-center gap-2 sm:gap-5">
+        <a href="#our-story" className="hidden text-sm text-default-600 transition hover:text-accent sm:inline">Our story</a>
+        <a href="#heritage" className="hidden text-sm text-default-600 transition hover:text-accent sm:inline">Heritage</a>
+        <Link href="/login" className="inline-flex h-10 items-center justify-center rounded-full border border-default-300 bg-content1 px-4 text-sm font-medium transition hover:border-accent hover:bg-default-50">Admin login</Link>
+      </nav>
     </header>
 
-    <section aria-label="Store metrics" className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-      {metricValues.map(([label, value], index) => {
-        const { icon: Icon, color, tint } = metricStyles[index]
-        return <Card key={label} className="rounded-xl border border-default-200 bg-content1/85 shadow-none backdrop-blur-sm">
-          <Card.Content className="p-4 sm:p-5">
-            <div className="grid min-h-16 grid-cols-[1fr_auto] items-start gap-3">
-              <div className="min-w-0"><p className="text-xs font-medium text-default-500">{label}</p><p className="mt-2 truncate text-2xl font-bold tracking-tight">{value}</p></div>
-              <span className={`rounded-xl p-2.5 ${tint} ${color}`}><Icon size={19} aria-hidden="true" /></span>
-            </div>
-          </Card.Content>
-        </Card>
-      })}
+    <section className="relative isolate mx-auto grid min-h-[min(760px,calc(100svh-5rem))] w-full max-w-7xl items-center gap-10 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[1.03fr_.97fr] lg:gap-14 lg:px-12 lg:pb-24 lg:pt-10">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-40 top-20 -z-10 size-[34rem] rounded-full bg-accent/10 blur-3xl" />
+      <div className="relative z-10 max-w-2xl">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-content1/80 px-3 py-1.5 text-xs font-medium text-accent shadow-sm"><Leaf size={14} aria-hidden="true" />Rooted in Filipino heritage</div>
+        <h1 className="font-serif text-5xl font-medium leading-[1.04] tracking-[-.045em] sm:text-6xl lg:text-7xl">Native heritage,<br /><span className="text-accent">made part of life.</span></h1>
+        <p className="mt-6 max-w-xl text-base leading-7 text-default-600 sm:text-lg sm:leading-8">Discover native products and the stories, materials, and traditions that give them meaning.</p>
+        <div className="mt-9 flex flex-wrap items-center gap-3">
+          <a href={customerAppDownload} className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-foreground shadow-lg shadow-accent/15 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><ArrowDownToLine size={17} aria-hidden="true" />Download customer app</a>
+          <a href="#our-story" className="inline-flex h-12 items-center gap-2 rounded-full border border-default-300 bg-content1/80 px-5 text-sm font-medium transition hover:border-accent hover:bg-content1">Explore AKP<ArrowRight size={15} aria-hidden="true" /></a>
+        </div>
+        <p className="mt-4 flex items-center gap-2 text-xs text-default-500"><Smartphone size={14} aria-hidden="true" />Android app · APK download</p>
+      </div>
+
+      <div className="relative mx-auto w-full max-w-[36rem] lg:ml-auto">
+        <div className="absolute -inset-3 rotate-2 rounded-[2rem] border border-accent/15 bg-accent/5" />
+        <div className="relative aspect-[4/4.25] overflow-hidden rounded-[1.7rem] border border-default-200 bg-default-100 shadow-2xl shadow-foreground/10 sm:aspect-[4/3.7]">
+          <Image src="/images/banig-badian.jpg" alt="Sculptural woven native craft displayed in warm light" fill priority sizes="(max-width: 1024px) 90vw, 44vw" className="object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-white/75">Craft · Culture · Community</p>
+            <p className="mt-2 max-w-sm font-serif text-2xl leading-tight sm:text-3xl">Every piece carries a story worth keeping.</p>
+          </div>
+        </div>
+        <div className="absolute -bottom-5 -left-3 rounded-2xl border border-default-200 bg-content1/95 px-4 py-3 shadow-xl backdrop-blur-xl sm:-left-8 sm:px-5">
+          <p className="text-[10px] font-medium uppercase tracking-[.16em] text-default-500">AKP Native Products</p>
+          <p className="mt-1 text-sm font-semibold">Inspired by heritage</p>
+        </div>
+      </div>
     </section>
 
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[1.4fr_0.8fr]">
-      <Card className="min-w-0 rounded-xl border border-default-200 bg-content1/85 shadow-none backdrop-blur-sm">
-        <Card.Content className="min-w-0 space-y-4 p-0">
-          <div className="flex items-center justify-between gap-3 px-5 pt-5">
-            <SectionTitle title="Recent orders" action={<Link href="/orders" className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-default-600 transition hover:bg-default-100">View all<ArrowUpRight size={13} /></Link>} />
-          </div>
-          {preview.recentOrders.length ? <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left text-xs">
-              <thead className="bg-default-50 text-default-500"><tr>{["Order", "Customer", "Amount", "Status", "Date"].map((item) => <th key={item} className="px-5 py-3 font-medium">{item}</th>)}</tr></thead>
-              <tbody>{preview.recentOrders.map(([id, name, amount, status, date]) => <tr key={id} className="border-t border-default-100">
-                <td className="px-5 py-3 font-semibold">{id}</td>
-                <td className="px-5 py-3">{name}</td>
-                <td className="px-5 py-3">{amount}</td>
-                <td className="px-5 py-3"><Chip size="sm" variant="soft" color={status === "Completed" ? "success" : status === "Pending" ? "warning" : "accent"}>{status}</Chip></td>
-                <td className="px-5 py-3 text-default-500">{date}</td>
-              </tr>)}</tbody>
-            </table>
-          </div> : <p className="px-5 pb-5 text-xs text-default-500">No customer orders to show.</p>}
-        </Card.Content>
-      </Card>
+    <section id="our-story" className="border-y border-default-200 bg-content1/65">
+      <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 md:grid-cols-[.8fr_1.2fr] md:items-center md:py-20 lg:px-12">
+        <div><p className="text-xs font-semibold uppercase tracking-[.2em] text-accent">A little about AKP</p><h2 className="mt-3 max-w-sm font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Keeping native products close to everyday life.</h2></div>
+        <p className="max-w-2xl text-sm leading-7 text-default-600 sm:text-base sm:leading-8">AKP Native Products Trading brings together products shaped by local craft and cultural heritage. We invite you to explore the collection, learn about the traditions behind it, and connect with AKP through the customer app.</p>
+      </div>
+    </section>
 
-      <Card className="min-w-0 rounded-xl border border-default-200 bg-content1/85 shadow-none backdrop-blur-sm">
-        <Card.Content className="space-y-4 p-5">
-          <SectionTitle title="Needs attention" />
-          {attention.length ? <div className="space-y-2">{attention.map(({ count, label, detail, href, tone, icon: Icon }) => {
-            const styles = { warning: "bg-warning/10 text-warning", danger: "bg-danger/10 text-danger", accent: "bg-accent/10 text-accent", success: "bg-success/10 text-success" }[tone]
-            return <Link key={label} href={href} className="flex items-start gap-3 rounded-xl border border-default-100 p-3 transition hover:border-default-300 hover:bg-default-50">
-              <span className={`mt-0.5 rounded-lg p-2 ${styles}`}><Icon size={15} aria-hidden="true" /></span>
-              <span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{count} {label}</span><span className="mt-1 block text-[11px] text-default-500">{detail}</span></span>
-              <ArrowUpRight size={14} className="mt-1 shrink-0 text-default-400" aria-hidden="true" />
-            </Link>
-          })}</div> : <p className="rounded-xl bg-success/10 p-4 text-xs text-success">You’re all caught up. Nothing needs attention.</p>}
-        </Card.Content>
-      </Card>
-    </div>
-    </div>
-  </div>
+    <section id="heritage" className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-5 py-12 sm:px-8 md:flex-row md:items-center md:py-16 lg:px-12">
+      <div><p className="text-xs font-semibold uppercase tracking-[.2em] text-accent">Explore with AKP</p><h2 className="mt-2 font-serif text-2xl tracking-tight sm:text-3xl">Bring the collection to your phone.</h2><p className="mt-2 text-sm text-default-600">Get the AKP Native Products customer app for Android.</p></div>
+      <a href={customerAppDownload} className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"><ArrowDownToLine size={16} aria-hidden="true" />Download customer app</a>
+    </section>
+
+    <footer className="border-t border-default-200">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-6 text-xs text-default-500 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
+        <span>© {new Date().getFullYear()} AKP Native Products Trading</span>
+        <Link href="/login" className="w-fit transition hover:text-accent">Admin login</Link>
+      </div>
+    </footer>
+  </main>
 }

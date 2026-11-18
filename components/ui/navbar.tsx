@@ -60,7 +60,7 @@ export default function NavBar({ onOpenMenu, inert = false }: { onOpenMenu: () =
     <button type="button" aria-label="Open admin navigation" onClick={onOpenMenu} className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-default-300 bg-transparent text-foreground transition hover:border-primary hover:bg-default-100 focus-visible:outline-2 focus-visible:outline-primary">
       <Menu size={21} strokeWidth={1.8} aria-hidden="true" />
     </button>
-    <Link href="/" className="flex shrink-0 items-center gap-3 text-foreground no-underline">
+    <Link href="/dashboard" className="flex shrink-0 items-center gap-3 text-foreground no-underline">
       <span
         className="flex size-11 items-center justify-center rounded-md border border-amber-300/55 text-[11px] font-bold tracking-tight text-white shadow-sm shadow-black/30 ring-1 ring-black/20"
         style={{ backgroundImage: "linear-gradient(rgba(26, 24, 20, 0.48), rgba(26, 24, 20, 0.48)), url('/images/banig-badian.jpg')", backgroundPosition: "center", backgroundSize: "cover" }}

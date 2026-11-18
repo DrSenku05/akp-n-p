@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 
 const sections = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard, links: [] },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, links: [] },
   { label: "Operations", href: "/orders", icon: ClipboardList, links: [
     { label: "Orders & Payments", href: "/orders", icon: ClipboardList },
     { label: "Delivery Personnel", href: "/delivery-personnel", icon: Truck },
@@ -46,7 +46,7 @@ const sections = [
 ]
 
 function isCurrent(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`)
+  return pathname === href || pathname.startsWith(`${href}/`)
 }
 
 export default function SideBar({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -104,10 +104,10 @@ export default function SideBar({ open, onClose }: { open: boolean; onClose: () 
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Admin sections">
         <Link
-          href="/"
+          href="/dashboard"
           onClick={onClose}
-          aria-current={pathname === "/" ? "page" : undefined}
-          className={`mb-3 flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${pathname === "/" ? "border-accent bg-accent font-semibold text-accent-foreground" : "border-default-200 text-foreground hover:border-accent hover:bg-accent hover:text-accent-foreground"}`}
+          aria-current={pathname === "/dashboard" ? "page" : undefined}
+          className={`mb-3 flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-primary ${pathname === "/dashboard" ? "border-accent bg-accent font-semibold text-accent-foreground" : "border-default-200 text-foreground hover:border-accent hover:bg-accent hover:text-accent-foreground"}`}
         >
           <LayoutDashboard size={17} strokeWidth={1.8} aria-hidden="true" />
           Dashboard

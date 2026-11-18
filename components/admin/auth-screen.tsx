@@ -95,7 +95,7 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
         }
         const next = new URLSearchParams(window.location.search).get("next")
         navigating = true
-        router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/")
+        router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard")
         return
       }
       if (step === "forgot-password") {
