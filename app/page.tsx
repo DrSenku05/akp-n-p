@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
-import Image from "next/image"
 import Link from "next/link"
 import { ArrowDownToLine, ArrowRight, Leaf, Smartphone } from "lucide-react"
+import ProductSlideshow from "@/components/public/product-slideshow"
 
 export const metadata: Metadata = {
   title: "AKP Native Products Trading",
@@ -37,21 +37,7 @@ export default function Home() {
         <p className="mt-4 flex items-center gap-2 text-xs text-default-500"><Smartphone size={14} aria-hidden="true" />Android app · APK download</p>
       </div>
 
-      <div className="relative mx-auto w-full max-w-[36rem] lg:ml-auto">
-        <div className="absolute -inset-3 rotate-2 rounded-[2rem] border border-accent/15 bg-accent/5" />
-        <div className="relative aspect-[4/4.25] overflow-hidden rounded-[1.7rem] border border-default-200 bg-default-100 shadow-2xl shadow-foreground/10 sm:aspect-[4/3.7]">
-          <Image src="/images/banig-badian.jpg" alt="Sculptural woven native craft displayed in warm light" fill priority sizes="(max-width: 1024px) 90vw, 44vw" className="object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-8">
-            <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-white/75">Craft · Culture · Community</p>
-            <p className="mt-2 max-w-sm font-serif text-2xl leading-tight sm:text-3xl">Every piece carries a story worth keeping.</p>
-          </div>
-        </div>
-        <div className="absolute -bottom-5 -left-3 rounded-2xl border border-default-200 bg-content1/95 px-4 py-3 shadow-xl backdrop-blur-xl sm:-left-8 sm:px-5">
-          <p className="text-[10px] font-medium uppercase tracking-[.16em] text-default-500">AKP Native Products</p>
-          <p className="mt-1 text-sm font-semibold">Inspired by heritage</p>
-        </div>
-      </div>
+      <ProductSlideshow />
     </section>
 
     <section id="our-story" className="border-y border-default-200 bg-content1/65">
