@@ -1535,8 +1535,8 @@ function OrderDirectory({ config, rows, selectable, selectedIds, onToggle, onAct
       {selectable && <label className="mb-2 inline-flex items-center gap-2 px-2 text-xs text-default-500"><input type="checkbox" checked={selectedIds.length === rows.length && rows.length > 0} onChange={(event) => rows.forEach((row) => onToggle?.(row, event.target.checked))} />Select visible orders</label>}
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
         {rows.map((row, index) => {
-          const selected = selectedOrderId === (row[18] || row[0])
-          return <div key={row[18] || row[0]} className={`flex items-center gap-2 rounded-lg p-2 ${selected ? "bg-primary/10 ring-1 ring-primary/30" : "hover:bg-default-50"}`}>
+          const selected = selectedOrderId === (row[18] || row[0]) || selectedIds.includes(row[0])
+          return <div key={row[18] || row[0]} className={`flex items-center gap-2 rounded-lg p-2 text-foreground transition-colors ${selected ? "bg-accent/15 ring-1 ring-accent/40" : "bg-content1 hover:bg-accent/10"}`}>
             {selectable && <input aria-label={`Select ${row[0]}`} type="checkbox" checked={selectedIds.includes(row[0])} onChange={(event) => onToggle?.(row, event.target.checked)} />}
             <button type="button" aria-current={selected ? "true" : undefined} onClick={() => setSelectedOrderId(row[18] || row[0])} className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-1 text-left focus-visible:outline-2 focus-visible:outline-primary">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><ClipboardList size={18} aria-hidden="true" /></span>
