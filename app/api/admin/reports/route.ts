@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       records = data.map((item) => ({ dimensions: { date: item.day }, measures: { verifiedTransactions: item.transactions, revenuePHP: item.total } }))
     } else if (report === "inventory") {
       const data = await prisma.$queryRaw<{ product_id: string; sku: string; product: string; stock: number; movements: number }[]>`
-        select p.id::text as product_id, p.sku, p.name, p.stock_quantity as stock,
+        select p.id::text as product_id, p.sku, p.name as product, p.stock_quantity as stock,
           count(im.id)::int as movements
         from public.products p
         left join public.inventory_movements im on im.product_id = p.id
@@ -112,55 +112,63 @@ export async function GET(request: NextRequest) {
       measures = [{ key: "currentStock", label: "Current Stock", format: "number" }, { key: "movementsInPeriod", label: "Movements in Period", format: "count" }]
       records = data.map((item) => ({ dimensions: { productId: item.product_id }, measures: { currentStock: item.stock, movementsInPeriod: item.movements } }))
     } else if (report === "orders") {
-      const data = await prisma.$queryRaw<{ status: string; fulfillment: string; orders: number; total: string }[]>`
-        select o.status, o.fulfillment_method as fulfillment,
-          count(*)::int as orders, coalesce(sum(o.total_amount), 0)::text as total
+      const data = await prisma.$queryRaw<{ order_id: string; order_number: string; status: string; customer_name: string; ordered_at: string; fulfillment: string; total: string }[]>`
+        select o.id::text as order_id, o.order_number, o.status,
+          coalesce(c.name, 'Customer unavailable') as customer_name,
+          to_char(o.created_at at time zone 'Asia/Manila', 'YYYY-MM-DD HH12:MI AM') as ordered_at,
+          o.fulfillment_method as fulfillment, o.total_amount::text as total
         from public.orders o
+        left join public.customers c on c.id = o.customer_id
         where o.order_number not like 'DEMO-ORD-%'
           and o.created_at >= (${start}::date::timestamp at time zone 'Asia/Manila')
           and o.created_at < (((${end}::date) + 1)::timestamp at time zone 'Asia/Manila')
-        group by o.status, o.fulfillment_method
-        order by o.status, o.fulfillment_method
+        order by o.created_at desc, o.order_number
       `
-      dimensions = [{ key: "orderStatus", label: "Order Status" }, { key: "fulfillmentMethod", label: "Fulfillment" }]
+      dimensions = [{ key: "order", label: "Order ID", attributes: [{ key: "status", label: "Status" }, { key: "customer", label: "Ordered By" }, { key: "orderedAt", label: "Order Date & Time" }, { key: "fulfillment", label: "Fulfillment" }] }]
       dimensionMembers = {}
-      measures = [{ key: "orderCount", label: "Orders", format: "count" }, { key: "orderValuePHP", label: "Order Value (PHP)", format: "currency" }]
-      records = data.map((item) => ({ dimensions: { orderStatus: item.status, fulfillmentMethod: item.fulfillment }, measures: { orderCount: item.orders, orderValuePHP: item.total } }))
+      dimensionMembers.order = data.map((item) => ({ id: item.order_id, label: item.order_number, attributes: { status: item.status, customer: item.customer_name, orderedAt: item.ordered_at, fulfillment: item.fulfillment } }))
+      measures = [{ key: "orderValuePHP", label: "Order Total (PHP)", format: "currency" }]
+      records = data.map((item) => ({ dimensions: { order: item.order_id }, measures: { orderValuePHP: item.total } }))
     } else if (report === "customers") {
-      const data = await prisma.$queryRaw<{ customer_id: string; name: string; email: string | null; orders: number; spent: string }[]>`
-        select c.id::text as customer_id, c.name, c.email, count(o.id)::int as orders, coalesce(sum(o.total_amount), 0)::text as spent
-        from public.customers c
-        left join public.orders o on o.customer_id = c.id
-          and o.order_number not like 'DEMO-ORD-%'
-          and o.created_at >= (${start}::date::timestamp at time zone 'Asia/Manila')
-          and o.created_at < (((${end}::date) + 1)::timestamp at time zone 'Asia/Manila')
-        where c.name not like 'Demo Customer - %'
-          and coalesce(c.email, '') not like '%.demo@example.com'
-        group by c.id
-        order by orders desc, spent desc, c.name
-      `
-      dimensions = [{ key: "customerId", label: "Customer ID", attributes: [{ key: "email", label: "Email" }] }]
-      dimensionMembers = { customerId: data.map((item) => ({ id: item.customer_id, label: item.name, attributes: { email: item.email ?? "—" } })) }
-      measures = [{ key: "orderCount", label: "Orders in Period", format: "count" }, { key: "orderValuePHP", label: "Order Value (PHP)", format: "currency" }]
-      records = data.map((item) => ({ dimensions: { customerId: item.customer_id }, measures: { orderCount: item.orders, orderValuePHP: item.spent } }))
-    } else if (report === "delivery") {
-      const data = await prisma.$queryRaw<{ personnel_id: string | null; personnel: string; deliveries: number; completed: number; active: number }[]>`
-        select d.id::text as personnel_id, coalesce(d.name, 'Unassigned') as personnel, count(o.id)::int as deliveries,
-          count(*) filter (where o.status in ('delivered', 'completed'))::int as completed,
-          count(*) filter (where o.status in ('pending', 'processing', 'shipped'))::int as active
+      const data = await prisma.$queryRaw<{ customer_id: string; customer_name: string; delivery_id: string; order_number: string; order_status: string; ordered_at: string; total: string }[]>`
+        select c.id::text as customer_id, c.name as customer_name, o.id::text as delivery_id,
+          o.order_number, o.status as order_status,
+          to_char(o.created_at at time zone 'Asia/Manila', 'YYYY-MM-DD HH12:MI AM') as ordered_at,
+          o.total_amount::text as total
         from public.orders o
-        left join public.delivery_personnel d on d.id = o.delivery_personnel_id
+        join public.customers c on c.id = o.customer_id
         where o.fulfillment_method = 'delivery'
           and o.order_number not like 'DEMO-ORD-%'
           and o.created_at >= (${start}::date::timestamp at time zone 'Asia/Manila')
           and o.created_at < (((${end}::date) + 1)::timestamp at time zone 'Asia/Manila')
-        group by d.id, d.name
-        order by deliveries desc, personnel
+          and c.name not like 'Demo Customer - %'
+          and coalesce(c.email, '') not like '%.demo@example.com'
+        order by c.name, o.created_at desc, o.order_number
       `
-      dimensions = [{ key: "personnelId", label: "Delivery Personnel ID" }]
-      dimensionMembers = { personnelId: data.map((item) => ({ id: item.personnel_id ?? "unassigned", label: item.personnel })) }
-      measures = [{ key: "deliveries", label: "Deliveries", format: "count" }, { key: "completed", label: "Completed", format: "count" }, { key: "active", label: "Active", format: "count" }]
-      records = data.map((item) => ({ dimensions: { personnelId: item.personnel_id ?? "unassigned" }, measures: { deliveries: item.deliveries, completed: item.completed, active: item.active } }))
+      dimensions = [{ key: "customerDelivery", label: "Customer", attributes: [{ key: "deliveryId", label: "Delivery ID" }, { key: "orderNumber", label: "Order ID" }, { key: "orderedAt", label: "Order Date & Time" }, { key: "status", label: "Order Status" }] }]
+      dimensionMembers = { customerDelivery: data.map((item) => ({ id: `${item.customer_id}:${item.delivery_id}`, label: item.customer_name, attributes: { deliveryId: item.delivery_id, orderNumber: item.order_number, orderedAt: item.ordered_at, status: item.order_status } })) }
+      measures = [{ key: "orderValuePHP", label: "Order Total (PHP)", format: "currency" }]
+      records = data.map((item) => ({ dimensions: { customerDelivery: `${item.customer_id}:${item.delivery_id}` }, measures: { orderValuePHP: item.total } }))
+    } else if (report === "delivery") {
+      const data = await prisma.$queryRaw<{ personnel_id: string; personnel: string; delivery_id: string; order_number: string; customer_name: string; delivered_at: string }[]>`
+        select d.id::text as personnel_id, d.name as personnel, o.id::text as delivery_id,
+          o.order_number, coalesce(c.name, 'Customer unavailable') as customer_name,
+          to_char(o.delivered_at at time zone 'Asia/Manila', 'YYYY-MM-DD HH12:MI AM') as delivered_at
+        from public.orders o
+        join public.delivery_personnel d on d.id = o.delivery_personnel_id
+        left join public.customers c on c.id = o.customer_id
+        where o.fulfillment_method = 'delivery'
+          and o.delivery_status = 'delivered'
+          and o.delivered_at is not null
+          and o.order_number not like 'DEMO-ORD-%'
+          and o.delivered_at >= (${start}::date::timestamp at time zone 'Asia/Manila')
+          and o.delivered_at < (((${end}::date) + 1)::timestamp at time zone 'Asia/Manila')
+        order by d.name, o.delivered_at desc, o.order_number
+      `
+      dimensions = [{ key: "driverDelivery", label: "Driver", attributes: [{ key: "orderNumber", label: "Order ID" }, { key: "deliveredAt", label: "Delivery Date & Time" }, { key: "customer", label: "Customer" }] }]
+      dimensionMembers = { driverDelivery: data.map((item) => ({ id: `${item.personnel_id}:${item.delivery_id}`, label: item.personnel, attributes: { orderNumber: item.order_number, deliveredAt: item.delivered_at, customer: item.customer_name } })) }
+      measures = []
+      records = data.map((item) => ({ dimensions: { driverDelivery: `${item.personnel_id}:${item.delivery_id}` }, measures: {} }))
     } else {
       const data = await prisma.$queryRaw<{ method: string; status: string; transactions: number; total: string }[]>`
         select p.method, p.status, count(*)::int as transactions, coalesce(sum(p.amount), 0)::text as total
@@ -180,7 +188,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       report: { id: report, title: titles[report] },
-      period: { from: start, to: end, timeZone: "Asia/Manila", scope: report === "inventory" ? "Current stock; movements within the selected period" : "Created within the selected period" },
+      period: { from: start, to: end, timeZone: "Asia/Manila", scope: report === "inventory" ? "Current stock; movements within the selected period" : report === "delivery" ? "Completed deliveries within the selected period" : "Created within the selected period" },
       dimensions,
       dimensionMembers,
       measures,

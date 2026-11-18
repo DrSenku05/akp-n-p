@@ -235,36 +235,6 @@ function saveCsv(filename: string, headings: string[], rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
-function saveText(filename: string, content: string, mimeType: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: mimeType }))
-  const link = document.createElement("a")
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-function reportSql(data: ReportData) {
-  const fields = reportFields(data)
-  const q = (value: unknown) => `'${String(value ?? "").replaceAll("'", "''")}'`
-  const rows = data.records.map((record, index) => {
-    const dimensionValues = fields.filter((field) => "memberDimension" in field)
-      .map((field) => `(${index + 1}, ${q(field.key)}, ${q(reportCsvValue(record, field, data))})`)
-    const measureValues = data.measures.map((measure) => {
-      const value = record.measures[measure.key]
-      const raw = value === null || value === undefined ? "" : String(value)
-      const numeric = /^-?\d+(?:\.\d+)?$/.test(raw) ? raw : "NULL"
-      return `(${index + 1}, ${q(measure.key)}, ${numeric})`
-    })
-    return { dimensionValues, measureValues }
-  })
-  const inserts = (table: string, columns: string, values: string[]) => values.length ? `INSERT INTO ${table} (${columns}) VALUES\n${values.join(",\n")};\n` : ""
-  const dimensionDefs = fields.filter((field) => "memberDimension" in field).map((field) => `(${q(field.key)}, ${q(field.label)})`)
-  const measureDefs = data.measures.map((measure) => `(${q(measure.key)}, ${q(measure.label)}, ${q(measure.format)})`)
-  const metadata = `INSERT INTO akp_report_metadata (report_id, title, period_from, period_to, time_zone, scope) VALUES (${q(data.report.id)}, ${q(data.report.title)}, ${q(data.period.from)}, ${q(data.period.to)}, ${q(data.period.timeZone)}, ${q(data.period.scope)});\n`
-  return `-- AKP generated report export: normalized report metadata and fact values\n-- Run in PostgreSQL. Export tables are temporary and scoped to this database session.\nBEGIN;\nCREATE TEMP TABLE akp_report_metadata (report_id text PRIMARY KEY, title text NOT NULL, period_from date NOT NULL, period_to date NOT NULL, time_zone text NOT NULL, scope text NOT NULL) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_dimension_definitions (dimension_key text PRIMARY KEY, label text NOT NULL) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_measure_definitions (measure_key text PRIMARY KEY, label text NOT NULL, value_format text NOT NULL) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_records (record_no integer PRIMARY KEY) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_dimension_values (record_no integer NOT NULL REFERENCES akp_report_records(record_no), dimension_key text NOT NULL REFERENCES akp_report_dimension_definitions(dimension_key), value text NOT NULL, PRIMARY KEY (record_no, dimension_key)) ON COMMIT PRESERVE ROWS;\nCREATE TEMP TABLE akp_report_measure_values (record_no integer NOT NULL REFERENCES akp_report_records(record_no), measure_key text NOT NULL REFERENCES akp_report_measure_definitions(measure_key), value numeric, PRIMARY KEY (record_no, measure_key)) ON COMMIT PRESERVE ROWS;\n${metadata}${inserts("akp_report_dimension_definitions", "dimension_key, label", dimensionDefs)}${inserts("akp_report_measure_definitions", "measure_key, label, value_format", measureDefs)}${inserts("akp_report_records", "record_no", data.records.map((_, index) => `(${index + 1})`))}${inserts("akp_report_dimension_values", "record_no, dimension_key, value", rows.flatMap((row) => row.dimensionValues))}${inserts("akp_report_measure_values", "record_no, measure_key, value", rows.flatMap((row) => row.measureValues))}COMMIT;\n`
-}
-
 export default function ModulePage({ slug: rawSlug, databaseRows, databaseCategories, databaseAnnouncements, assignableOrders = [], unassignableOrders = [], databaseError = false }: { slug: string; databaseRows?: string[][]; databaseCategories?: string[]; databaseAnnouncements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; unassignableOrders?: { driverId: string; orderNumber: string; customer: string }[]; databaseError?: boolean }) {
   const router = useRouter()
   const slug = slugAliases[rawSlug] ?? rawSlug
@@ -550,7 +520,7 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     }
     setDialog({ title, kind: "form", row, rowIndex, action, values, message, module: requestModule })
   }
-  const exportRows = (format: "csv" | "pdf" | "sql" = "csv", reportData?: ReportData) => {
+  const exportRows = (format: "csv" | "pdf" = "csv", reportData?: ReportData) => {
     if (format === "pdf") {
       if (slug === "reports" && !reportData) { setNotice("Wait for this report to load before printing it."); return }
       if (slug === "reports") {
@@ -564,12 +534,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
       const fields = reportFields(reportData)
       saveCsv(`report-${reportData.report.id}-${new Date().toISOString().slice(0, 10)}.csv`, fields.map((field) => field.label), reportData.records.map((record) => fields.map((field) => reportCsvValue(record, field, reportData))))
       setNotice(`Exported ${reportData.records.length} ${reportData.report.title.toLowerCase()} rows as CSV.`)
-      return
-    }
-    if (slug === "reports" && format === "sql") {
-      if (!reportData) { setNotice("Wait for this report to load before exporting it."); return }
-      saveText(`report-${reportData.report.id}-${new Date().toISOString().slice(0, 10)}.sql`, reportSql(reportData), "application/sql;charset=utf-8")
-      setNotice(`Exported ${reportData.report.title.toLowerCase()} data as normalized SQL.`)
       return
     }
     saveCsv(`${slug}-${new Date().toISOString().slice(0, 10)}.csv`, config.columns, filteredRows.map((row) => row.slice(0, config.columns.length)))
@@ -1227,9 +1191,9 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
                   <select aria-label={`Export ${title}`} value={exportFormats[reportId] ?? ""} disabled={!data || report.loading} onChange={(event) => {
                     const format = event.target.value
                     setExportFormats((current) => ({ ...current, [reportId]: "" }))
-                    if (format === "pdf" || format === "csv" || format === "sql") exportRows(format, data)
+                    if (format === "pdf" || format === "csv") exportRows(format, data)
                   }} className="h-9 min-w-36 rounded-md border border-default-200 bg-background px-2 text-xs">
-                    <option value="">Choose format…</option><option value="pdf">Export PDF</option><option value="csv">Export CSV</option><option value="sql">Export SQL</option>
+                    <option value="">Choose format…</option><option value="pdf">Export PDF</option><option value="csv">Export CSV</option>
                   </select>
                 </label>
               </div>
