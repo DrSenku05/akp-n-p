@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { prisma } from "@/prisma/prisma"
 
 type PreviewResult = { rows: string[][]; categories?: string[]; announcements?: string[][]; assignableOrders?: { orderNumber: string; customer: string }[]; unassignableOrders?: { driverId: string; orderNumber: string; customer: string }[]; error: boolean } | null
-const databaseModules = new Set(["customers", "orders", "delivery-personnel", "returns-refunds", "feedback", "payments", "promotions", "notifications", "audit-logs", "users", "backup-restore", "reports", "settings"])
+const databaseModules = new Set(["customers", "orders", "delivery-personnel", "remittance", "returns-refunds", "feedback", "payments", "promotions", "notifications", "audit-logs", "users", "backup-restore", "reports", "settings"])
 type ProductRecord = {
   sku: string
   name: string
@@ -300,6 +300,26 @@ export async function getAdminDatabasePreview(slug: string): Promise<PreviewResu
         assignableOrders: assignableOrders.map((order) => ({ orderNumber: order.order_number, customer: order.customer ?? "Customer" })),
         unassignableOrders: unassignableOrders.map((order) => ({ driverId: order.driver_id, orderNumber: order.order_number, customer: order.customer ?? "Customer" })),
       }
+    }
+
+    if (slug === "remittance") {
+      const deliveries = await prisma.$queryRaw<{ order_number: string; driver: string | null; customer: string | null; payment_method: string | null; total: string; delivery_fee: string; delivered_at: Date | null; cod_collected_at: Date | null }[]>`
+        select o.order_number, d.name as driver, c.name as customer, o.payment_method,
+          o.total_amount::text as total, o.delivery_fee::text as delivery_fee, o.delivered_at, o.cod_collected_at
+        from public.orders o
+        left join public.delivery_personnel d on d.id = o.delivery_personnel_id
+        left join public.customers c on c.id = o.customer_id
+        where o.fulfillment_method = 'delivery'
+          and o.delivery_status = 'delivered'
+          and o.status = 'delivered'
+          and o.order_number not like 'DEMO-ORD-%'
+        order by o.delivered_at desc nulls last, o.created_at desc
+      `
+      const moneyValue = (value: string) => `₱${Number(value).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`
+      return { error: false, rows: deliveries.map((delivery) => {
+        const isCod = ["cod", "cash on delivery"].includes((delivery.payment_method ?? "").trim().toLowerCase().replaceAll("_", " "))
+        return [delivery.order_number, delivery.driver ?? "Unassigned", delivery.customer ?? "Unknown", delivery.payment_method ? paymentMethodLabel(delivery.payment_method) : "—", isCod ? delivery.cod_collected_at ? moneyValue(delivery.total) : "Not recorded" : "—", moneyValue(delivery.delivery_fee), dateTimeLabel(delivery.delivered_at), isCod && delivery.cod_collected_at ? dateTimeLabel(delivery.cod_collected_at) : "—"]
+      }) }
     }
 
     if (slug === "returns-refunds") {

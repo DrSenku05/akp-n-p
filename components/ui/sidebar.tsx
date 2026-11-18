@@ -13,6 +13,7 @@ import {
   MessageSquareText,
   Package,
   RotateCcw,
+  WalletCards,
   Settings2,
   Shapes,
   Truck,
@@ -25,6 +26,7 @@ const sections = [
   { label: "Operations", href: "/orders", icon: ClipboardList, links: [
     { label: "Orders & Payments", href: "/orders", icon: ClipboardList },
     { label: "Delivery Personnel", href: "/delivery-personnel", icon: Truck },
+    { label: "Remittance", href: "/remittance", icon: WalletCards },
     { label: "Return & Refund", href: "/returns-refunds", icon: RotateCcw },
   ] },
   { label: "Customers", href: "/customers", icon: UsersRound, links: [
