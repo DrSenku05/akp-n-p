@@ -181,6 +181,7 @@ type ReportMeasure = { key: string; label: string; format: "count" | "currency" 
 type ReportField = ReportMeasure | { key: string; label: string; memberDimension: string; memberAttribute?: string }
 type ReportRecord = { dimensions: Record<string, string>; measures: Record<string, string | number> }
 type ReportData = { report: { id: string; title: string }; period: { from: string; to: string; timeZone: string; scope: string }; dimensions: ReportDimension[]; dimensionMembers: Record<string, ReportDimensionMember[]>; measures: ReportMeasure[]; records: ReportRecord[] }
+type ReportLoad = { data?: ReportData; error?: string; loading: boolean }
 const reportFields = (data: ReportData): ReportField[] => [
   ...data.dimensions.flatMap((dimension) => [
     { key: dimension.key, label: dimension.label, memberDimension: dimension.key },
@@ -271,13 +272,9 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState("All")
   const [orderQueue, setOrderQueue] = useState("All Orders")
-  const [generatedReport, setGeneratedReport] = useState<string | null>(null)
-  const [generatedReports, setGeneratedReports] = useState<Record<string, ReportData>>({})
-  const [selectedReportId, setSelectedReportId] = useState("")
-  const [exportFormat, setExportFormat] = useState("")
-  const reportData = generatedReports[selectedReportId] ?? null
-  const [reportBusy, setReportBusy] = useState(false)
-  const [reportError, setReportError] = useState("")
+  const [reportResults, setReportResults] = useState<Record<string, ReportLoad>>({})
+  const [exportFormats, setExportFormats] = useState<Record<string, string>>({})
+  const [printReportData, setPrintReportData] = useState<ReportData | null>(null)
   const [rows, setRows] = useState<string[][]>(databaseRows ?? config.rows)
   const [promotionProducts, setPromotionProducts] = useState<{ sku: string; name: string; price: number }[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -329,6 +326,34 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
   const [backupAutomationMessage, setBackupAutomationMessage] = useState("")
   const [backupAutomationMessageIsError, setBackupAutomationMessageIsError] = useState(false)
   const isDatabasePreview = databaseRows !== undefined
+  useEffect(() => {
+    if (slug !== "reports") return
+    const controller = new AbortController()
+    const reportNames = Object.keys(reportIds)
+    if (dateRange === "Custom range" && (!customStart || !customEnd || customStart > customEnd)) {
+      setReportResults(Object.fromEntries(reportNames.map((name) => [reportIds[name], { loading: false, error: "Choose a valid custom date range to load this report." }])))
+      return () => controller.abort()
+    }
+    setReportResults(Object.fromEntries(reportNames.map((name) => [reportIds[name], { loading: true }])))
+    for (const name of reportNames) {
+      const reportId = reportIds[name]
+      const params = new URLSearchParams({ report: reportId, range: dateRange })
+      if (dateRange === "Custom range") {
+        params.set("from", customStart)
+        params.set("to", customEnd)
+      }
+      void fetch(`/api/admin/reports?${params}`, { cache: "no-store", signal: controller.signal })
+        .then(async (response) => {
+          const result = await response.json() as ReportData & { error?: string }
+          if (!response.ok) throw new Error(result.error || "Could not load this report.")
+          if (!controller.signal.aborted) setReportResults((current) => ({ ...current, [reportId]: { data: result, loading: false } }))
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) setReportResults((current) => ({ ...current, [reportId]: { loading: false, error: error instanceof Error ? error.message : "Could not load this report." } }))
+        })
+    }
+    return () => controller.abort()
+  }, [slug, dateRange, customStart, customEnd])
   useEffect(() => {
     if (slug !== "promotions" || !isDatabasePreview) return
     let active = true
@@ -525,21 +550,24 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
     }
     setDialog({ title, kind: "form", row, rowIndex, action, values, message, module: requestModule })
   }
-  const exportRows = (format: "csv" | "pdf" | "sql" = "csv") => {
+  const exportRows = (format: "csv" | "pdf" | "sql" = "csv", reportData?: ReportData) => {
     if (format === "pdf") {
-      if (slug === "reports" && !reportData) { setNotice("Generate a report before printing it."); return }
-      window.print()
+      if (slug === "reports" && !reportData) { setNotice("Wait for this report to load before printing it."); return }
+      if (slug === "reports") {
+        setPrintReportData(reportData ?? null)
+        window.setTimeout(() => window.print(), 50)
+      } else window.print()
       return
     }
     if (slug === "reports" && format === "csv") {
-      if (!reportData) { setNotice("Generate a report before exporting it."); return }
+      if (!reportData) { setNotice("Wait for this report to load before exporting it."); return }
       const fields = reportFields(reportData)
       saveCsv(`report-${reportData.report.id}-${new Date().toISOString().slice(0, 10)}.csv`, fields.map((field) => field.label), reportData.records.map((record) => fields.map((field) => reportCsvValue(record, field, reportData))))
       setNotice(`Exported ${reportData.records.length} ${reportData.report.title.toLowerCase()} rows as CSV.`)
       return
     }
     if (slug === "reports" && format === "sql") {
-      if (!reportData) { setNotice("Generate a report before exporting it."); return }
+      if (!reportData) { setNotice("Wait for this report to load before exporting it."); return }
       saveText(`report-${reportData.report.id}-${new Date().toISOString().slice(0, 10)}.sql`, reportSql(reportData), "application/sql;charset=utf-8")
       setNotice(`Exported ${reportData.report.title.toLowerCase()} data as normalized SQL.`)
       return
@@ -1119,33 +1147,6 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
   const movementProduct = dialog?.action === "Record Movement" ? rows.find((item) => item[0] === dialog.values?.Product) : undefined
   const personnelAvailabilityColumn = config.columns.indexOf("Availability")
   const availablePersonnel = rows.filter((row) => row[personnelAvailabilityColumn]?.toLowerCase() === "available")
-  const generateReport = async (name: string) => {
-    if (dateRange === "Custom range" && (!customStart || !customEnd || customStart > customEnd)) {
-      setNotice("Choose a valid custom start and end date.")
-      return
-    }
-    const params = new URLSearchParams({ report: reportIds[name], range: dateRange })
-    if (dateRange === "Custom range") {
-      params.set("from", customStart)
-      params.set("to", customEnd)
-    }
-    setGeneratedReport(name)
-    setReportError("")
-    setReportBusy(true)
-    setNotice("")
-    try {
-      const response = await fetch(`/api/admin/reports?${params}`, { cache: "no-store" })
-      const result = await response.json() as ReportData & { error?: string }
-      if (!response.ok) throw new Error(result.error || "Could not generate report.")
-      const resultKey = `${result.report.id}:${result.period.from}:${result.period.to}`
-      setGeneratedReports((current) => ({ ...current, [resultKey]: result }))
-      setSelectedReportId(resultKey)
-    } catch (error) {
-      setReportError(error instanceof Error ? error.message : "Could not generate report.")
-    } finally {
-      setReportBusy(false)
-    }
-  }
   const openManualAssign = () => {
     if (!availablePersonnel.length) {
       setNotice("There are no available delivery personnel to assign.")
@@ -1211,30 +1212,33 @@ export default function ModulePage({ slug: rawSlug, databaseRows, databaseCatego
           <label className="space-y-1 text-xs text-default-500">From<input aria-label="Custom start date" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} className="block h-9 rounded-md border border-default-200 bg-background px-2 text-xs" /></label>
           <label className="space-y-1 text-xs text-default-500">To<input aria-label="Custom end date" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} className="block h-9 rounded-md border border-default-200 bg-background px-2 text-xs" /></label>
         </div>}
-        <p className="text-[11px] text-default-400">Reports use live database records.</p>
+        <p className="text-[11px] text-default-400">Reports use live database records. All six tables load automatically.</p>
       </div>
-      <div className="report-controls grid gap-3 md:grid-cols-2">{config.rows.map((row) => <Card key={row[0]} className="rounded-md border border-default-200 shadow-none"><Card.Content className="flex items-center justify-between gap-4 p-4"><div><p className="text-sm font-semibold">{row[0]}</p><p className="mt-1 text-xs text-default-500">{row[1]}</p></div><Button size="sm" variant="outline" isDisabled={reportBusy} onPress={() => void generateReport(row[0])}>{reportBusy && generatedReport === row[0] ? "Generating…" : "Generate"}</Button></Card.Content></Card>)}</div>
-      <Card className="report-preview rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-3 p-4">
-        <div className="report-heading flex flex-wrap items-end justify-between gap-3">
-          <div><p className="text-sm font-semibold">{reportData?.report.title ?? generatedReport ?? "Report Preview"}</p><p className="mt-1 text-xs text-default-500">{reportData ? `${reportData.period.scope}: ${reportData.period.from} to ${reportData.period.to} (${reportData.period.timeZone})` : reportBusy ? "Loading live report data…" : "Generate a report to load live results."}</p>{reportError && <p role="alert" className="mt-2 text-xs text-danger">{reportError}</p>}</div>
-          <label className="space-y-1 text-xs text-default-500">Generated reports
-            <select aria-label="Generated reports" value={selectedReportId} disabled={!Object.keys(generatedReports).length || reportBusy} onChange={(event) => setSelectedReportId(event.target.value)} className="block h-9 min-w-52 rounded-md border border-default-200 bg-background px-3 text-xs">
-              {!Object.keys(generatedReports).length && <option value="">No reports generated yet</option>}
-              {Object.entries(generatedReports).map(([key, report]) => <option key={key} value={key}>{report.report.title} · {report.period.from} – {report.period.to}</option>)}
-            </select>
-          </label>
-        </div>
-        {reportBusy ? <p className="py-8 text-center text-xs text-default-500">Generating report…</p> : reportData ? reportData.records.length ? <div className="report-table-wrap max-h-[32rem] overflow-auto"><table className="report-table w-full min-w-[560px] text-left text-xs"><thead className="sticky top-0 bg-default-50 text-default-500"><tr>{reportFields(reportData).map((field) => <th key={field.key} className="whitespace-nowrap px-3 py-2 font-medium">{field.label}</th>)}</tr></thead><tbody>{reportData.records.map((record, index) => <tr key={`${reportData.report.id}-${index}`} className="border-t border-default-100">{reportFields(reportData).map((field) => <td key={field.key} className="px-3 py-2">{reportDisplayValue(record, field, reportData)}</td>)}</tr>)}</tbody></table></div> : <p className="py-8 text-center text-xs text-default-500">No database records matched this report period.</p> : null}
-      </Card.Content></Card>
-      <div className="report-controls flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-xs text-default-500"><Download size={15} />Export
-          <select aria-label="Export report" value={exportFormat} disabled={!reportData || reportBusy} onChange={(event) => { const format = event.target.value; setExportFormat(""); if (format === "pdf" || format === "csv" || format === "sql") exportRows(format) }} className="h-9 min-w-40 rounded-md border border-default-200 bg-background px-3 text-xs">
-            <option value="">Choose format…</option><option value="pdf">Export PDF</option><option value="csv">Export CSV</option><option value="sql">Export SQL</option>
-          </select>
-        </label>
-        <span className="text-xs text-default-500">PDF opens the print dialog; choose Save as PDF.</span>
+      <div className="report-controls grid gap-3 md:grid-cols-2">
+        {config.rows.map(([title, description]) => {
+          const reportId = reportIds[title]
+          const report = reportResults[reportId] ?? { loading: true }
+          const data = report.data
+          return <Card key={reportId} className="rounded-md border border-default-200 shadow-none">
+            <Card.Content className="space-y-3 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div><h2 className="text-sm font-semibold">{title}</h2><p className="mt-1 text-xs text-default-500">{description}</p><p className="mt-1 text-[11px] text-default-400">{data ? `${data.period.from} – ${data.period.to} · ${data.period.timeZone}` : report.loading ? "Loading report…" : report.error ? "Report unavailable" : "No report loaded"}</p></div>
+                <label className="flex items-center gap-2 text-xs text-default-500"><Download size={14} />Export
+                  <select aria-label={`Export ${title}`} value={exportFormats[reportId] ?? ""} disabled={!data || report.loading} onChange={(event) => {
+                    const format = event.target.value
+                    setExportFormats((current) => ({ ...current, [reportId]: "" }))
+                    if (format === "pdf" || format === "csv" || format === "sql") exportRows(format, data)
+                  }} className="h-9 min-w-36 rounded-md border border-default-200 bg-background px-2 text-xs">
+                    <option value="">Choose format…</option><option value="pdf">Export PDF</option><option value="csv">Export CSV</option><option value="sql">Export SQL</option>
+                  </select>
+                </label>
+              </div>
+              {report.loading ? <p className="rounded-md border border-dashed border-default-200 py-8 text-center text-xs text-default-500">Loading live report data…</p> : report.error ? <p role="alert" className="rounded-md border border-danger/20 bg-danger/5 p-3 text-xs text-danger">{report.error}</p> : data ? data.records.length ? <div className="report-table-wrap max-h-[28rem] overflow-auto"><table className="report-table w-full min-w-[480px] text-left text-xs"><thead className="sticky top-0 bg-default-50 text-default-500"><tr>{reportFields(data).map((field) => <th key={field.key} className="whitespace-nowrap px-3 py-2 font-medium">{field.label}</th>)}</tr></thead><tbody>{data.records.map((record, index) => <tr key={`${reportId}-${index}`} className="border-t border-default-100">{reportFields(data).map((field) => <td key={field.key} className="px-3 py-2">{reportDisplayValue(record, field, data)}</td>)}</tr>)}</tbody></table></div> : <p className="rounded-md border border-dashed border-default-200 py-8 text-center text-xs text-default-500">No database records matched this report period.</p> : null}
+            </Card.Content>
+          </Card>
+        })}
       </div>
-      <section className="report-print-sheet" aria-label="Printable report">{reportData && <><div className="report-print-brand"><span>AKP</span><span>BUSINESS REPORT</span></div><h1>{reportData.report.title}</h1><p className="report-print-period">{reportData.period.from} — {reportData.period.to} · {reportData.period.timeZone}</p><p className="report-print-scope">{reportData.period.scope}</p><table><thead><tr>{reportFields(reportData).map((field) => <th key={field.key}>{field.label}</th>)}</tr></thead><tbody>{reportData.records.map((record, index) => <tr key={`print-${index}`}>{reportFields(reportData).map((field) => <td key={field.key}>{reportDisplayValue(record, field, reportData)}</td>)}</tr>)}</tbody></table><footer>Generated {new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: reportData.period.timeZone }).format(new Date())} · {reportData.records.length} records</footer></>}</section>
+      <section className="report-print-sheet" aria-label="Printable report">{printReportData && <><div className="report-print-brand"><span>AKP</span><span>BUSINESS REPORT</span></div><h1>{printReportData.report.title}</h1><p className="report-print-period">{printReportData.period.from} — {printReportData.period.to} · {printReportData.period.timeZone}</p><p className="report-print-scope">{printReportData.period.scope}</p><table><thead><tr>{reportFields(printReportData).map((field) => <th key={field.key}>{field.label}</th>)}</tr></thead><tbody>{printReportData.records.map((record, index) => <tr key={`print-${index}`}>{reportFields(printReportData).map((field) => <td key={field.key}>{reportDisplayValue(record, field, printReportData)}</td>)}</tr>)}</tbody></table><footer>Generated {new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: printReportData.period.timeZone }).format(new Date())} · {printReportData.records.length} records</footer></>}</section>
     </>}
     {slug === "promotions" && <div className="grid gap-3 xl:grid-cols-2"><Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-3 p-4"><h2 className="text-sm font-semibold">Product Promotions</h2><DataTable compact config={{ ...config, columns: ["Promotion", "Product", "Discount", "Valid Until", "Status", "Actions"] }} rows={rows} selectable={isDatabasePreview} selectedIds={selectedIds} onToggle={toggleSelected} onToggleAll={(checked) => setSelectedIds((current) => checked ? Array.from(new Set([...current, ...rows.map((row) => row[0])])).slice(0, 100) : current.filter((id) => !rows.some((row) => row[0] === id)))} onAction={(action, row, index) => openAction(action, row, index)} /></Card.Content></Card><Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-3 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-sm font-semibold">Announcements</h2><p className="mt-1 text-xs text-default-500">Promotions still notify customers automatically.</p></div><Button size="sm" variant="primary" onPress={() => triggerTopAction("New Announcement")}><Plus size={14}/>New Announcement</Button></div><AnnouncementFolders selected={announcementFolder} onSelect={setAnnouncementFolder} /><DataTable compact config={{ ...config, columns: ["Title", "Target", "Description", "Sent", "Actions"] }} rows={roleAnnouncementRows.map((row) => [row[0], row[1], row[8], row[2], row[3], row[4], row[6], row[7], row[8]])} onAction={(action, row, index) => openAction(action, row, index, "announcements")} /></Card.Content></Card></div>}
     {slug === "notifications" && <Card className="rounded-md border border-default-200 shadow-none"><Card.Content className="space-y-4 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Admin activity</h2><p className="mt-1 text-xs text-default-500">Orders, payments, and other new system changes. Updates automatically.</p></div><Bell size={17} className="text-accent" /></div><AdminNotificationsFeed /></Card.Content></Card>}
