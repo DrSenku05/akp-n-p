@@ -93,9 +93,12 @@ export default function AuthScreen({ step }: { step: AuthStep }) {
           await supabase.auth.signOut()
           throw new Error("This account does not have active admin access.")
         }
-        const next = new URLSearchParams(window.location.search).get("next")
+        const requestedNext = new URLSearchParams(window.location.search).get("next")
+        const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") && requestedNext !== "/"
+          ? requestedNext
+          : "/dashboard"
         navigating = true
-        router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard")
+        router.replace(next)
         return
       }
       if (step === "forgot-password") {
